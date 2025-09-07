@@ -1,0 +1,314 @@
+[
+  {
+    "id": "6-E-1",
+    "grade": 6,
+    "domain": "English",
+    "stem": "Choose the synonym for 'astute'.",
+    "choices": [
+      "clever",
+      "slow",
+      "noisy",
+      "timid"
+    ],
+    "answer_index": 0
+  },
+  {
+    "id": "6-E-2",
+    "grade": 6,
+    "domain": "English",
+    "stem": "Which sentence is punctuated correctly?",
+    "choices": [
+      "Its raining today.",
+      "It's raining today.",
+      "Its' raining today.",
+      "It raining today."
+    ],
+    "answer_index": 1
+  },
+  {
+    "id": "6-M-1",
+    "grade": 6,
+    "domain": "Maths",
+    "stem": "What is 3 \u00d7 7?",
+    "choices": [
+      "18",
+      "20",
+      "21",
+      "24"
+    ],
+    "answer_index": 2
+  },
+  {
+    "id": "6-M-2",
+    "grade": 6,
+    "domain": "Maths",
+    "stem": "Solve: 5x = 35. x = ?",
+    "choices": [
+      "5",
+      "6",
+      "7",
+      "8"
+    ],
+    "answer_index": 2
+  },
+  {
+    "id": "6-R-1",
+    "grade": 6,
+    "domain": "Reasoning",
+    "stem": "Find the next number: 2, 6, 10, 14, ?",
+    "choices": [
+      "16",
+      "18",
+      "20",
+      "22"
+    ],
+    "answer_index": 0
+  },
+  {
+    "id": "6-R-2",
+    "grade": 6,
+    "domain": "Reasoning",
+    "stem": "Odd one out: square, triangle, circle, cube",
+    "choices": [
+      "square",
+      "triangle",
+      "circle",
+      "cube"
+    ],
+    "answer_index": 3
+  },
+  {
+    "id": "6-R-1",
+    "grade": 6,
+    "domain": "Readiness",
+    "stem": "You have 20 minutes for a 5-question task. How many minutes per question keeps you on time?",
+    "choices": [
+      "2",
+      "3",
+      "4",
+      "5"
+    ],
+    "answer_index": 3
+  },
+  {
+    "id": "6-R-2",
+    "grade": 6,
+    "domain": "Readiness",
+    "stem": "Best strategy when stuck on a question?",
+    "choices": [
+      "Guess and move on",
+      "Ask for the answer",
+      "Spend all your time",
+      "Take a breath, skip, return later"
+    ],
+    "answer_index": 3
+  },
+  {
+    "id": "7-E-1",
+    "grade": 7,
+    "domain": "English",
+    "stem": "Choose the synonym for 'astute'.",
+    "choices": [
+      "clever",
+      "slow",
+      "noisy",
+      "timid"
+    ],
+    "answer_index": 0
+  },
+  {
+    "id": "7-E-2",
+    "grade": 7,
+    "domain": "English",
+    "stem": "Which sentence is punctuated correctly?",
+    "choices": [
+      "Its raining today.",
+      "It's raining today.",
+      "Its' raining today.",
+      "It raining today."
+    ],
+    "answer_index": 1
+  },
+  {
+    "id": "7-M-1",
+    "grade": 7,
+    "domain": "Maths",
+    "stem": "What is 3 \u00d7 7?",
+    "choices": [
+      "18",
+      "20",
+      "21",
+      "24"
+    ],
+    "answer_index": 2
+  },
+  {
+    "id": "7-M-2",
+    "grade": 7,
+    "domain": "Maths",
+    "stem": "Solve: 5x = 35. x = ?",
+    "choices": [
+      "5",
+      "6",
+      "7",
+      "8"
+    ],
+    "answer_index": 2
+  },
+  {
+    "id": "7-R-1",
+    "grade": 7,
+    "domain": "Reasoning",
+    "stem": "Find the next number: 2, 6, 10, 14, ?",
+    "choices": [
+      "16",
+      "18",
+      "20",
+      "22"
+    ],
+    "answer_index": 0
+  },
+  {
+    "id": "7-R-2",
+    "grade": 7,
+    "domain": "Reasoning",
+    "stem": "Odd one out: square, triangle, circle, cube",
+    "choices": [
+      "square",
+      "triangle",
+      "circle",
+      "cube"
+    ],
+    "answer_index": 3
+  },
+  {
+    "id": "7-R-1",
+    "grade": 7,
+    "domain": "Readiness",
+    "stem": "You have 20 minutes for a 5-question task. How many minutes per question keeps you on time?",
+    "choices": [
+      "2",
+      "3",
+      "4",
+      "5"
+    ],
+    "answer_index": 3
+  },
+  {
+    "id": "7-R-2",
+    "grade": 7,
+    "domain": "Readiness",
+    "stem": "Best strategy when stuck on a question?",
+    "choices": [
+      "Guess and move on",
+      "Ask for the answer",
+      "Spend all your time",
+      "Take a breath, skip, return later"
+    ],
+    "answer_index": 3
+  },
+  {
+    "id": "8-E-1",
+    "grade": 8,
+    "domain": "English",
+    "stem": "Choose the synonym for 'astute'.",
+    "choices": [
+      "clever",
+      "slow",
+      "noisy",
+      "timid"
+    ],
+    "answer_index": 0
+  },
+  {
+    "id": "8-E-2",
+    "grade": 8,
+    "domain": "English",
+    "stem": "Which sentence is punctuated correctly?",
+    "choices": [
+      "Its raining today.",
+      "It's raining today.",
+      "Its' raining today.",
+      "It raining today."
+    ],
+    "answer_index": 1
+  },
+  {
+    "id": "8-M-1",
+    "grade": 8,
+    "domain": "Maths",
+    "stem": "What is 3 \u00d7 7?",
+    "choices": [
+      "18",
+      "20",
+      "21",
+      "24"
+    ],
+    "answer_index": 2
+  },
+  {
+    "id": "8-M-2",
+    "grade": 8,
+    "domain": "Maths",
+    "stem": "Solve: 5x = 35. x = ?",
+    "choices": [
+      "5",
+      "6",
+      "7",
+      "8"
+    ],
+    "answer_index": 2
+  },
+  {
+    "id": "8-R-1",
+    "grade": 8,
+    "domain": "Reasoning",
+    "stem": "Find the next number: 2, 6, 10, 14, ?",
+    "choices": [
+      "16",
+      "18",
+      "20",
+      "22"
+    ],
+    "answer_index": 0
+  },
+  {
+    "id": "8-R-2",
+    "grade": 8,
+    "domain": "Reasoning",
+    "stem": "Odd one out: square, triangle, circle, cube",
+    "choices": [
+      "square",
+      "triangle",
+      "circle",
+      "cube"
+    ],
+    "answer_index": 3
+  },
+  {
+    "id": "8-R-1",
+    "grade": 8,
+    "domain": "Readiness",
+    "stem": "You have 20 minutes for a 5-question task. How many minutes per question keeps you on time?",
+    "choices": [
+      "2",
+      "3",
+      "4",
+      "5"
+    ],
+    "answer_index": 3
+  },
+  {
+    "id": "8-R-2",
+    "grade": 8,
+    "domain": "Readiness",
+    "stem": "Best strategy when stuck on a question?",
+    "choices": [
+      "Guess and move on",
+      "Ask for the answer",
+      "Spend all your time",
+      "Take a breath, skip, return later"
+    ],
+    "answer_index": 3
+  }
+]

@@ -1,0 +1,94 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width"/>
+  <title>Evalent – Demo Runner</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Arial;margin:24px;max-width:860px}
+    .card{border:1px solid #eee;border-radius:10px;padding:16px;margin:16px 0;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+    button{padding:10px 16px;margin-top:8px}
+    .choices button{display:block;margin:6px 0}
+  </style>
+</head>
+<body>
+  <h1>Evalent – Clean Install Demo (Node 20)</h1>
+  <div class="card">
+    <h3>Start Session</h3>
+    <label>School ID (optional)</label><br/>
+    <input id="school" style="width:100%"/><br/>
+    <label>Grade (Year)</label><br/>
+    <input id="grade" type="number" min="1" max="13" value="7"/><br/>
+    <button id="start">Start</button>
+    <div id="session"></div>
+  </div>
+
+  <div class="card" id="test" style="display:none">
+    <div id="qstem" style="font-weight:600;margin-bottom:10px"></div>
+    <div class="choices" id="choices"></div>
+    <div id="progress"></div>
+  </div>
+
+  <div class="card" id="finish" style="display:none">
+    <label>Student name</label><br/><input id="name" style="width:100%"/><br/>
+    <label>Student/Parent email</label><br/><input id="email" style="width:100%"/><br/>
+    <button id="finishBtn">Finish & Decide</button>
+    <div id="result"></div>
+  </div>
+
+  <script>
+    const $ = (id)=>document.getElementById(id);
+    let sessionId = null, grade = 7, schoolId = null, currentItem = null, total = 0, index = 0;
+
+    async function nextItem(){
+      const r = await fetch(`/api/next-item?session_id=${encodeURIComponent(sessionId)}&_=${Date.now()}`);
+      const j = await r.json();
+      if(!j.ok) return alert('next-item failed: '+(j.error||'unknown'));
+      if(j.done){ $('test').style.display='none'; $('finish').style.display='block'; return; }
+      currentItem = j.item; total = j.total; index = j.index;
+      $('qstem').textContent = currentItem.stem + ` (${currentItem.domain})`;
+      $('choices').innerHTML = '';
+      currentItem.choices.forEach((c, i)=>{
+        const b = document.createElement('button');
+        b.textContent = c;
+        b.onclick = async ()=>{
+          const r = await fetch('/api/submit', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({
+            session_id: sessionId, item_id: currentItem.id, choice_index: i
+          })});
+          const j = await r.json();
+          if(!j.ok) return alert('submit failed: '+(j.error||'unknown'));
+          nextItem();
+        };
+        $('choices').appendChild(b);
+      });
+      $('progress').textContent = `Question ${index+1} of ${total}`;
+    }
+
+    $('start').onclick = async ()=>{
+      schoolId = $('school').value.trim() || null;
+      grade = Number($('grade').value);
+      const r = await fetch('/api/start-session', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ school_id: schoolId, grade }) });
+      const j = await r.json();
+      if(!j.ok) return alert('start failed: '+(j.error||'unknown'));
+      sessionId = j.session_id;
+      $('session').textContent = 'Session: '+sessionId;
+      $('test').style.display='block';
+      nextItem();
+    };
+
+    $('finishBtn').onclick = async ()=>{
+      const body = {
+        school_id: schoolId,
+        session_id: sessionId,
+        grade: grade,
+        student_name: $('name').value || null,
+        student_email: $('email').value || null
+      };
+      const r = await fetch('/api/finish', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify(body) });
+      const j = await r.json();
+      if(!j.ok) return alert('finish failed: '+(j.error||'unknown'));
+      $('result').textContent = j.decision ? `Overall: ${j.decision}` : (j.note || 'Finished.');
+    };
+  </script>
+</body>
+</html>
