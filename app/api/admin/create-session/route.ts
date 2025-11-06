@@ -1,115 +1,81 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
-import { sbAdmin } from '@/lib/supabase';
+import { getSupaSR } from '../../../../lib/supabase';
 
-export async function POST(_req: NextRequest) {
+function rndCode(len = 6) {
+  // fallback in case DB default isn't used
+  return Math.random().toString(36).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, len).padEnd(len, 'X');
+}
+
+export async function POST() {
+  const sb = getSupaSR();
+
   try {
-    const sb = sbAdmin();
+    // 1) Demo school
+    const schoolSlug = `demo-${Date.now()}`;
+    const short_code = rndCode(6); // we also send one explicitly
 
-    // 1) Pick a usable programme/grade from items
-    const { data: pgRows, error: ePG } = await sb
-      .from('items')
-      .select('programme, grade')
-      .not('programme', 'is', null)
-      .not('grade', 'is', null)
-      .neq('programme', '')
-      .neq('grade', '')
-      .limit(1);
-    if (ePG) throw ePG;
-
-    const programme = pgRows?.[0]?.programme ?? 'UK';
-    const grade = pgRows?.[0]?.grade ?? 'Y7';
-
-    // 2) Ensure demo school
-    const upSchool = await sb
+    const { data: school, error: sErr } = await sb
       .from('schools')
-      .upsert({ slug: 'demo', name: 'Demo School' }, { onConflict: 'slug' })
+      .insert({ name: 'Demo School', slug: schoolSlug, short_code })
       .select('id')
-      .maybeSingle();
-    if (upSchool.error) throw upSchool.error;
+      .single();
 
-    let schoolId = upSchool.data?.id as string | undefined;
-    if (!schoolId) {
-      const chk = await sb
-        .from('schools')
-        .select('id')
-        .eq('slug', 'demo')
-        .maybeSingle();
-      if (chk.error) throw chk.error;
-      schoolId = chk.data?.id as string | undefined;
-    }
-    if (!schoolId) throw new Error('Failed to create or find demo school');
+    if (sErr) throw sErr;
 
-    // 3) Ensure demo candidate (unique email so insert each time)
+    // 2) Demo candidate
     const email = `demo+${Date.now()}@example.com`;
-    const insCand = await sb
+    const { data: cand, error: cErr } = await sb
       .from('candidates')
-      .insert({ school_id: schoolId, name: 'Demo Candidate', email })
+      .insert({ school_id: school.id, name: 'Demo Candidate', email })
       .select('id')
-      .single(); // << IMPORTANT
-    if (insCand.error) throw insCand.error;
-    const candidateId = insCand.data.id as string;
+      .single();
 
-    // 4) Ensure blueprint
-    const bpSlug = `demo-${programme}-${grade}`.toLowerCase();
-    const upBp = await sb
+    if (cErr) throw cErr;
+
+    // 3) Demo blueprint (use the biggest bucket you currently have: UK / Y7)
+    const programme = 'UK';
+    const grade = 'Y7';
+    const bpSlug = `${programme.toLowerCase()}-${grade.toLowerCase()}-core`;
+
+    const { data: bp, error: bErr } = await sb
       .from('blueprints')
-      .upsert(
-        {
-          school_id: schoolId,
-          slug: bpSlug,
-          title: `Demo ${programme} ${grade}`,
-          programme,
-          grade,
-        },
-        { onConflict: 'slug' }
-      )
-      .select('id')
-      .maybeSingle();
-    if (upBp.error) throw upBp.error;
-
-    let blueprintId = upBp.data?.id as string | undefined;
-    if (!blueprintId) {
-      const chk = await sb
-        .from('blueprints')
-        .select('id')
-        .eq('slug', bpSlug)
-        .maybeSingle();
-      if (chk.error) throw chk.error;
-      blueprintId = chk.data?.id as string | undefined;
-    }
-    if (!blueprintId) throw new Error('Failed to create or find demo blueprint');
-
-    // 5) Create session
-    const token = randomUUID().replace(/-/g, '');
-    const insSess = await sb
-      .from('sessions')
       .insert({
-        school_id: schoolId,
-        candidate_id: candidateId,
-        blueprint_id: blueprintId,
-        token,
-        item_index: 0,
+        school_id: school.id,
+        slug: bpSlug,
+        programme,
+        grade,
+        label: `${programme} ${grade} (Core)`
       })
       .select('id')
-      .single(); // << IMPORTANT
-    if (insSess.error) throw insSess.error;
+      .single();
+
+    if (bErr) throw bErr;
+
+    // 4) Session
+    const token = randomUUID().replace(/-/g, '');
+    const { data: sess, error: seErr } = await sb
+      .from('sessions')
+      .insert({
+        school_id: school.id,
+        candidate_id: cand.id,
+        blueprint_id: bp.id,
+        token,
+        item_index: 0,
+        status: 'active'
+      })
+      .select('id, token')
+      .single();
+
+    if (seErr) throw seErr;
 
     return NextResponse.json({
       ok: true,
-      session_id: insSess.data.id,
-      token,
-      take_url: `/take/${token}`,
+      session_id: sess.id,
+      token: sess.token,
+      take_url: `/take/${sess.token}`
     });
   } catch (err: any) {
-    return NextResponse.json(
-      { ok: false, error: String(err?.message || err) },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: err?.message ?? String(err) });
   }
-}
-
-// Allow GET to convenience-trigger the same logic
-export async function GET(req: NextRequest) {
-  return POST(req);
 }
