@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
+// SUPABASE (server) — sbAdmin is a client, not a function
 import { sbAdmin } from '@/lib/supabase';
+const sb = sbAdmin;
+
 
 /** Read token, item_id, payload from either GET query or POST body */
 async function readInput(req: NextRequest) {
