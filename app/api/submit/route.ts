@@ -20,7 +20,7 @@ export async function GET(req: Request) {
   if (!session) return NextResponse.json({ ok:false, error:'session not found' }, { status:404 });
 
   const { data: item } = await supa.from('items').select('*').eq('item_id', item_id!).single();
-  const isMcq = (item?.type || 'mcq') === 'mcq';
+  const isMcq = (item?.type || 'mcq').toLowerCase() === 'mcq';
   const correct = isMcq ? (payload.choice === item.answer) : null;
   const score = isMcq ? (correct ? 1 : 0) : null;
 
