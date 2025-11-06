@@ -1,6 +1,7 @@
-import { NextResponse } from 'next/server';
-import { randomUUID } from 'crypto';
-import { getSupaSR } from '@/lib/supabase';
+// SUPABASE (server) — sbAdmin is a client, not a function
+import { sbAdmin } from '@/lib/supabase';
+const sb = sbAdmin;
+
 
 export async function POST(_req: Request) {
   const sb = getSupaSR();
