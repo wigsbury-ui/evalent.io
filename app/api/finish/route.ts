@@ -33,3 +33,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: e?.message || String(e) }, { status: 500 });
   }
 }
+await sb.from('sessions')
+  .update({ status: 'finished' })
+  .eq('id', sessionId);
