@@ -1,5 +1,7 @@
-import { NextResponse } from 'next/server';
+// SUPABASE (server) — sbAdmin is a client, not a function
 import { sbAdmin } from '@/lib/supabase';
+const sb = sbAdmin;
+
 
 export async function GET() {
   try {
