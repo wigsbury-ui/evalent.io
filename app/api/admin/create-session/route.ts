@@ -2,12 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { sbAdmin } from '@/lib/supabase';
 
-async function ensureRowId<T extends Record<string, any>>(
-  promise: Promise<{ data: T | null; error: any }>
-): Promise<string> {
-  const { data, error } = await promise;
+// Minimal, promise-based helper (avoid strict typings friction)
+async function ensureRowId(p: Promise<any>): Promise<string> {
+  const { data, error } = await p;
   if (error) throw error;
-  const id = (data as any)?.id as string | undefined;
+  const id = data?.id as string | undefined;
   if (!id) throw new Error('Row upsert/insert returned null id');
   return id;
 }
@@ -16,7 +15,7 @@ export async function POST(_req: NextRequest) {
   try {
     const sb = sbAdmin();
 
-    // 1) Pick a usable (programme, grade) from items
+    // 1) pick a usable programme/grade
     const { data: pgRows, error: ePG } = await sb
       .from('items')
       .select('programme, grade')
@@ -30,8 +29,7 @@ export async function POST(_req: NextRequest) {
     const programme = pgRows?.[0]?.programme || 'UK';
     const grade = pgRows?.[0]?.grade || 'Y7';
 
-    // 2) Ensure demo school
-    // Try upsert; if it doesn’t return a row, do a follow-up select.
+    // 2) ensure demo school
     const schoolId = await (async () => {
       const { data, error } = await sb
         .from('schools')
@@ -51,17 +49,17 @@ export async function POST(_req: NextRequest) {
       return chk.id;
     })();
 
-    // 3) Ensure demo candidate (unique-ish email so we can insert freely)
+    // 3) ensure demo candidate (unique email so we always insert)
     const email = `demo+${Date.now()}@example.com`;
     const candidateId = await ensureRowId(
       sb
         .from('candidates')
         .insert({ school_id: schoolId, name: 'Demo Candidate', email })
         .select('id')
-        .single()
+        .single() // <- important: make it a Promise
     );
 
-    // 4) Ensure blueprint for the chosen programme/grade
+    // 4) ensure blueprint for that programme/grade
     const bpSlug = `demo-${programme}-${grade}`.toLowerCase();
     const blueprintId = await (async () => {
       const { data, error } = await sb
@@ -91,7 +89,7 @@ export async function POST(_req: NextRequest) {
       return chk.id;
     })();
 
-    // 5) Create session
+    // 5) create session
     const token = randomUUID().replace(/-/g, '');
     const sessionId = await ensureRowId(
       sb
@@ -122,6 +120,5 @@ export async function POST(_req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  // convenience for clicking the button
   return POST(req);
 }
