@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
-import { getSupaSR } from '@/lib/supabase/server';
+import { getSupaSR } from '@/lib/supabase';
 
 export async function POST(_req: Request) {
   const sb = getSupaSR();
