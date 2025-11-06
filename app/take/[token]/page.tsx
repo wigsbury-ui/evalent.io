@@ -2,19 +2,46 @@
 
 import { useEffect, useMemo, useState } from 'react';
 
-/** Grab first non-empty from a list of possible keys */
+/* ---------- helpers ---------- */
+
 function firstNonEmpty(obj: any, keys: string[]): string | null {
   for (const k of keys) {
-    const v = obj?.[k];
-    if (v !== undefined && v !== null) {
-      const s = String(v).trim();
-      if (s.length) return s;
+    if (k in obj && obj[k] != null) {
+      const s = String(obj[k]).trim();
+      if (s) return s;
     }
   }
   return null;
 }
 
-/** Try to coerce the question text from many possible columns */
+function normKey(k: string) {
+  return k.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function findByNormalizedKey(obj: any, candidates: string[]): string | null {
+  const wanted = new Set(candidates.map(normKey));
+  for (const k of Object.keys(obj || {})) {
+    const nk = normKey(k);
+    if (wanted.has(nk)) {
+      const val = obj[k];
+      if (val !== undefined && val !== null && String(val).trim() !== '') {
+        return String(val);
+      }
+    }
+  }
+  return null;
+}
+
+function splitJoined(s: string): string[] {
+  // prefer newline | pipe
+  let parts = s.split(/\r?\n|\|/).map(t => t.trim()).filter(Boolean);
+  if (parts.length > 1) return parts;
+  // try comma
+  parts = s.split(',').map(t => t.trim()).filter(Boolean);
+  if (parts.length > 1) return parts;
+  return [];
+}
+
 function coerceStem(item: any): { text: string; isHtml: boolean } {
   const text =
     firstNonEmpty(item, [
@@ -31,87 +58,82 @@ function coerceStem(item: any): { text: string; isHtml: boolean } {
   return { text, isHtml };
 }
 
-/** Split a joined string into options */
-function splitJoined(s: string): string[] {
-  const lines = s
-    .split(/\r?\n|[|]/) // try newline or pipe first
-    .map(x => x.trim())
-    .filter(Boolean);
-  if (lines.length > 1) return lines;
-  const commas = s
-    .split(',')
-    .map(x => x.trim())
-    .filter(Boolean);
-  return commas.length > 1 ? commas : [];
-}
-
-/** Build an options array from many possible shapes */
+/** Build options from many possible shapes. Returns [] if none. */
 function coerceOptions(item: any): string[] {
-  // 1) options already array
-  if (Array.isArray(item?.options)) {
-    return item.options.map((x: any) => String(x));
-  }
-  // 2) options as JSON string
+  // 1) direct array
+  if (Array.isArray(item?.options)) return item.options.map((x: any) => String(x));
+
+  // 2) options as JSON or joined string
   if (typeof item?.options === 'string') {
     try {
       const parsed = JSON.parse(item.options);
-      if (Array.isArray(parsed)) return parsed.map(x => String(x));
+      if (Array.isArray(parsed)) return parsed.map((x: any) => String(x));
     } catch {}
-    const s = String(item.options).trim();
-    if (s) {
-      const split = splitJoined(s);
-      if (split.length) return split;
-    }
+    const split = splitJoined(item.options);
+    if (split.length) return split;
   }
+
   // 3) options_joined
   if (typeof item?.options_joined === 'string') {
     const split = splitJoined(item.options_joined);
     if (split.length) return split;
   }
 
-  // 4) common column patterns A/B/C/D/E or option_a..e or choice1..6 / opt1..6
-  const letterSets = [
-    ['A','B','C','D','E','F'],
-    ['a','b','c','d','e','f']
-  ];
-  for (const set of letterSets) {
-    const cols = set
+  // 4) columns A..F or option_a..option_f
+  const collectAlpha = (letters: string[]) =>
+    letters
       .map(L => item?.[L] ?? item?.[`option_${L.toLowerCase()}`])
-      .filter((v: any) => v !== undefined && v !== null && String(v).trim() !== '')
-      .map((v: any) => String(v).trim());
-    if (cols.length >= 2) return cols;
-  }
-  const numbered = ['choice1','choice2','choice3','choice4','choice5','choice6']
-    .map(k => item?.[k])
-    .filter((v: any) => v !== undefined && v !== null && String(v).trim() !== '')
-    .map((v: any) => String(v).trim());
-  if (numbered.length >= 2) return numbered;
+      .map((v: any) => (v == null ? '' : String(v).trim()))
+      .filter(Boolean);
+
+  const AB = collectAlpha(['A', 'B', 'C', 'D', 'E', 'F']);
+  if (AB.length >= 2) return AB;
+
+  // 5) numbered patterns choice1..6 or opt1..6
+  const numbered1 = ['choice1','choice2','choice3','choice4','choice5','choice6']
+    .map(k => (item?.[k] == null ? '' : String(item[k]).trim()))
+    .filter(Boolean);
+  if (numbered1.length >= 2) return numbered1;
+
   const numbered2 = ['opt1','opt2','opt3','opt4','opt5','opt6']
-    .map(k => item?.[k])
-    .filter((v: any) => v !== undefined && v !== null && String(v).trim() !== '')
-    .map((v: any) => String(v).trim());
+    .map(k => (item?.[k] == null ? '' : String(item[k]).trim()))
+    .filter(Boolean);
   if (numbered2.length >= 2) return numbered2;
 
-  // 5) As a last resort, if we only have letters (correct_answer + distractors),
-  //    show letter-only choices so you can still progress.
-  const ans = firstNonEmpty(item, ['answer','correct','correct_answer']);
-  const dist = firstNonEmpty(item, ['distractors','distractor']);
-  if (ans) {
-    const letters = new Set<string>([String(ans).trim().toUpperCase()]);
-    if (dist) {
-      String(dist)
-        .split(/[,\s]+/)
-        .map(x => x.trim().toUpperCase())
-        .filter(Boolean)
-        .forEach(x => letters.add(x));
-    }
-    const arr = Array.from(letters);
-    if (arr.length >= 2) return arr; // e.g., ["A","B","C","D"]
+  // 6) letter-only via Correct Answer + Distractors (handles many header spellings)
+  const ansRaw =
+    firstNonEmpty(item, ['answer', 'correct', 'correct_answer', 'answer_key']) ??
+    findByNormalizedKey(item, ['correctanswer', 'answerkey', 'correct', 'answer']);
+
+  const distRaw =
+    firstNonEmpty(item, ['distractors', 'distractor', 'incorrect_answers']) ??
+    findByNormalizedKey(item, ['distractors', 'distractor', 'incorrectanswers', 'wronganswers']);
+
+  const letters = new Set<string>();
+  if (ansRaw) {
+    String(ansRaw)
+      .split(/[,\s]+/)
+      .map(x => x.trim().toUpperCase())
+      .filter(Boolean)
+      .forEach(x => letters.add(x));
+  }
+  if (distRaw) {
+    String(distRaw)
+      .split(/[,\s]+/)
+      .map(x => x.trim().toUpperCase())
+      .filter(Boolean)
+      .forEach(x => letters.add(x));
+  }
+  if (letters.size >= 2) {
+    // Return the letters as labels (A., B., C., ...)
+    return Array.from(letters).sort().slice(0, 6);
   }
 
-  // no options
-  return [];
+  // 7) give a generic A-D set so the user can proceed (last resort)
+  return ['A', 'B', 'C', 'D'];
 }
+
+/* ---------- page ---------- */
 
 export default function TakePage({ params }: { params: { token: string } }) {
   const token = params.token;
@@ -126,11 +148,9 @@ export default function TakePage({ params }: { params: { token: string } }) {
 
   const { text: stemText, isHtml } = useMemo(() => coerceStem(item || {}), [item]);
   const options = useMemo(() => coerceOptions(item || {}), [item]);
-  const isMcq = useMemo(() => {
-    const t = String(item?.type || '').toLowerCase();
-    if (t) return t === 'mcq' || t === 'multiple_choice' || t === 'multiplechoice';
-    return options.length > 0; // infer
-  }, [item, options]);
+
+  // We treat as MCQ if we have at least 2 options
+  const isMcq = options.length >= 2;
 
   async function fetchNext() {
     setLoading(true);
@@ -155,10 +175,10 @@ export default function TakePage({ params }: { params: { token: string } }) {
 
   async function submit() {
     if (!item) return;
-    const payload = isMcq ? { choice } : { text: choice };
+    const payload = isMcq ? { choice } : { text: choice || '[blank]' };
     const qs = new URLSearchParams({
       token,
-      item_id: String(item.item_id ?? ''),
+      item_id: String(item.item_id ?? item.id ?? ''),
       payload: JSON.stringify(payload)
     }).toString();
     const res = await fetch(`/api/submit?${qs}`, { cache: 'no-store' });
@@ -183,6 +203,8 @@ export default function TakePage({ params }: { params: { token: string } }) {
   }
 
   useEffect(() => { fetchNext(); /* eslint-disable-next-line */ }, []);
+
+  /* ---------- render ---------- */
 
   if (loading && !finished) return <main className="p-6"><h1>Loading…</h1></main>;
   if (finished) {
@@ -213,8 +235,8 @@ export default function TakePage({ params }: { params: { token: string } }) {
 
       {isMcq ? (
         <div className="space-y-2 mb-6">
-          {options.length > 0 ? options.map((opt, i) => {
-            const label = String.fromCharCode(65 + i); // A, B, C...
+          {options.map((opt, i) => {
+            const label = ['A','B','C','D','E','F'][i] ?? String.fromCharCode(65 + i);
             return (
               <label key={i} className="block">
                 <input
@@ -228,18 +250,18 @@ export default function TakePage({ params }: { params: { token: string } }) {
                 <span><b>{label}.</b> {opt}</span>
               </label>
             );
-          }) : (
-            <p className="text-sm text-red-600">No options found for this item.</p>
-          )}
+          })}
         </div>
       ) : (
-        <textarea
-          className="w-full border rounded p-2 mb-6"
-          rows={4}
-          value={choice}
-          onChange={(e) => setChoice(e.target.value)}
-          placeholder="Type your answer here…"
-        />
+        <div className="mb-6">
+          <p className="text-sm text-gray-500 mb-2">No options detected — type your answer (you can type A/B/C/D as needed).</p>
+          <input
+            className="w-full border rounded p-2"
+            value={choice}
+            onChange={(e) => setChoice(e.target.value)}
+            placeholder="Type A, B, C, or a short answer…"
+          />
+        </div>
       )}
 
       <button
