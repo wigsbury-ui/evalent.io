@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 import { NextResponse } from 'next/server';
-import { supaSR } from '@/lib/supabase';
+import { supaSR } from '../../../lib/supabase';
 
 async function fetchCsv(url: string) {
   const res = await fetch(url, { cache: 'no-store' });
