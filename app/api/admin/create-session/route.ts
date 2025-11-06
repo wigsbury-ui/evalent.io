@@ -70,3 +70,15 @@ export async function POST(_req: Request) {
     return NextResponse.json({ ok: false, error: String(e?.message ?? e) }, { status: 500 });
   }
 }
+// when inserting the session:
+const { data: sess } = await sb
+  .from('sessions')
+  .insert({
+    token,
+    school_id: school.id,
+    candidate_id: candidateId,
+    blueprint_id: bp.id,
+    status: 'pending'   // <-- important
+  })
+  .select('id, token')
+  .single();
