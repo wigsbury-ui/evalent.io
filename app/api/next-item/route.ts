@@ -11,7 +11,7 @@ export async function GET(req: Request) {
     const token = searchParams.get('token');
     const session_id = searchParams.get('session_id');
 
-    // load session
+    // 1) Load session
     let session: any = null;
     if (token) {
       const s = await supa.from('sessions').select('*').eq('token', token).single();
@@ -22,40 +22,29 @@ export async function GET(req: Request) {
     }
     if (!session) return NextResponse.json({ ok:false, error:'session not found' }, { status:404 });
 
-    // load blueprint
-    const bpRes = await supa.from('blueprints').select('*').eq('id', session.blueprint_id).single();
-    const programme = bpRes.data?.programme;
-    const grade = bpRes.data?.grade;
-
     const idx = session.item_index ?? 0;
 
-    // Fetch item pool with graceful fallbacks
-    let poolRes = await supa
+    // 2) Build a universal pool (no filters, deterministic order)
+    const poolRes = await supa
       .from('items')
       .select('*')
-      .eq('programme', programme)
-      .eq('grade', grade)
+      .order('programme', { ascending: true })
+      .order('grade', { ascending: true })
       .order('item_id', { ascending: true });
 
-    if (!poolRes.data || poolRes.data.length === 0) {
-      poolRes = await supa
-        .from('items')
-        .select('*')
-        .eq('programme', programme)
-        .order('item_id', { ascending: true });
-    }
-    if (!poolRes.data || poolRes.data.length === 0) {
-      poolRes = await supa
-        .from('items')
-        .select('*')
-        .order('programme', { ascending: true })
-        .order('grade', { ascending: true })
-        .order('item_id', { ascending: true });
+    if (poolRes.error) {
+      return NextResponse.json({ ok:false, error: poolRes.error.message }, { status:500 });
     }
 
     const pool = poolRes.data || [];
     const total = pool.length;
+
+    if (total === 0) {
+      return NextResponse.json({ ok:false, error:'No items in database', total: 0 }, { status:400 });
+    }
+
     if (idx >= total) {
+      // nothing left → signal finish
       return NextResponse.json({ ok:true, item: null, index: idx, total });
     }
 
