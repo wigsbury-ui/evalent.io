@@ -11,7 +11,6 @@ export async function GET(req: Request) {
     const token = searchParams.get('token');
     const session_id = searchParams.get('session_id');
 
-    // 1) Load session
     let session: any = null;
     if (token) {
       const s = await supa.from('sessions').select('*').eq('token', token).single();
@@ -20,11 +19,10 @@ export async function GET(req: Request) {
       const s = await supa.from('sessions').select('*').eq('id', session_id).single();
       session = s.data;
     }
-    if (!session) return NextResponse.json({ ok:false, error:'session not found' }, { status:404 });
+    if (!session) return NextResponse.json({ ok: false, error: 'session not found' }, { status: 404 });
 
     const idx = session.item_index ?? 0;
 
-    // 2) Build a universal pool (no filters, deterministic order)
     const poolRes = await supa
       .from('items')
       .select('*')
@@ -33,24 +31,20 @@ export async function GET(req: Request) {
       .order('item_id', { ascending: true });
 
     if (poolRes.error) {
-      return NextResponse.json({ ok:false, error: poolRes.error.message }, { status:500 });
+      return NextResponse.json({ ok: false, error: poolRes.error.message }, { status: 500 });
     }
-
     const pool = poolRes.data || [];
     const total = pool.length;
 
     if (total === 0) {
-      return NextResponse.json({ ok:false, error:'No items in database', total: 0 }, { status:400 });
+      return NextResponse.json({ ok: false, error: 'No items in database', total: 0 }, { status: 400 });
     }
-
     if (idx >= total) {
-      // nothing left → signal finish
-      return NextResponse.json({ ok:true, item: null, index: idx, total });
+      return NextResponse.json({ ok: true, item: null, index: idx, total });
     }
 
-    const item = pool[idx];
-    return NextResponse.json({ ok:true, item, index: idx, total });
-  } catch (e:any) {
-    return NextResponse.json({ ok:false, error: e.message || String(e) }, { status:500 });
+    return NextResponse.json({ ok: true, item: pool[idx], index: idx, total });
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e.message || String(e) }, { status: 500 });
   }
 }
