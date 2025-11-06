@@ -1,44 +1,24 @@
 // lib/supabase.ts
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const SR_KEY       = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const ANON_KEY     = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-function assertEnv() {
-  if (!SUPABASE_URL) throw new Error('Missing env: NEXT_PUBLIC_SUPABASE_URL');
-}
-
-/** Internal singleton holders (server only) */
-let _sr: SupabaseClient | undefined;
-let _anon: SupabaseClient | undefined;
-
-/** Server-side Supabase client using the SERVICE-ROLE key */
-export function getSupaSR(): SupabaseClient {
-  assertEnv();
-  if (!SR_KEY) throw new Error('Missing env: SUPABASE_SERVICE_ROLE_KEY');
-  if (!_sr) {
-    _sr = createClient(SUPABASE_URL, SR_KEY, {
-      auth: { persistSession: false, autoRefreshToken: false },
-      global: { headers: { 'X-Client-Info': 'evalent-api' } },
-    });
+function pickEnv(...names: string[]): string | undefined {
+  for (const n of names) {
+    const v = process.env[n];
+    if (v && v.trim()) return v.trim();
   }
-  return _sr;
 }
 
-/** Public/anon client (rarely needed in API routes, included for completeness) */
-export function getSupaAnon(): SupabaseClient {
-  assertEnv();
-  if (!ANON_KEY) throw new Error('Missing env: NEXT_PUBLIC_SUPABASE_ANON_KEY');
-  if (!_anon) {
-    _anon = createClient(SUPABASE_URL, ANON_KEY, {
-      auth: { persistSession: false, autoRefreshToken: false },
-      global: { headers: { 'X-Client-Info': 'evalent-web' } },
-    });
+function makeClient(): SupabaseClient {
+  const url = pickEnv('SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL') || '';
+  const key = pickEnv('SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_ANON_KEY', 'NEXT_PUBLIC_SUPABASE_ANON_KEY') || '';
+  if (!url || !key) {
+    return createClient('https://example.supabase.co', 'invalid', {
+      // @ts-expect-error stub fetch to surface a clear error at runtime, not build time
+      global: { fetch: async () => { throw new Error('Supabase env missing (URL/key). Set them in Vercel.'); } },
+      auth: { persistSession: false },
+    } as any);
   }
-  return _anon;
+  return createClient(url, key, { auth: { persistSession: false } });
 }
 
-/** Back-compat named exports used by existing route files */
-export const sbAdmin: SupabaseClient = getSupaSR();
-export const sbAnon: SupabaseClient  = getSupaAnon();
+export const sbAdmin: SupabaseClient = makeClient();
