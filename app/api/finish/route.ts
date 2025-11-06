@@ -1,31 +1,18 @@
-export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
+import { NextRequest, NextResponse } from 'next/server';
+import { sbAdmin } from '@/lib/supabase';
 
-import { NextResponse } from 'next/server';
-import { getSupaSR } from '../../../lib/supabase';
+export async function POST(req: NextRequest) {
+  try {
+    const { token } = await req.json();
+    if (!token) return NextResponse.json({ ok: false, error: 'missing token' }, { status: 400 });
 
-export async function POST(req: Request) {
-  const supa = getSupaSR();
-  const { token, session_id } = await req.json();
+    const sb = sbAdmin();
+    const { data: sess, error } = await sb.from('sessions').select('id').eq('token', token).single();
+    if (error || !sess) return NextResponse.json({ ok: false, error: 'session not found' }, { status: 404 });
 
-  const s = token
-    ? await supa.from('sessions').select('*').eq('token', token).single()
-    : await supa.from('sessions').select('*').eq('id', session_id).single();
-  const session = s.data;
-  if (!session) return NextResponse.json({ ok:false, error:'session not found' }, { status:404 });
-
-  const { data: attempts } = await supa.from('attempts').select('score,response,item_id').eq('session_id', session.id);
-  const scored = (attempts || []).filter(a => a.score !== null);
-  const mcqScore = scored.reduce((s,a)=> s+(a.score || 0), 0);
-  const mcqCount = scored.length;
-
-  const summary = { mcq: { score: mcqScore, outOf: mcqCount }, strengths: [], needs: [] };
-  const recommendation = mcqCount ? ((mcqScore / mcqCount) >= 0.6 ? 'admit' : 'review') : 'review';
-
-  const { data: rep } = await supa
-    .from('reports').insert({ session_id: session.id, summary, recommendation }).select('id').single();
-
-  await supa.from('sessions').update({ status:'finished', finished_at: new Date().toISOString() }).eq('id', session.id);
-
-  return NextResponse.json({ ok:true, report_id: rep?.id, recommendation, summary });
+    // placeholder result
+    return NextResponse.json({ ok: true, recommendation: 'Proceed' });
+  } catch (err: any) {
+    return NextResponse.json({ ok: false, error: String(err?.message || err) }, { status: 500 });
+  }
 }
