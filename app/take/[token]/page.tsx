@@ -217,4 +217,18 @@ export default function TakePage({ params }: { params: { token: string } }) {
             className="w-full border rounded p-2"
             value={choice}
             onChange={(e) => setChoice(e.target.value)}
-            placehold
+            placeholder="Type A, B, C, or a short answer…"
+          />
+        </div>
+      )}
+
+      <button
+        onClick={submit}
+        disabled={!choice}
+        className="px-4 py-2 rounded bg-black text-white disabled:opacity-50"
+      >
+        Submit
+      </button>
+    </main>
+  );
+}
