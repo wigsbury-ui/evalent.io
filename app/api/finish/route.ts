@@ -2,8 +2,7 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 import { NextResponse } from 'next/server';
-import { supaSR } from '@/lib/supabase';
-
+import { supaSR } from '../../../lib/supabase';
 export async function POST(req: Request) {
   const { token, session_id } = await req.json();
 
