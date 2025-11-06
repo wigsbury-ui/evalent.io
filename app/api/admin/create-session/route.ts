@@ -5,77 +5,105 @@ import { NextResponse } from 'next/server';
 import { getSupaSR } from '../../../../lib/supabase';
 import { randomUUID } from 'crypto';
 
+type CreateBody = {
+  school_name?: string;
+  school_code?: string;
+  candidate?: {
+    first_name?: string;
+    last_name?: string;
+    email?: string;
+    grade_applied?: string;
+  };
+  programme?: string;
+  grade?: string;
+};
+
 export async function POST(req: Request) {
   try {
     const supa = getSupaSR();
-    const body = await req.json().catch(() => ({}));
+    const body = (await req.json().catch(() => ({}))) as CreateBody;
 
-    let {
-      school_name = 'Demo School',
-      school_code = 'DEMO',
-      candidate = {
-        first_name: 'Test',
-        last_name: 'Candidate',
-        email: 'test@example.com',
-        grade_applied: 'Y7'
-      },
-      programme = 'UK',
-      grade = 'Y7'
-    } = body || {};
+    const school_name = (body.school_name ?? 'Demo School').trim();
+    const school_code = (body.school_code ?? 'DEMO').trim();
+    const candidate = {
+      first_name: body.candidate?.first_name ?? 'Test',
+      last_name: body.candidate?.last_name ?? 'Candidate',
+      email: body.candidate?.email ?? 'test@example.com',
+      grade_applied: body.candidate?.grade_applied ?? 'Y7'
+    };
 
-    // --------- ensure we target an existing (programme, grade) ----------
-    const hasPair = await supa
-      .from('items')
-      .select('programme, grade')
-      .eq('programme', programme)
-      .eq('grade', grade)
-      .limit(1);
+    // ---- Try to honor requested programme/grade, else pick a NON-NULL pair from items
+    let programme = (body.programme ?? '').trim();
+    let grade = (body.grade ?? '').trim();
 
-    if (!hasPair.data || hasPair.data.length === 0) {
-      // take the first available pair from items
-      const anyPair = await supa.from('items').select('programme, grade').limit(1).single();
-      if (!anyPair.data) {
+    // If requested pair is missing, query a valid pair from items
+    async function pickValidPair() {
+      const q = await supa
+        .from('items')
+        .select('programme, grade')
+        .not('programme', 'is', null)
+        .not('grade', 'is', null)
+        .neq('programme', '')
+        .neq('grade', '')
+        .limit(1)
+        .single();
+      return q.data as { programme: string; grade: string } | null;
+    }
+
+    if (programme && grade) {
+      const chk = await supa
+        .from('items')
+        .select('programme, grade')
+        .eq('programme', programme)
+        .eq('grade', grade)
+        .limit(1);
+      if (!chk.data || chk.data.length === 0) {
+        const any = await pickValidPair();
+        if (!any) {
+          return NextResponse.json(
+            { ok: false, error: 'No usable (programme, grade) found in items. Run /api/sheet-sync and ensure columns "programme" and "grade" are populated.' },
+            { status: 400 }
+          );
+        }
+        programme = any.programme;
+        grade = any.grade;
+      }
+    } else {
+      const any = await pickValidPair();
+      if (!any) {
         return NextResponse.json(
-          { ok: false, error: 'No items in database. Run /api/sheet-sync first.' },
+          { ok: false, error: 'No usable (programme, grade) found in items. Run /api/sheet-sync and ensure columns "programme" and "grade" are populated.' },
           { status: 400 }
         );
       }
-      programme = anyPair.data.programme;
-      grade = anyPair.data.grade;
+      programme = any.programme;
+      grade = any.grade;
     }
 
-    // --------- school (UPSERT by short_code) ----------
+    // ---- Upsert school by short_code
     const schoolUp = await supa
       .from('schools')
       .upsert({ name: school_name, short_code: school_code }, { onConflict: 'short_code' })
       .select('*')
       .eq('short_code', school_code)
       .single();
-
     if (schoolUp.error || !schoolUp.data) {
-      return NextResponse.json(
-        { ok: false, error: schoolUp.error?.message || 'Failed to upsert school' },
-        { status: 500 }
-      );
+      return NextResponse.json({ ok: false, error: schoolUp.error?.message || 'Failed to upsert school' }, { status: 500 });
     }
     const school = schoolUp.data;
 
-    // --------- candidate ----------
+    // ---- Create candidate
     const candRes = await supa
       .from('candidates')
       .insert({ school_id: school.id, ...candidate })
       .select('*')
       .single();
-
     if (candRes.error || !candRes.data) {
-      return NextResponse.json(
-        { ok: false, error: candRes.error?.message || 'Failed to create candidate' },
-        { status: 500 }
-      );
+      return NextResponse.json({ ok: false, error: candRes.error?.message || 'Failed to create candidate' }, { status: 500 });
     }
     const cand = candRes.data;
 
-    // --------- blueprint (select or create; ties to school/programme/grade) ----------
+    // ---- Blueprint (select or create)
     const defaultConfig = {
       counts: { English: 2, Maths: 2, Reasoning: 2, Readiness: 2 },
       order: ['English', 'Maths', 'Reasoning', 'Readiness'],
@@ -107,17 +135,13 @@ export async function POST(req: Request) {
         })
         .select('*')
         .single();
-
       if (bpIns.error || !bpIns.data) {
-        return NextResponse.json(
-          { ok: false, error: bpIns.error?.message || 'Failed to create blueprint' },
-          { status: 500 }
-        );
+        return NextResponse.json({ ok: false, error: bpIns.error?.message || 'Failed to create blueprint' }, { status: 500 });
       }
       bp = bpIns;
     }
 
-    // --------- session ----------
+    // ---- Session
     const token = randomUUID().replace(/-/g, '');
     const sessRes = await supa
       .from('sessions')
@@ -130,12 +154,8 @@ export async function POST(req: Request) {
       })
       .select('id, token')
       .single();
-
     if (sessRes.error || !sessRes.data) {
-      return NextResponse.json(
-        { ok: false, error: sessRes.error?.message || 'Failed to create session' },
-        { status: 500 }
-      );
+      return NextResponse.json({ ok: false, error: sessRes.error?.message || 'Failed to create session' }, { status: 500 });
     }
 
     return NextResponse.json({
