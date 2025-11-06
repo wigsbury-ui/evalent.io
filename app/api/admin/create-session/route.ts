@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 import { NextResponse } from 'next/server';
-import { supaSR } from '@/lib/supabase';
+import { supaSR } from '../../../../lib/supabase';
 import { randomUUID } from 'crypto';
 
 export async function POST(req: Request) {
