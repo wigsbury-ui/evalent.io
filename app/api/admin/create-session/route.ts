@@ -1,73 +1,107 @@
-// SUPABASE (server) — sbAdmin is a client, not a function
+import { NextResponse } from 'next/server';
+import { randomUUID } from 'crypto';
 import { sbAdmin } from '@/lib/supabase';
-const sb = sbAdmin;
 
-
+/**
+ * Creates a demo School, Candidate, Blueprint and Session,
+ * and returns a /take/{token} URL.
+ */
 export async function POST(_req: Request) {
-  const sb = getSupaSR();
+  try {
+    const sb = sbAdmin;
 
-  // 1) School (uses your DB defaults for short_code, slug)
-  const { data: school, error: schErr } = await sb
-    .from('schools')
-    .insert({ name: 'Demo School' })
-    .select('id, short_code, slug')
-    .single();
+    // 1) School — DB triggers/defaults handle short_code + slug
+    const { data: school, error: schErr } = await sb
+      .from('schools')
+      .insert({ name: 'Demo School' })
+      .select('id, slug, short_code')
+      .single();
 
-  if (schErr || !school) {
-    return NextResponse.json({ ok: false, error: schErr?.message ?? 'No school' }, { status: 500 });
+    if (schErr || !school) {
+      return NextResponse.json(
+        { ok: false, error: schErr?.message || 'failed to create school' },
+        { status: 500 }
+      );
+    }
+
+    // 2) Candidate — name column now exists; backfills are in DB
+    const email = `demo+${Date.now()}@example.com`;
+    const { data: candidate, error: candErr } = await sb
+      .from('candidates')
+      .insert({ school_id: school.id, name: 'Demo Candidate', email })
+      .select('id')
+      .single();
+
+    if (candErr || !candidate) {
+      return NextResponse.json(
+        { ok: false, error: candErr?.message || 'failed to create candidate' },
+        { status: 500 }
+      );
+    }
+
+    // 3) Blueprint — ensure we have a simple default config
+    const defaultConfig = { programme: 'UK', grade: 'Y7' };
+    const { data: blueprint, error: bpErr } = await sb
+      .from('blueprints')
+      .insert({
+        school_id: school.id,
+        name: 'Default Blueprint',
+        slug: 'default',
+        config: defaultConfig,
+      })
+      .select('id')
+      .single();
+
+    // We’ll still try to continue even if blueprints table/cols differ
+    const blueprintId = !bpErr && blueprint ? blueprint.id : null;
+
+    // 4) Session — create token and insert, prefer blueprint_id when possible
+    const token = randomUUID().replace(/-/g, '');
+    let sessErr: any = null;
+
+    // attempt with blueprint_id (if we have one)
+    if (blueprintId) {
+      const { error } = await sb
+        .from('sessions')
+        .insert({
+          school_id: school.id,
+          candidate_id: candidate.id,
+          blueprint_id: blueprintId,
+          token,
+          status: 'new',
+        })
+        .select('id')
+        .single();
+      sessErr = error || null;
+    }
+
+    // fallback: insert without blueprint_id if the column/constraint doesn’t exist
+    if (sessErr || !blueprintId) {
+      const { error } = await sb
+        .from('sessions')
+        .insert({
+          school_id: school.id,
+          candidate_id: candidate.id,
+          token,
+          status: 'new',
+        })
+        .select('id')
+        .single();
+      if (error) {
+        return NextResponse.json(
+          { ok: false, error: error.message || 'failed to create session' },
+          { status: 500 }
+        );
+      }
+    }
+
+    const base =
+      process.env.NEXT_PUBLIC_BASE_URL || 'https://evalent-io.vercel.app';
+    return NextResponse.json({ ok: true, token, url: `${base}/take/${token}` });
+  } catch (e: any) {
+    return NextResponse.json(
+      { ok: false, error: e?.message || String(e) },
+      { status: 500 }
+    );
   }
-
-  // 2) Candidate
-  const email = `demo+${Date.now()}@example.com`;
-  const { data: cand, error: candErr } = await sb
-    .from('candidates')
-    .insert({ school_id: school.id, name: 'Demo Candidate', email })
-    .select('id')
-    .single();
-
-  if (candErr || !cand) {
-    return NextResponse.json({ ok: false, error: candErr?.message ?? 'No candidate' }, { status: 500 });
-  }
-
-  // 3) Blueprint (pick something that exists in items)
-  //    You already have UK/Y7 items; slug can be any unique string.
-  const { data: bp, error: bpErr } = await sb
-    .from('blueprints')
-    .insert({
-      school_id: school.id,
-      name: 'Demo UK Y7 Core',
-      programme: 'UK',
-      grade: 'Y7',
-      slug: 'uk-y7-core'
-    })
-    .select('id')
-    .single();
-
-  if (bpErr || !bp) {
-    return NextResponse.json({ ok: false, error: bpErr?.message ?? 'No blueprint' }, { status: 500 });
-  }
-
-  // 4) Session with token
-  const token = randomUUID().replace(/-/g, '');
-  const { data: sess, error: sessErr } = await sb
-    .from('sessions')
-    .insert({
-      school_id: school.id,
-      candidate_id: cand.id,
-      blueprint_id: bp.id,
-      token
-    })
-    .select('id, token')
-    .single();
-
-  if (sessErr || !sess) {
-    return NextResponse.json({ ok: false, error: sessErr?.message ?? 'No session' }, { status: 500 });
-  }
-
-  return NextResponse.json({
-    ok: true,
-    session_id: sess.id,
-    token: sess.token,
-    take_url: `/take/${sess.token}`
-  });
 }
