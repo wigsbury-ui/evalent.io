@@ -1,33 +1,74 @@
-export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
+import { NextRequest, NextResponse } from 'next/server';
+import { sbAdmin } from '@/lib/supabase';
 
-import { NextResponse } from 'next/server';
-import { getSupaSR } from '../../../lib/supabase';
+/** Read token, item_id, payload from either GET query or POST body */
+async function readInput(req: NextRequest) {
+  const url = new URL(req.url);
+  const sp = url.searchParams;
 
-export async function GET(req: Request) {
-  const supa = getSupaSR();
-  const { searchParams } = new URL(req.url);
-  const token = searchParams.get('token');
-  const session_id = searchParams.get('session_id');
-  const item_id = searchParams.get('item_id');
-  const payloadStr = searchParams.get('payload') || '{}';
-  const payload = JSON.parse(payloadStr);
+  let token = sp.get('token') ?? '';
+  let item_id = sp.get('item_id') ?? '';
+  let payloadRaw = sp.get('payload');
 
-  const s = token
-    ? await supa.from('sessions').select('*').eq('token', token).single()
-    : await supa.from('sessions').select('*').eq('id', session_id!).single();
-  const session = s.data;
-  if (!session) return NextResponse.json({ ok:false, error:'session not found' }, { status:404 });
+  if (req.method === 'POST') {
+    try {
+      const body = await req.json();
+      token = (body.token ?? token ?? '').toString();
+      item_id = (body.item_id ?? item_id ?? '').toString();
+      payloadRaw = body.payload ?? payloadRaw;
+    } catch {
+      // ignore – fall back to query
+    }
+  }
 
-  const { data: item } = await supa.from('items').select('*').eq('item_id', item_id!).single();
-  const isMcq = (item?.type || 'mcq').toLowerCase() === 'mcq';
-  const correct = isMcq ? (payload.choice === item.answer) : null;
-  const score = isMcq ? (correct ? 1 : 0) : null;
+  let payload: any = null;
+  if (payloadRaw == null) payload = null;
+  else if (typeof payloadRaw === 'string') {
+    try { payload = JSON.parse(payloadRaw); } catch { payload = payloadRaw; }
+  } else {
+    payload = payloadRaw;
+  }
 
-  await supa.from('attempts').insert({ session_id: session.id, item_id, response: payload, correct, score });
+  return { token: token.trim(), item_id: item_id.trim(), payload };
+}
 
-  const nextIndex = (session.item_index ?? 0) + 1;
-  await supa.from('sessions').update({ item_index: nextIndex, status:'in_progress' }).eq('id', session.id);
+export async function GET(req: NextRequest)  { return handle(req); }
+export async function POST(req: NextRequest) { return handle(req); }
 
-  return NextResponse.json({ ok:true, correct, score, nextIndex });
+async function handle(req: NextRequest) {
+  try {
+    const { token, item_id, payload } = await readInput(req);
+    if (!token) return NextResponse.json({ ok: false, error: 'missing token' }, { status: 400 });
+    if (!item_id) return NextResponse.json({ ok: false, error: 'missing item_id' }, { status: 400 });
+
+    const sb = sbAdmin();
+
+    // find session by token
+    const { data: sess, error: e1 } = await sb
+      .from('sessions')
+      .select('id,item_index')
+      .eq('token', token)
+      .single();
+    if (e1 || !sess) return NextResponse.json({ ok: false, error: 'session not found' }, { status: 404 });
+
+    // write attempt
+    const attempt = {
+      session_id: sess.id,
+      item_id,
+      response: payload ?? {},
+    };
+    const { error: e2 } = await sb.from('attempts').insert(attempt);
+    if (e2) return NextResponse.json({ ok: false, error: `insert attempt: ${e2.message}` }, { status: 500 });
+
+    // advance index
+    const { error: e3 } = await sb
+      .from('sessions')
+      .update({ item_index: (sess.item_index ?? 0) + 1 })
+      .eq('id', sess.id);
+    if (e3) return NextResponse.json({ ok: false, error: `advance index: ${e3.message}` }, { status: 500 });
+
+    return NextResponse.json({ ok: true });
+  } catch (err: any) {
+    return NextResponse.json({ ok: false, error: String(err?.message || err) }, { status: 500 });
+  }
 }
