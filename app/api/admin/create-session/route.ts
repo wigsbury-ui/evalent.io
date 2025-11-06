@@ -1,107 +1,50 @@
 import { NextResponse } from 'next/server';
-import { randomUUID } from 'crypto';
 import { sbAdmin } from '@/lib/supabase';
+import { randomUUID } from 'crypto';
 
-/**
- * Creates a demo School, Candidate, Blueprint and Session,
- * and returns a /take/{token} URL.
- */
 export async function POST(_req: Request) {
   try {
     const sb = sbAdmin;
 
-    // 1) School — DB triggers/defaults handle short_code + slug
+    // 1) School (slug/short_code now handled in DB with triggers/defaults)
     const { data: school, error: schErr } = await sb
       .from('schools')
       .insert({ name: 'Demo School' })
-      .select('id, slug, short_code')
+      .select('id, short_code, slug')
       .single();
+    if (schErr) throw schErr;
+    const schoolId = school.id;
 
-    if (schErr || !school) {
-      return NextResponse.json(
-        { ok: false, error: schErr?.message || 'failed to create school' },
-        { status: 500 }
-      );
-    }
-
-    // 2) Candidate — name column now exists; backfills are in DB
+    // 2) Candidate (name column exists; we backfilled earlier)
     const email = `demo+${Date.now()}@example.com`;
-    const { data: candidate, error: candErr } = await sb
+    const { data: cand, error: candErr } = await sb
       .from('candidates')
-      .insert({ school_id: school.id, name: 'Demo Candidate', email })
+      .insert({ school_id: schoolId, name: 'Demo Candidate', email })
       .select('id')
       .single();
+    if (candErr) throw candErr;
+    const candidateId = cand.id;
 
-    if (candErr || !candidate) {
-      return NextResponse.json(
-        { ok: false, error: candErr?.message || 'failed to create candidate' },
-        { status: 500 }
-      );
-    }
-
-    // 3) Blueprint — ensure we have a simple default config
-    const defaultConfig = { programme: 'UK', grade: 'Y7' };
-    const { data: blueprint, error: bpErr } = await sb
+    // 3) Blueprint (config jsonb default {} ensured in DB)
+    const { data: bp, error: bpErr } = await sb
       .from('blueprints')
-      .insert({
-        school_id: school.id,
-        name: 'Default Blueprint',
-        slug: 'default',
-        config: defaultConfig,
-      })
+      .insert({ school_id: schoolId, name: 'Y7 Core', slug: 'y7-core', config: {} })
       .select('id')
       .single();
+    if (bpErr) throw bpErr;
+    const blueprintId = bp.id;
 
-    // We’ll still try to continue even if blueprints table/cols differ
-    const blueprintId = !bpErr && blueprint ? blueprint.id : null;
-
-    // 4) Session — create token and insert, prefer blueprint_id when possible
+    // 4) Session (rely on DB default status='pending'; just set token)
     const token = randomUUID().replace(/-/g, '');
-    let sessErr: any = null;
+    const { error: sessErr } = await sb
+      .from('sessions')
+      .insert({ school_id: schoolId, candidate_id: candidateId, blueprint_id: blueprintId, token })
+      .select('token')
+      .single();
+    if (sessErr) throw sessErr;
 
-    // attempt with blueprint_id (if we have one)
-    if (blueprintId) {
-      const { error } = await sb
-        .from('sessions')
-        .insert({
-          school_id: school.id,
-          candidate_id: candidate.id,
-          blueprint_id: blueprintId,
-          token,
-          status: 'new',
-        })
-        .select('id')
-        .single();
-      sessErr = error || null;
-    }
-
-    // fallback: insert without blueprint_id if the column/constraint doesn’t exist
-    if (sessErr || !blueprintId) {
-      const { error } = await sb
-        .from('sessions')
-        .insert({
-          school_id: school.id,
-          candidate_id: candidate.id,
-          token,
-          status: 'new',
-        })
-        .select('id')
-        .single();
-      if (error) {
-        return NextResponse.json(
-          { ok: false, error: error.message || 'failed to create session' },
-          { status: 500 }
-        );
-      }
-    }
-
-    const base =
-      process.env.NEXT_PUBLIC_BASE_URL || 'https://evalent-io.vercel.app';
-    return NextResponse.json({ ok: true, token, url: `${base}/take/${token}` });
+    return NextResponse.json({ ok: true, token, link: `/test?token=${token}` });
   } catch (e: any) {
-    return NextResponse.json(
-      { ok: false, error: e?.message || String(e) },
-      { status: 500 }
-    );
+    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 400 });
   }
 }
