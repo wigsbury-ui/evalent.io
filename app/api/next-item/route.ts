@@ -39,3 +39,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({ ok: true, item: items[0] });
 }
+await sb.from('sessions')
+  .update({ status: 'in_progress' })
+  .eq('id', sessionId)
+  .eq('status', 'pending');
