@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
 import { NextResponse } from 'next/server';
-import { supaSR } from '../../../lib/supabase';
+import { getSupaSR } from '../../../lib/supabase';
 
 async function fetchCsv(url: string) {
   const res = await fetch(url, { cache: 'no-store' });
@@ -21,6 +21,7 @@ async function fetchCsv(url: string) {
 
 export async function GET() {
   try {
+    const supa = getSupaSR();
     const itemsUrl = process.env.SHEET_ITEMS_CSV_URL!;
     const assetsUrl = process.env.SHEET_ASSETS_CSV_URL!;
     const [itemsCsv, assetsCsv] = await Promise.all([fetchCsv(itemsUrl), fetchCsv(assetsUrl)]);
@@ -41,7 +42,7 @@ export async function GET() {
       }
     }));
     if (upItems.length) {
-      await supaSR.from('items').upsert(upItems, { onConflict: 'item_id' });
+      await supa.from('items').upsert(upItems, { onConflict: 'item_id' });
     }
 
     const upAssets = assetsCsv.map((r:any) => ({
@@ -60,7 +61,7 @@ export async function GET() {
       notes: r.Notes || r.notes || null
     }));
     if (upAssets.length) {
-      await supaSR.from('assets').upsert(upAssets, { onConflict: 'item_id' });
+      await supa.from('assets').upsert(upAssets, { onConflict: 'item_id' });
     }
 
     return NextResponse.json({ ok: true, items: upItems.length, assets: upAssets.length });
