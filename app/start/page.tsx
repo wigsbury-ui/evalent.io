@@ -1,60 +1,93 @@
 "use client";
 
-import { useState } from "react";
+export const dynamic = "force-dynamic";
 
 type Ok = { ok: true; token: string; url: string };
 type Err = { ok: false; error: string };
 type Resp = Ok | Err;
 
-export const dynamic = "force-dynamic";
+import { useState } from "react";
 
-export default function StartHelper() {
+export default function Start() {
   const [resp, setResp] = useState<Resp | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  async function handleClick() {
+  async function create() {
+    setLoading(true);
     setResp(null);
     try {
-      const r = await fetch("/api/admin/create-session", { method: "POST" });
-      const j: Resp = await r.json();
-      setResp(j);
+      const r = await fetch("/api/admin/create-session", {
+        method: "POST",
+        cache: "no-store",
+      });
+      const data: Resp = await r.json();
+      setResp(data);
     } catch (e: any) {
-      setResp({ ok: false, error: e?.message ?? "Network error" });
+      setResp({ ok: false, error: String(e?.message ?? e) });
+    } finally {
+      setLoading(false);
     }
   }
 
-  const tokenText = resp && resp.ok ? resp.token : "";
-  const openUrl   = resp && resp.ok ? resp.url   : undefined;
-  const errorText = resp && !resp.ok ? resp.error : undefined;
+  const tokenText = resp && "token" in resp ? resp.token : "";
+  const openUrl = resp && "url" in resp ? resp.url : undefined;
+  const errorText = resp && "error" in resp ? resp.error : undefined;
 
   return (
     <main style={{ padding: 24, maxWidth: 1000, margin: "0 auto" }}>
-      <h1 style={{ fontSize: 56, lineHeight: 1.1, marginBottom: 8 }}>Start a Test (helper)</h1>
-      <p style={{ marginBottom: 24 }}>
+      <h1 style={{ fontSize: 64, lineHeight: 1.1, margin: "16px 0 24px" }}>
+        Start a Test (helper)
+      </h1>
+      <p style={{ fontSize: 22, marginBottom: 24 }}>
         This creates a demo school, candidate, blueprint, and session link.
       </p>
 
       <button
-        onClick={handleClick}
+        onClick={create}
+        disabled={loading}
         style={{
-          fontSize: 18, padding: "12px 16px", borderRadius: 8, border: "1px solid #ddd",
-          background: "#f8f8f8", cursor: "pointer"
+          fontSize: 20,
+          padding: "12px 18px",
+          borderRadius: 10,
+          border: "1px solid #ccc",
+          background: loading ? "#eee" : "#fff",
+          cursor: loading ? "default" : "pointer",
         }}
       >
-        Create session link
+        {loading ? "Creating…" : "Create session link"}
       </button>
 
-      <section style={{ marginTop: 24, border: "1px solid #e5e7eb", borderRadius: 12, padding: 20 }}>
-        <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Token:</div>
-        <div style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>{tokenText}</div>
-        <div style={{ height: 12 }} />
-        <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>Open:</div>
-        {openUrl ? (
-          <a href={openUrl} target="_blank" rel="noreferrer" style={{ color: "#2563eb" }}>
-            {openUrl}
-          </a>
-        ) : errorText ? (
-          <pre style={{ color: "#b91c1c", whiteSpace: "pre-wrap" }}>{errorText}</pre>
-        ) : null}
+      <section
+        style={{
+          marginTop: 28,
+          border: "1px solid #e5e7eb",
+          borderRadius: 12,
+          padding: 18,
+          fontSize: 22,
+        }}
+      >
+        <div style={{ marginBottom: 8 }}>
+          <strong>Token:</strong>{" "}
+          <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo" }}>
+            {tokenText}
+          </span>
+        </div>
+
+        <div>
+          <strong>Open:</strong>{" "}
+          {openUrl ? (
+            <a
+              href={openUrl}
+              style={{ color: "#2563eb", wordBreak: "break-all" }}
+            >
+              {openUrl}
+            </a>
+          ) : errorText ? (
+            <pre style={{ color: "#b91c1c", whiteSpace: "pre-wrap" }}>
+              {errorText}
+            </pre>
+          ) : null}
+        </div>
       </section>
     </main>
   );
