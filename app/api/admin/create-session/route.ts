@@ -1,74 +1,88 @@
-import { NextResponse } from 'next/server';
-import { sbAdmin } from '@/lib/supabase';
+// app/api/admin/create-session/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'node:crypto';
+import { sbAdmin } from '@/lib/supabase'; // sbAdmin MUST be a function that returns a Supabase client
 
-export async function POST() {
+// Small util to form a base URL that also works on Vercel
+function getOrigin(req: NextRequest) {
+  const envUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '');
+  if (envUrl) return envUrl.replace(/\/+$/, '');
+  const host = req.headers.get('host') ?? 'localhost:3000';
+  const proto = req.headers.get('x-forwarded-proto') ?? 'http';
+  return `${proto}://${host}`;
+}
+
+export async function POST(req: NextRequest) {
   try {
-    const sb = sbAdmin(); // NOTE: call it (function returns a client)
+    const sb = sbAdmin(); // ✅ NOTE the () — it's a function
 
-    // 1) School (DB fills short_code/slug via defaults/trigger)
+    // 1) School (DB trigger fills short_code/slug if you followed the earlier steps)
     const { data: school, error: schErr } = await sb
       .from('schools')
       .insert({ name: 'Demo School' })
-      .select('id, short_code, slug')
+      .select('id, name, short_code, slug')
       .single();
-    if (schErr || !school) {
-      throw new Error(schErr?.message || 'failed to create school');
-    }
+    if (schErr) throw schErr;
 
-    // 2) Candidate (ensure name exists)
-    const { data: cand, error: candErr } = await sb
+    // 2) Candidate (we previously added/filled the NOT NULL "name" column)
+    const { data: candidate, error: candErr } = await sb
       .from('candidates')
       .insert({ name: 'Demo Candidate' })
-      .select('id')
+      .select('id, name')
       .single();
-    if (candErr || !cand) {
-      throw new Error(candErr?.message || 'failed to create candidate');
-    }
+    if (candErr) throw candErr;
 
-    // 3) Blueprint (respect NOT NULLs: name, programme, grade, pass_logic, config)
-    const { data: bp, error: bpErr } = await sb
+    // 3) Blueprint (grade/programme/pass_logic/config now safe due to DB defaults,
+    //    but we still send explicit values to avoid any not-null issues)
+    const { data: blueprint, error: bpErr } = await sb
       .from('blueprints')
       .insert({
-        name: 'Default',
+        name: 'Demo UK Y7',
         programme: 'UK',
         grade: 7,
-        pass_logic: {},   // jsonb
-        config: {},       // jsonb
-        // school_id: school.id, // uncomment if your schema has this FK (nullable is fine)
+        pass_logic: {}, // jsonb
+        config: {},     // jsonb
+        school_id: school.id,
       })
-      .select('id')
+      .select('id, name, grade, programme')
       .single();
-    if (bpErr || !bp) {
-      throw new Error(bpErr?.message || 'failed to create blueprint');
-    }
+    if (bpErr) throw bpErr;
 
-    // 4) Session (use allowed status and a token)
-    const token = crypto.randomUUID().replace(/-/g, '').slice(0, 32);
-    const { data: sess, error: sessErr } = await sb
+    // 4) Session with token (status defaults to 'pending' from your DB patch)
+    const token = crypto.randomBytes(16).toString('hex');
+    const { data: session, error: sessErr } = await sb
       .from('sessions')
       .insert({
-        school_id: school.id,
-        candidate_id: cand.id,
-        blueprint_id: bp.id,
-        status: 'pending', // must match the CHECK constraint
         token,
+        school_id: school.id,
+        candidate_id: candidate.id,
+        blueprint_id: blueprint.id,
+        // status left to default 'pending'
       })
       .select('id, token')
       .single();
-    if (sessErr || !sess) {
-      throw new Error(sessErr?.message || 'failed to create session');
-    }
+    if (sessErr) throw sessErr;
 
+    // 5) Return a URL the helper can show
+    const origin = getOrigin(req);
+
+    // If your take page path is different, change here (I provide a few flavors).
+    const urlTestQuery = `${origin}/test?token=${session.token}`;
+    const urlTakeQuery = `${origin}/take?token=${session.token}`;
+    const urlTParam = `${origin}/t/${session.token}`;
+
+    // Most helpers expect "url". I also return "links" for convenience.
     return NextResponse.json({
       ok: true,
-      token: sess.token,
-      // adjust this path to your actual start page:
-      link: `/start?token=${sess.token}`,
-      school,
+      token: session.token,
+      url: urlTestQuery,                      // <- helper will likely read this
+      links: { test: urlTestQuery, take: urlTakeQuery, t: urlTParam },
     });
   } catch (e: any) {
     return NextResponse.json(
-      { ok: false, error: String(e?.message ?? e) },
+      { ok: false, error: e?.message ?? String(e) },
       { status: 500 }
     );
   }
