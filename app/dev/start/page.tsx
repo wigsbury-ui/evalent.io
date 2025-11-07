@@ -23,7 +23,6 @@ export default function StartDev() {
       }
 
       let { token, url } = data;
-      // Fallback if API didn't return url for any reason
       if (!url && token) {
         const origin = window.location.origin;
         const prefix = window.location.pathname.startsWith("/dev/") ? "/dev" : "";
@@ -36,6 +35,11 @@ export default function StartDev() {
       setBusy(false);
     }
   }
+
+  // ---- safely derive display values (avoids JSX narrowing issues) ----
+  const tokenText = resp && resp.ok ? resp.token : "";
+  const openUrl = resp && resp.ok ? resp.url : undefined;
+  const errorText = resp && !resp.ok ? resp.error : undefined;
 
   return (
     <main style={{ padding: 24, maxWidth: 1000, margin: "0 auto" }}>
@@ -68,19 +72,18 @@ export default function StartDev() {
         }}
       >
         <div style={{ marginBottom: 8 }}>
-          <strong>Token:</strong>{" "}
-          {resp && "ok" in resp && resp.ok ? resp.token : ""}
+          <strong>Token:</strong> {tokenText}
         </div>
         <div>
           <strong>Open:</strong>{" "}
-          {resp && "ok" in resp && resp.ok && resp.url ? (
-            <a href={resp.url}>{resp.url}</a>
+          {openUrl ? (
+            <a href={openUrl}>{openUrl}</a>
           ) : (
             ""
           )}
         </div>
 
-        {resp && "ok" in resp && !resp.ok && (
+        {errorText && (
           <pre
             style={{
               marginTop: 16,
@@ -89,7 +92,7 @@ export default function StartDev() {
               fontSize: 14,
             }}
           >
-            {resp.error}
+            {errorText}
           </pre>
         )}
       </section>
