@@ -1,23 +1,33 @@
-export const dynamic = "force-dynamic";
+// app/t/[token]/page.tsx
+import type { Metadata } from "next";
 
-export default function Runner({
-  params,
-}: {
-  params: { token: string };
-}) {
+export const dynamic = "force-dynamic"; // never prerender/cache a live test run
+
+type Props = { params: { token: string } };
+
+export const metadata: Metadata = {
+  title: "Evalent Test Runner",
+};
+
+export default async function RunnerPage({ params }: Props) {
   const token = params.token;
+
+  // TODO: Replace this with your real runner UI.
+  // Keep this simple page so session links never 404 while you iterate.
   return (
-    <main style={{ padding: 40, maxWidth: 1000, margin: "0 auto" }}>
-      <h1 style={{ fontSize: 72, lineHeight: 1.1, marginBottom: 24 }}>
+    <main style={{ padding: 24, maxWidth: 960, margin: "0 auto" }}>
+      <h1 style={{ fontSize: 64, lineHeight: 1.05, margin: "24px 0" }}>
         Evalent Test Runner
       </h1>
-      <p style={{ fontSize: 28, marginBottom: 24 }}>
+      <p style={{ fontSize: 28, marginTop: 32 }}>
         <strong>Token:</strong>{" "}
-        <span style={{ fontFamily: "ui-monospace, Menlo" }}>{token}</span>
+        <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+          {token}
+        </span>
       </p>
-      <p style={{ fontSize: 24, color: "#666" }}>
-        This placeholder route is here so your session links don’t 404. Replace
-        with your full runner UI when ready.
+      <p style={{ fontSize: 24, color: "#6b7280", marginTop: 24 }}>
+        This placeholder route is here so your session links don’t 404. Replace with your full
+        runner UI when ready.
       </p>
     </main>
   );
