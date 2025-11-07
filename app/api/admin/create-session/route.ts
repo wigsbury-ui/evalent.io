@@ -33,6 +33,7 @@ export async function POST(_req: Request) {
         grade: '7',   // universal default: works for text or casts to int
         config: {},
       })
+       pass_logic: {},            // will serialize to jsonb
       .select('id')
       .single();
     if (bpErr || !bp) throw bpErr ?? new Error('blueprint insert failed');
