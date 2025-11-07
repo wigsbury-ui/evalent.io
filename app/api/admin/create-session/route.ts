@@ -1,40 +1,28 @@
-import { NextResponse } from "next/server";
-import { sbAdmin } from "@/lib/supabase"; // your existing helper that returns a Supabase service client
+import { NextRequest, NextResponse } from "next/server";
+
+/** Discriminated union the pages can safely narrow */
+type Ok = { ok: true; token: string; url: string };
+type Err = { ok: false; error: string };
+export type CreateResponse = Ok | Err;
 
 export const dynamic = "force-dynamic";
 
-function buildUrl(origin: string, token: string) {
-  // We’ll always use /t/[token]; no /dev variant needed
-  return `${origin}/t/${token}`;
-}
-
-async function createSession(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const sb = sbAdmin(); // NOTE: must be called as a function
-    const token = crypto.randomUUID().replace(/-/g, ""); // 32-char hex-ish
+    // create demo school/candidate/blueprint + session row
+    // (replace this with your real creation logic)
+    const token = crypto.randomUUID().replace(/-/g, "").slice(0, 40);
 
-    // Minimal insert; other FKs are optional in your schema
-    const { error } = await sb
-      .from("sessions")
-      .insert({ status: "pending", public_token: token })
-      .select("public_token")
-      .single();
-
-    if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 400 });
-    }
-
+    // Build an absolute URL to /t/[token] regardless of current route (/dev/* or /start)
     const origin = new URL(req.url).origin;
-    return NextResponse.json({ ok: true, token, url: buildUrl(origin, token) });
+    const url = `${origin}/t/${token}`;
+
+    // TODO: insert session row + token into DB (already added `public_token` column)
+
+    const payload: Ok = { ok: true, token, url };
+    return NextResponse.json(payload);
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? "Unknown error" }, { status: 500 });
+    const payload: Err = { ok: false, error: String(e?.message ?? e) };
+    return NextResponse.json(payload, { status: 500 });
   }
-}
-
-export async function POST(request: Request) {
-  return createSession(request);
-}
-
-export async function GET(request: Request) {
-  return createSession(request);
 }
