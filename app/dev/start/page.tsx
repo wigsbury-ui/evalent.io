@@ -1,115 +1,73 @@
-// app/dev/start/page.tsx  (REPLACE)
+// app/dev/start/page.tsx
 "use client";
 
 import { useState } from "react";
 
-type CreateResp = {
-  ok: boolean;
-  token?: string;
-  url?: string;
-  links?: { test?: string; take?: string };
-  error?: string;
-};
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
-export default function StartHelper() {
-  const [token, setToken] = useState<string | null>(null);
-  const [openUrl, setOpenUrl] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+type CreateResponse =
+  | { ok: true; token: string; url: string }
+  | { ok: false; error: string };
 
-  const create = async () => {
-    setLoading(true);
-    setErr(null);
-    setToken(null);
-    setOpenUrl(null);
+export default function DevStart() {
+  const [resp, setResp] = useState<CreateResponse | null>(null);
+  const [busy, setBusy] = useState(false);
 
+  async function go() {
+    setBusy(true);
+    setResp(null);
     try {
-      const res = await fetch("/api/admin/create-session", { method: "POST" });
-      const data: CreateResp = await res.json();
-
-      if (!data.ok || !data.token) {
-        setErr(data.error || "Unknown error");
-        setLoading(false);
-        return;
-      }
-
-      const t = data.token;
-      setToken(t);
-
-      const origin =
-        typeof window !== "undefined" ? window.location.origin : "";
-      // strip any trailing /dev segment to point at the real runner
-      const base = origin.replace(/\/dev($|\/).*/, "");
-
-      const url =
-        data.url ||
-        data.links?.test ||
-        data.links?.take ||
-        `${base}/test?token=${t}`;
-
-      setOpenUrl(url);
+      const r = await fetch("/api/admin/create-session", { method: "POST" });
+      const j = (await r.json()) as CreateResponse;
+      setResp(j);
     } catch (e: any) {
-      setErr(String(e?.message ?? e));
+      setResp({ ok: false, error: String(e?.message ?? e) });
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
-  };
+  }
+
+  const open =
+    resp && resp.ok ? (
+      <a href={resp.url} style={{ wordBreak: "break-all" }}>
+        {resp.url}
+      </a>
+    ) : null;
 
   return (
-    <main style={{ padding: "3rem 1.5rem", maxWidth: 960, margin: "0 auto" }}>
-      <h1 style={{ fontSize: "3rem", lineHeight: 1.1, marginBottom: "1rem" }}>
-        Start a Test (helper)
-      </h1>
-      <p style={{ fontSize: "1.25rem", marginBottom: "1.5rem" }}>
-        This creates a demo school, candidate, blueprint, and session link.
-      </p>
-
-      <button
-        onClick={create}
-        disabled={loading}
-        style={{
-          fontSize: "1.125rem",
-          padding: "0.75rem 1rem",
-          borderRadius: 10,
-          border: "1px solid #ccc",
-          background: "#fff",
-          cursor: "pointer",
-        }}
-      >
-        {loading ? "Working…" : "Create session link"}
+    <main style={{ padding: 24 }}>
+      <h1>Start a Test (helper)</h1>
+      <p>This creates a demo school, candidate, blueprint, and session link.</p>
+      <button onClick={go} disabled={busy} style={{ padding: "8px 14px" }}>
+        {busy ? "Working…" : "Create session link"}
       </button>
 
-      <section
-        style={{
-          marginTop: "2rem",
-          border: "1px solid #e5e5e5",
-          borderRadius: 12,
-          padding: "1rem 1.25rem",
-          background: "#fafafa",
-        }}
-      >
-        {token && (
-          <p style={{ fontSize: "1.125rem", margin: 0 }}>
-            <strong>Token:</strong> {token}
-          </p>
-        )}
-        <p style={{ fontSize: "1.125rem", marginTop: "0.5rem" }}>
-          <strong>Open:</strong>{" "}
-          {openUrl ? (
-            <a href={openUrl} style={{ color: "#2563eb" }}>
-              {openUrl}
-            </a>
+      {resp && (
+        <div
+          style={{
+            marginTop: 24,
+            padding: 16,
+            border: "1px solid #ddd",
+            borderRadius: 8,
+          }}
+        >
+          {resp.ok ? (
+            <>
+              <p>
+                <strong>Token:</strong> {resp.token}
+              </p>
+              <p>
+                <strong>Open:</strong> {open}
+              </p>
+            </>
           ) : (
-            <span>(none yet)</span>
+            <pre style={{ color: "#b91c1c", whiteSpace: "pre-wrap" }}>
+              {resp.error}
+            </pre>
           )}
-        </p>
-        {err && (
-          <p style={{ color: "#b91c1c", marginTop: "0.5rem" }}>
-            <strong>Error:</strong> {err}
-          </p>
-        )}
-      </section>
+        </div>
+      )}
     </main>
   );
 }
-
