@@ -27,7 +27,7 @@ export default function RunnerClient({ token }: { token: string }) {
     }
   };
 
-  useEffect(() => { load(); /* on first mount */ }, []);
+  useEffect(() => { load(); }, []);
 
   const submit = async () => {
     if (!item) return;
