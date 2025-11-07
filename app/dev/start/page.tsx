@@ -39,12 +39,12 @@ export default function StartHelper() {
       const origin =
         typeof window !== "undefined" ? window.location.origin : "";
 
-      // Prefer API-provided link; otherwise fall back to your real runner under /dev
+      // Prefer API-provided link; then test/take; fallback to /dev/test
       const url =
         data.url ||
-        data.links?.take ||
         data.links?.test ||
-        `${origin}/dev/t/${t}`;
+        data.links?.take ||
+        `${origin}/dev/test?token=${t}`;
 
       setOpenUrl(url);
     } catch (e: any) {
