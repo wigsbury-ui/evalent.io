@@ -1,93 +1,82 @@
 "use client";
 
-export const dynamic = "force-dynamic";
+import { useMemo, useState } from "react";
 
-type Ok = { ok: true; token: string; url: string };
+type Ok = { ok: true; token: string; url?: string };
 type Err = { ok: false; error: string };
-type Resp = Ok | Err;
+type CreateResp = Ok | Err;
 
-import { useState } from "react";
-
-export default function Start() {
-  const [resp, setResp] = useState<Resp | null>(null);
-  const [loading, setLoading] = useState(false);
+export default function StartHelper() {
+  const [resp, setResp] = useState<CreateResp | null>(null);
+  const [busy, setBusy] = useState(false);
 
   async function create() {
-    setLoading(true);
-    setResp(null);
+    setBusy(true);
     try {
-      const r = await fetch("/api/admin/create-session", {
-        method: "POST",
-        cache: "no-store",
-      });
-      const data: Resp = await r.json();
+      const r = await fetch("/api/admin/create-session", { method: "POST" });
+      const data = (await r.json()) as CreateResp;
       setResp(data);
     } catch (e: any) {
-      setResp({ ok: false, error: String(e?.message ?? e) });
+      setResp({ ok: false, error: String(e?.message || e) });
     } finally {
-      setLoading(false);
+      setBusy(false);
     }
   }
 
-  const tokenText = resp && "token" in resp ? resp.token : "";
-  const openUrl = resp && "url" in resp ? resp.url : undefined;
-  const errorText = resp && "error" in resp ? resp.error : undefined;
+  const token = useMemo(() => (resp && resp.ok ? resp.token : ""), [resp]);
+  const origin = typeof window !== "undefined" ? window.location.origin.replace(/\/dev$/, "") : "";
+  const openUrl = useMemo(() => {
+    if (resp && resp.ok && (resp as any).url) return (resp as any).url as string;
+    return token ? `${origin}/t/${token}` : "";
+  }, [resp, token, origin]);
 
   return (
-    <main style={{ padding: 24, maxWidth: 1000, margin: "0 auto" }}>
-      <h1 style={{ fontSize: 64, lineHeight: 1.1, margin: "16px 0 24px" }}>
-        Start a Test (helper)
-      </h1>
-      <p style={{ fontSize: 22, marginBottom: 24 }}>
+    <main style={{ maxWidth: 980, margin: "0 auto", padding: 24 }}>
+      <h1 style={{ fontSize: 64, lineHeight: 1.05, marginBottom: 12 }}>Start a Test (helper)</h1>
+      <p style={{ fontSize: 22, marginBottom: 20 }}>
         This creates a demo school, candidate, blueprint, and session link.
       </p>
 
       <button
         onClick={create}
-        disabled={loading}
+        disabled={busy}
         style={{
-          fontSize: 20,
-          padding: "12px 18px",
-          borderRadius: 10,
-          border: "1px solid #ccc",
-          background: loading ? "#eee" : "#fff",
-          cursor: loading ? "default" : "pointer",
+          padding: "14px 18px",
+          borderRadius: 12,
+          border: "1px solid #111",
+          background: "#111",
+          color: "#fff",
+          cursor: "pointer",
+          marginBottom: 16,
         }}
       >
-        {loading ? "Creating…" : "Create session link"}
+        {busy ? "Creating…" : "Create session link"}
       </button>
 
       <section
         style={{
-          marginTop: 28,
           border: "1px solid #e5e7eb",
           borderRadius: 12,
-          padding: 18,
-          fontSize: 22,
+          padding: 16,
+          fontSize: 20,
         }}
       >
         <div style={{ marginBottom: 8 }}>
-          <strong>Token:</strong>{" "}
-          <span style={{ fontFamily: "ui-monospace, SFMono-Regular, Menlo" }}>
-            {tokenText}
-          </span>
+          <strong>Token:</strong> {token || ""}
         </div>
-
         <div>
           <strong>Open:</strong>{" "}
           {openUrl ? (
-            <a
-              href={openUrl}
-              style={{ color: "#2563eb", wordBreak: "break-all" }}
-            >
+            <a href={openUrl} style={{ color: "#2563eb", textDecoration: "underline" }}>
               {openUrl}
             </a>
-          ) : errorText ? (
-            <pre style={{ color: "#b91c1c", whiteSpace: "pre-wrap" }}>
-              {errorText}
-            </pre>
-          ) : null}
+          ) : (
+            ""
+          )}
         </div>
+        {!openUrl && resp && !resp.ok ? (
+          <pre style={{ color: "#b91c1c", whiteSpace: "pre-wrap", marginTop: 12 }}>{(resp as Err).error}</pre>
+        ) : null}
       </section>
     </main>
   );
