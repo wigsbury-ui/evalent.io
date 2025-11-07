@@ -17,13 +17,12 @@ function sbAdmin(): SupabaseClient {
 
 function makeBaseUrl(): string {
   const h = headers();
-  const scheme = h.get("x-forwarded-proto") ?? "https";
+  const proto = h.get("x-forwarded-proto") ?? "https";
   const host = h.get("host") ?? "";
-  return process.env.NEXT_PUBLIC_SITE_URL || `${scheme}://${host}`;
+  return process.env.NEXT_PUBLIC_SITE_URL || `${proto}://${host}`;
 }
 
 function makeToken(): string {
-  // 32-byte hex (64 chars)
   const buf = new Uint8Array(32);
   crypto.getRandomValues(buf);
   return Array.from(buf, (b) => b.toString(16).padStart(2, "0")).join("");
@@ -34,89 +33,75 @@ export async function POST(_req: NextRequest) {
     const sb = sbAdmin();
     const base = makeBaseUrl();
 
-    // --- Ensure a demo school exists (idempotent by name) ---
+    // 1) School
     const schoolName = "Demo School";
-    let { data: school, error: schErr } = await sb
+    let { data: school } = await sb
       .from("schools")
       .select("id")
       .eq("name", schoolName)
       .maybeSingle();
-
     if (!school) {
       const ins = await sb
         .from("schools")
         .insert({ name: schoolName })
         .select("id")
         .single();
-      school = ins.data as any;
-      schErr = ins.error as any;
+      if (ins.error) throw ins.error;
+      school = ins.data!;
     }
-    if (schErr || !school) throw schErr || new Error("Failed to upsert school");
 
-    // --- Ensure a demo candidate exists for that school ---
+    // 2) Candidate
     const candName = "Demo Candidate";
-    let { data: candidate, error: candErr } = await sb
+    let { data: candidate } = await sb
       .from("candidates")
       .select("id")
       .eq("school_id", school.id)
       .eq("name", candName)
       .maybeSingle();
-
     if (!candidate) {
       const ins = await sb
         .from("candidates")
         .insert({ school_id: school.id, name: candName })
         .select("id")
         .single();
-      candidate = ins.data as any;
-      candErr = ins.error as any;
+      if (ins.error) throw ins.error;
+      candidate = ins.data!;
     }
-    if (candErr || !candidate)
-      throw candErr || new Error("Failed to upsert candidate");
 
-    // --- Ensure a demo blueprint exists (fields kept minimal & DB defaults fill the rest) ---
+    // 3) Blueprint
     const bpName = "Demo Blueprint";
-    let { data: blueprint, error: bpErr } = await sb
+    let { data: blueprint } = await sb
       .from("blueprints")
       .select("id")
       .eq("school_id", school.id)
       .eq("name", bpName)
       .maybeSingle();
-
     if (!blueprint) {
       const ins = await sb
         .from("blueprints")
-        .insert({
-          school_id: school.id,
-          name: bpName,
-          // rely on DB defaults for programme/grade/pass_logic if present
-        })
+        .insert({ school_id: school.id, name: bpName })
         .select("id")
         .single();
-      blueprint = ins.data as any;
-      bpErr = ins.error as any;
+      if (ins.error) throw ins.error;
+      blueprint = ins.data!;
     }
-    if (bpErr || !blueprint)
-      throw bpErr || new Error("Failed to upsert blueprint");
 
-    // --- Create a session with a fresh token ---
+    // 4) Session
     const token = makeToken();
-
-    const { error: sessErr } = await sb.from("sessions").insert({
+    const insSess = await sb.from("sessions").insert({
       school_id: school.id,
       candidate_id: candidate.id,
       blueprint_id: blueprint.id,
       token,
-      // let DB default status = 'pending' (your constraint now allows this)
+      // status uses DB default 'pending'
     });
+    if (insSess.error) throw insSess.error;
 
-    if (sessErr) throw sessErr;
-
-    // Hand back direct links (pointing to your /dev runner)
-    const url = `${base}/dev/t/${token}`;
+    // Provide a direct working link to your runner under /dev/test
+    const url = `${base}/dev/test?token=${token}`;
     const links = {
+      test: url,
       take: `${base}/dev/take?token=${token}`,
-      test: `${base}/dev/test?token=${token}`,
     };
 
     return NextResponse.json({ ok: true, token, url, links });
