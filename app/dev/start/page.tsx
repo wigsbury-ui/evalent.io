@@ -1,77 +1,113 @@
-'use client';
+// app/dev/start/page.tsx
+"use client";
 
-import React from 'react';
+import { useState } from "react";
+
+type CreateResp = {
+  ok: boolean;
+  token?: string;
+  url?: string;
+  links?: { test?: string; take?: string };
+  error?: string;
+};
 
 export default function StartHelper() {
-  const [token, setToken] = React.useState<string>('');
-  const [url, setUrl] = React.useState<string>('');
-  const [busy, setBusy] = React.useState(false);
-  const [err, setErr] = React.useState<string>('');
+  const [token, setToken] = useState<string | null>(null);
+  const [openUrl, setOpenUrl] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
-  async function create() {
-    setBusy(true);
-    setErr('');
-    setToken('');
-    setUrl('');
+  const create = async () => {
+    setLoading(true);
+    setErr(null);
+    setToken(null);
+    setOpenUrl(null);
 
     try {
-      const res = await fetch('/api/admin/create-session', { method: 'POST' });
-      const data = await res.json();
-      // console.log('create-session result:', data);
+      const res = await fetch("/api/admin/create-session", { method: "POST" });
+      const data: CreateResp = await res.json();
 
-      if (!res.ok || !data?.ok) {
-        throw new Error(data?.error || `HTTP ${res.status}`);
+      if (!data.ok || !data.token) {
+        setErr(data.error || "Unknown error");
+        setLoading(false);
+        return;
       }
 
-      const t = data.token as string;
+      const t = data.token;
       setToken(t);
 
-      // Preferred URL if API provides it
-      let u: string =
+      const origin =
+        typeof window !== "undefined" ? window.location.origin : "";
+
+      // Prefer API-provided link; otherwise fall back to your real runner under /dev
+      const url =
         data.url ||
         data.links?.take ||
         data.links?.test ||
-        '';
+        `${origin}/dev/t/${t}`;
 
-      // Fallbacks if API didn't return a URL:
-      if (!u) {
-        const origin = window.location.origin;
-        // Pick ONE default path below that matches your runner:
-        u = `${origin}/t/${t}`;                 // <-- runner at /t/[token]
-        // u = `${origin}/take?token=${t}`;     // <-- runner at /take?token=...
-        // u = `${origin}/test?token=${t}`;     // <-- runner at /test?token=...
-      }
-
-      setUrl(u);
+      setOpenUrl(url);
     } catch (e: any) {
-      setErr(e?.message || String(e));
+      setErr(String(e?.message ?? e));
     } finally {
-      setBusy(false);
+      setLoading(false);
     }
-  }
+  };
 
   return (
-    <div style={{ maxWidth: 880, margin: '60px auto', fontSize: 18, lineHeight: 1.5 }}>
-      <h1 style={{ fontSize: 56, marginBottom: 10 }}>Start a Test (helper)</h1>
-      <p>This creates a demo school, candidate, blueprint, and session link.</p>
+    <main style={{ padding: "3rem 1.5rem", maxWidth: 960, margin: "0 auto" }}>
+      <h1 style={{ fontSize: "3rem", lineHeight: 1.1, marginBottom: "1rem" }}>
+        Start a Test (helper)
+      </h1>
+      <p style={{ fontSize: "1.25rem", marginBottom: "1.5rem" }}>
+        This creates a demo school, candidate, blueprint, and session link.
+      </p>
 
-      <button onClick={create} disabled={busy}
-        style={{ fontSize: 20, padding: '10px 16px', borderRadius: 8, cursor: 'pointer' }}>
-        {busy ? 'Creating…' : 'Create session link'}
+      <button
+        onClick={create}
+        disabled={loading}
+        style={{
+          fontSize: "1.125rem",
+          padding: "0.75rem 1rem",
+          borderRadius: 10,
+          border: "1px solid #ccc",
+          background: "#fff",
+          cursor: "pointer",
+        }}
+      >
+        {loading ? "Working…" : "Create session link"}
       </button>
 
-      <div style={{ marginTop: 30, padding: 20, border: '1px solid #ddd', borderRadius: 12 }}>
-        <p><strong>Token:</strong> {token || '—'}</p>
-        <p>
-          <strong>Open:</strong>{' '}
-          {url ? <a href={url} target="_blank" rel="noreferrer">{url}</a> : '—'}
+      <section
+        style={{
+          marginTop: "2rem",
+          border: "1px solid #e5e5e5",
+          borderRadius: 12,
+          padding: "1rem 1.25rem",
+          background: "#fafafa",
+        }}
+      >
+        {token && (
+          <p style={{ fontSize: "1.125rem", margin: 0 }}>
+            <strong>Token:</strong> {token}
+          </p>
+        )}
+        <p style={{ fontSize: "1.125rem", marginTop: "0.5rem" }}>
+          <strong>Open:</strong>{" "}
+          {openUrl ? (
+            <a href={openUrl} style={{ color: "#2563eb" }}>
+              {openUrl}
+            </a>
+          ) : (
+            <span>(none yet)</span>
+          )}
         </p>
         {err && (
-          <p style={{ color: '#c00', marginTop: 10 }}>
+          <p style={{ color: "#b91c1c", marginTop: "0.5rem" }}>
             <strong>Error:</strong> {err}
           </p>
         )}
-      </div>
-    </div>
+      </section>
+    </main>
   );
 }
