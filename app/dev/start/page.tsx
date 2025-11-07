@@ -1,4 +1,4 @@
-// app/dev/start/page.tsx
+// app/dev/start/page.tsx  (REPLACE)
 "use client";
 
 import { useState } from "react";
@@ -38,13 +38,14 @@ export default function StartHelper() {
 
       const origin =
         typeof window !== "undefined" ? window.location.origin : "";
+      // strip any trailing /dev segment to point at the real runner
+      const base = origin.replace(/\/dev($|\/).*/, "");
 
-      // Prefer API-provided link; then test/take; fallback to /dev/test
       const url =
         data.url ||
         data.links?.test ||
         data.links?.take ||
-        `${origin}/dev/test?token=${t}`;
+        `${base}/test?token=${t}`;
 
       setOpenUrl(url);
     } catch (e: any) {
@@ -111,3 +112,4 @@ export default function StartHelper() {
     </main>
   );
 }
+
