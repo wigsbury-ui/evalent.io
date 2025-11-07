@@ -5,10 +5,14 @@ export const dynamic = "force-dynamic";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY! // RLS-enabled; safe in server code
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
 async function getSessionByToken(token: string) {
+  // First, mark a visit (no throw if fails)
+  await supabase.rpc("touch_session", { p_token: token });
+
+  // Then read the row
   const { data, error } = await supabase
     .from("sessions")
     .select("id, status, created_at, visited_at")
@@ -37,9 +41,7 @@ export default async function RunnerPage({ params }: { params: { token: string }
   return (
     <main style={{ padding: 24 }}>
       <h1 style={{ fontSize: 64, lineHeight: 1.05 }}>Evalent Test Runner</h1>
-      <p style={{ fontSize: 22, marginTop: 8 }}>
-        Token: <code>{params.token}</code>
-      </p>
+      <p style={{ fontSize: 22, marginTop: 8 }}>Token: <code>{params.token}</code></p>
 
       <div style={{ marginTop: 24, fontSize: 18 }}>
         <div><strong>Session ID:</strong> {session.id}</div>
