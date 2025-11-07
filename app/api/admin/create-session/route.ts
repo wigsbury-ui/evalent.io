@@ -4,7 +4,7 @@ import { sbAdmin } from '@/lib/supabase';
 
 export async function POST(_req: Request) {
   try {
-    const sb = sbAdmin; // sbAdmin is a client instance (not a function)
+    const sb = sbAdmin(); // <-- call the factory to get a client
 
     // 1) School (DB fills short_code/slug via defaults/trigger)
     const { data: school, error: schErr } = await sb
@@ -14,10 +14,12 @@ export async function POST(_req: Request) {
       .single();
     if (schErr || !school) throw schErr ?? new Error('school insert failed');
 
-    // 2) Candidate (ensure a non-null name)
+    // 2) Candidate (ensure non-null name)
+    const candidateName =
+      'Candidate ' + String(school.short_code ?? '').toUpperCase();
     const { data: cand, error: candErr } = await sb
       .from('candidates')
-      .insert({ name: 'Candidate ' + String(school.short_code ?? '').toUpperCase() })
+      .insert({ name: candidateName })
       .select('id')
       .single();
     if (candErr || !cand) throw candErr ?? new Error('candidate insert failed');
@@ -25,16 +27,12 @@ export async function POST(_req: Request) {
     // 3) Blueprint (name + {} config required)
     const { data: bp, error: bpErr } = await sb
       .from('blueprints')
-      .insert({
-        school_id: school.id,
-        name: 'Default',
-        config: {}, // jsonb
-      })
+      .insert({ school_id: school.id, name: 'Default', config: {} })
       .select('id')
       .single();
     if (bpErr || !bp) throw bpErr ?? new Error('blueprint insert failed');
 
-    // 4) Session (status 'pending' is now valid; token drives test URL)
+    // 4) Session (status must be one of allowed values; 'pending' is valid)
     const token = randomUUID().replace(/-/g, '');
     const { data: sess, error: sessErr } = await sb
       .from('sessions')
