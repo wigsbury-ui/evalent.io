@@ -1,33 +1,15 @@
-// app/test/page.tsx
-"use client";
-
-import { useSearchParams } from "next/navigation";
+// app/dev/test/page.tsx
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 0; // <= forces a valid number and overrides any bad parent value
+export const revalidate = 0;
 
-export default function TestPage() {
-  const sp = useSearchParams();
-  const token = sp.get("token") ?? "";
-
-  return (
-    <main style={{ padding: "2rem", maxWidth: 800, margin: "0 auto" }}>
-      <h1 style={{ fontSize: "2rem", marginBottom: 8 }}>Evalent Test</h1>
-      {!token ? (
-        <p style={{ color: "#b91c1c" }}>
-          Missing <code>token</code> query param.
-        </p>
-      ) : (
-        <>
-          <p>
-            <strong>Token:</strong> {token}
-          </p>
-          <p>
-            (Placeholder runner so the route exists and no 404. Wire up the real
-            runner next.)
-          </p>
-        </>
-      )}
-    </main>
-  );
+export default function DevTest({
+  searchParams,
+}: {
+  searchParams: { token?: string | string[] };
+}) {
+  const raw = searchParams?.token;
+  const token = Array.isArray(raw) ? raw[0] : raw ?? "";
+  redirect(`/test?token=${encodeURIComponent(token)}`);
 }
