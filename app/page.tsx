@@ -1,9 +1,12 @@
+// app/page.tsx  (simple home so the app builds)
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export default function Home() {
   return (
-    <main style={{ maxWidth: 720, margin: '40px auto', fontFamily: 'system-ui' }}>
+    <main style={{ padding: 24 }}>
       <h1>Evalent</h1>
-      <p>This is the minimal UI. Use the Start helper to create a session.</p>
-      <p><a href="/start">Go to Start Helper →</a></p>
+      <p>Go to <code>/dev/start</code> to create a demo session link.</p>
     </main>
   );
 }
