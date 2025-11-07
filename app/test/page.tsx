@@ -1,4 +1,4 @@
-// app/test/page.tsx   (NEW — this is the real runner page; prevents 404)
+// app/test/page.tsx
 "use client";
 
 import { useSearchParams } from "next/navigation";
@@ -11,11 +11,11 @@ export default function TestPage() {
   const token = sp.get("token") ?? "";
 
   return (
-    <main style={{ padding: "2rem", maxWidth: 800, margin: "0 auto" }}>
-      <h1 style={{ fontSize: "2rem", marginBottom: 8 }}>Evalent Test</h1>
+    <main style={{ padding: 24, maxWidth: 800, margin: "0 auto" }}>
+      <h1>Evalent Test Runner (placeholder)</h1>
       {!token ? (
         <p style={{ color: "#b91c1c" }}>
-          Missing <code>token</code> query param.
+          Missing <code>?token=</code> in the URL.
         </p>
       ) : (
         <>
@@ -23,8 +23,8 @@ export default function TestPage() {
             <strong>Token:</strong> {token}
           </p>
           <p>
-            (This is a minimal placeholder so the route exists. You can wire
-            it to your flow via <code>/api/next-item</code> etc.)
+            This is a placeholder so the route exists and does not 404. Replace
+            with the real runner when ready.
           </p>
         </>
       )}
