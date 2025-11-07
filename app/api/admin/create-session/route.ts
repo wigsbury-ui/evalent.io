@@ -4,9 +4,9 @@ import { sbAdmin } from '@/lib/supabase';
 
 export async function POST(_req: Request) {
   try {
-    const sb = sbAdmin(); // factory → client
+    const sb = sbAdmin(); // factory -> client
 
-    // 1) School (DB fills short_code/slug via defaults/trigger)
+    // 1) School
     const { data: school, error: schErr } = await sb
       .from('schools')
       .insert({ name: 'Demo School' })
@@ -14,9 +14,8 @@ export async function POST(_req: Request) {
       .single();
     if (schErr || !school) throw schErr ?? new Error('school insert failed');
 
-    // 2) Candidate (ensure non-null name)
-    const candidateName =
-      'Candidate ' + String(school.short_code ?? '').toUpperCase();
+    // 2) Candidate
+    const candidateName = 'Candidate ' + String(school.short_code ?? '').toUpperCase();
     const { data: cand, error: candErr } = await sb
       .from('candidates')
       .insert({ name: candidateName })
@@ -24,20 +23,21 @@ export async function POST(_req: Request) {
       .single();
     if (candErr || !cand) throw candErr ?? new Error('candidate insert failed');
 
-    // 3) Blueprint (programme is REQUIRED → set an explicit default)
+    // 3) Blueprint  (programme + grade are required)
     const { data: bp, error: bpErr } = await sb
       .from('blueprints')
       .insert({
         school_id: school.id,
         name: 'Default',
-        programme: 'UK',     // ← important
-        config: {},          // jsonb not null
+        programme: 'UK',
+        grade: '7',   // universal default: works for text or casts to int
+        config: {},
       })
       .select('id')
       .single();
     if (bpErr || !bp) throw bpErr ?? new Error('blueprint insert failed');
 
-    // 4) Session (status must be allowed; 'pending' is valid)
+    // 4) Session
     const token = randomUUID().replace(/-/g, '');
     const { data: sess, error: sessErr } = await sb
       .from('sessions')
@@ -53,16 +53,8 @@ export async function POST(_req: Request) {
       .single();
     if (sessErr || !sess) throw sessErr ?? new Error('session insert failed');
 
-    return NextResponse.json({
-      ok: true,
-      session_id: sess.id,
-      token,
-      url: `/test/${token}`,
-    });
+    return NextResponse.json({ ok: true, session_id: sess.id, token, url: `/test/${token}` });
   } catch (e: any) {
-    return NextResponse.json(
-      { ok: false, error: e?.message ?? String(e) },
-      { status: 400 }
-    );
+    return NextResponse.json({ ok: false, error: e?.message ?? String(e) }, { status: 400 });
   }
 }
