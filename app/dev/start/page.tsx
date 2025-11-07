@@ -1,97 +1,98 @@
-// app/dev/start/page.tsx
 "use client";
 
 import { useState } from "react";
 
-export const dynamic = "force-dynamic";
-export const revalidate = 0;
+type Ok = { ok: true; token: string; url?: string };
+type Err = { ok: false; error: string };
+type Resp = Ok | Err;
 
-type OkResp = { ok: true; token: string; url: string };
-type ErrResp = { ok: false; error: string };
-type CreateResponse = OkResp | ErrResp;
-
-function isOk(r: CreateResponse | null): r is OkResp {
-  return !!r && r.ok === true;
-}
-function isErr(r: CreateResponse | null): r is ErrResp {
-  return !!r && r.ok === false;
-}
-
-export default function DevStart() {
-  const [resp, setResp] = useState<CreateResponse | null>(null);
+export default function StartDev() {
+  const [resp, setResp] = useState<Resp | null>(null);
   const [busy, setBusy] = useState(false);
-  const [raw, setRaw] = useState<string>("");
 
-  async function go() {
+  async function create() {
     setBusy(true);
     setResp(null);
-    setRaw("");
     try {
       const r = await fetch("/api/admin/create-session", { method: "POST" });
-      const j = (await r.json()) as CreateResponse;
-      setResp(j);
-      setRaw(JSON.stringify(j, null, 2));
+      const data = (await r.json()) as Resp & { token?: string; url?: string };
+
+      if (!r.ok || !("ok" in data) || !data.ok) {
+        const msg = (data as any)?.error ?? `HTTP ${r.status}`;
+        throw new Error(msg);
+      }
+
+      let { token, url } = data;
+      // Fallback if API didn't return url for any reason
+      if (!url && token) {
+        const origin = window.location.origin;
+        const prefix = window.location.pathname.startsWith("/dev/") ? "/dev" : "";
+        url = `${origin}${prefix}/t/${token}`;
+      }
+      setResp({ ok: true, token: token!, url });
     } catch (e: any) {
-      const err: ErrResp = { ok: false, error: String(e?.message ?? e) };
-      setResp(err);
-      setRaw(JSON.stringify(err, null, 2));
+      setResp({ ok: false, error: e?.message ?? String(e) });
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <main style={{ padding: 24, maxWidth: 900, margin: "0 auto" }}>
-      <h1>Start a Test (helper)</h1>
-      <p>This creates a demo school, candidate, blueprint, and session link.</p>
+    <main style={{ padding: 24, maxWidth: 1000, margin: "0 auto" }}>
+      <h1 style={{ fontSize: 48, marginBottom: 8 }}>Start a Test (helper)</h1>
+      <p style={{ fontSize: 18, marginBottom: 24 }}>
+        This creates a demo school, candidate, blueprint, and session link.
+      </p>
 
-      <button onClick={go} disabled={busy} style={{ padding: "8px 14px" }}>
+      <button
+        onClick={create}
+        disabled={busy}
+        style={{
+          fontSize: 18,
+          padding: "12px 18px",
+          borderRadius: 8,
+          border: "1px solid #aaa",
+          cursor: busy ? "not-allowed" : "pointer",
+          marginBottom: 24,
+        }}
+      >
         {busy ? "Working…" : "Create session link"}
       </button>
 
-      {isOk(resp) && (
-        <div
-          style={{
-            marginTop: 24,
-            padding: 16,
-            border: "1px solid #ddd",
-            borderRadius: 8,
-          }}
-        >
-          <p>
-            <strong>Token:</strong> {resp.token}
-          </p>
-          <p>
-            <strong>Open:</strong>{" "}
-            <a href={resp.url} style={{ wordBreak: "break-all" }}>
-              {resp.url}
-            </a>
-          </p>
+      <section
+        style={{
+          border: "1px solid #ddd",
+          borderRadius: 12,
+          padding: 20,
+          fontSize: 18,
+        }}
+      >
+        <div style={{ marginBottom: 8 }}>
+          <strong>Token:</strong>{" "}
+          {resp && "ok" in resp && resp.ok ? resp.token : ""}
         </div>
-      )}
+        <div>
+          <strong>Open:</strong>{" "}
+          {resp && "ok" in resp && resp.ok && resp.url ? (
+            <a href={resp.url}>{resp.url}</a>
+          ) : (
+            ""
+          )}
+        </div>
 
-      {isErr(resp) && (
-        <pre
-          style={{
-            marginTop: 24,
-            padding: 16,
-            border: "1px solid #fca5a5",
-            borderRadius: 8,
-            color: "#b91c1c",
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-word",
-          }}
-        >
-          {resp.error}
-        </pre>
-      )}
-
-      {raw && (
-        <details style={{ marginTop: 16 }}>
-          <summary>Raw response</summary>
-          <pre>{raw}</pre>
-        </details>
-      )}
+        {resp && "ok" in resp && !resp.ok && (
+          <pre
+            style={{
+              marginTop: 16,
+              color: "#b91c1c",
+              whiteSpace: "pre-wrap",
+              fontSize: 14,
+            }}
+          >
+            {resp.error}
+          </pre>
+        )}
+      </section>
     </main>
   );
 }
