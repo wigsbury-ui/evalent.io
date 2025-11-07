@@ -4,7 +4,7 @@ import { sbAdmin } from '@/lib/supabase';
 
 export async function POST(_req: Request) {
   try {
-    const sb = sbAdmin(); // <-- call the factory to get a client
+    const sb = sbAdmin(); // factory → client
 
     // 1) School (DB fills short_code/slug via defaults/trigger)
     const { data: school, error: schErr } = await sb
@@ -24,15 +24,20 @@ export async function POST(_req: Request) {
       .single();
     if (candErr || !cand) throw candErr ?? new Error('candidate insert failed');
 
-    // 3) Blueprint (name + {} config required)
+    // 3) Blueprint (programme is REQUIRED → set an explicit default)
     const { data: bp, error: bpErr } = await sb
       .from('blueprints')
-      .insert({ school_id: school.id, name: 'Default', config: {} })
+      .insert({
+        school_id: school.id,
+        name: 'Default',
+        programme: 'UK',     // ← important
+        config: {},          // jsonb not null
+      })
       .select('id')
       .single();
     if (bpErr || !bp) throw bpErr ?? new Error('blueprint insert failed');
 
-    // 4) Session (status must be one of allowed values; 'pending' is valid)
+    // 4) Session (status must be allowed; 'pending' is valid)
     const token = randomUUID().replace(/-/g, '');
     const { data: sess, error: sessErr } = await sb
       .from('sessions')
