@@ -87,3 +87,12 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+// after you compute `token`
+const origin = req.headers.get('x-forwarded-proto')
+  ? `${req.headers.get('x-forwarded-proto')}://${req.headers.get('x-forwarded-host')}`
+  : process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+
+// choose the route you actually use:
+const url = `${origin}/t/${token}`; // or `/take?token=${token}` or `/test?token=${token}`
+
+return NextResponse.json({ ok: true, token, url });
