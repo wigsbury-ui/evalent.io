@@ -1,114 +1,94 @@
 // app/api/admin/create-session/route.ts
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse, NextRequest } from "next/server";
 import { headers } from "next/headers";
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 
-function sbAdmin(): SupabaseClient {
-  const url =
-    process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || "";
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
-  if (!url || !key) {
-    throw new Error(
-      "Supabase env missing. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY."
-    );
-  }
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
+function sbAdmin() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
-function makeBaseUrl(): string {
+function originFromHeaders(): string {
   const h = headers();
   const proto = h.get("x-forwarded-proto") ?? "https";
-  const host = h.get("host") ?? "";
-  return process.env.NEXT_PUBLIC_SITE_URL || `${proto}://${host}`;
-}
-
-function makeToken(): string {
-  const buf = new Uint8Array(32);
-  crypto.getRandomValues(buf);
-  return Array.from(buf, (b) => b.toString(16).padStart(2, "0")).join("");
+  const host = h.get("x-forwarded-host");
+  if (host) return `${proto}://${host}`;
+  return process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 }
 
 export async function POST(_req: NextRequest) {
   try {
     const sb = sbAdmin();
-    const base = makeBaseUrl();
 
-    // 1) School
-    const schoolName = "Demo School";
-    let { data: school } = await sb
+    // 1) Demo school
+    const { data: school, error: schErr } = await sb
       .from("schools")
-      .select("id")
-      .eq("name", schoolName)
-      .maybeSingle();
-    if (!school) {
-      const ins = await sb
-        .from("schools")
-        .insert({ name: schoolName })
-        .select("id")
-        .single();
-      if (ins.error) throw ins.error;
-      school = ins.data!;
-    }
+      .insert({ name: "Demo School" })
+      .select("id, short_code, slug")
+      .single();
+    if (schErr) throw schErr;
 
     // 2) Candidate
-    const candName = "Demo Candidate";
-    let { data: candidate } = await sb
+    const { data: cand, error: candErr } = await sb
       .from("candidates")
+      .insert({
+        school_id: school.id,
+        first_name: "Demo",
+        last_name: "Student",
+        email: "demo@example.com",
+      })
       .select("id")
-      .eq("school_id", school.id)
-      .eq("name", candName)
-      .maybeSingle();
-    if (!candidate) {
-      const ins = await sb
-        .from("candidates")
-        .insert({ school_id: school.id, name: candName })
-        .select("id")
-        .single();
-      if (ins.error) throw ins.error;
-      candidate = ins.data!;
-    }
+      .single();
+    if (candErr) throw candErr;
 
-    // 3) Blueprint
-    const bpName = "Demo Blueprint";
-    let { data: blueprint } = await sb
+    // 3) Blueprint (programme/grade/pass_logic cannot be null)
+    const { data: bp, error: bpErr } = await sb
       .from("blueprints")
+      .insert({
+        school_id: school.id,
+        programme: "UK",
+        grade: 7,
+        name: "Demo Blueprint",
+        pass_logic: { type: "threshold", overall: 60 }, // minimal valid JSON
+      })
       .select("id")
-      .eq("school_id", school.id)
-      .eq("name", bpName)
-      .maybeSingle();
-    if (!blueprint) {
-      const ins = await sb
-        .from("blueprints")
-        .insert({ school_id: school.id, name: bpName })
-        .select("id")
-        .single();
-      if (ins.error) throw ins.error;
-      blueprint = ins.data!;
-    }
+      .single();
+    if (bpErr) throw bpErr;
 
-    // 4) Session
-    const token = makeToken();
-    const insSess = await sb.from("sessions").insert({
-      school_id: school.id,
-      candidate_id: candidate.id,
-      blueprint_id: blueprint.id,
-      token,
-      // status uses DB default 'pending'
-    });
-    if (insSess.error) throw insSess.error;
+    // 4) Session (status has valid default/constraint in DB now)
+    const { data: sess, error: sessErr } = await sb
+      .from("sessions")
+      .insert({
+        school_id: school.id,
+        candidate_id: cand.id,
+        blueprint_id: bp.id,
+        status: "pending",
+      })
+      .select("id, token")
+      .single();
+    if (sessErr) throw sessErr;
 
-    // Provide a direct working link to your runner under /dev/test
-    const url = `${base}/dev/test?token=${token}`;
+    const origin = originFromHeaders();
+
+    // Preferred deep link(s) if you later store them server-side:
     const links = {
-      test: url,
-      take: `${base}/dev/take?token=${token}`,
+      t: `${origin}/t/${sess.token}`,
+      devTest: `${origin}/dev/test?token=${sess.token}`,
+      test: `${origin}/test?token=${sess.token}`,
     };
 
-    return NextResponse.json({ ok: true, token, url, links });
+    // Fallback: /t/[token]
+    const url = links.t;
+
+    return NextResponse.json({ ok: true, token: sess.token, url });
   } catch (e: any) {
     return NextResponse.json(
       { ok: false, error: e?.message ?? String(e) },
-      { status: 400 }
+      { status: 500 }
     );
   }
 }
