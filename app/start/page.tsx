@@ -1,83 +1,70 @@
-'use client';
+// app/start/page.tsx  (duplicate to app/dev/start/page.tsx if you keep both)
+"use client";
 
 import { useState } from "react";
 
-type Ok  = { ok: true;  token: string; url: string };
-type Err = { ok: false; error: string };
-type Resp = Ok | Err;
+type Resp = { ok: true; token: string; url: string } | { ok: false; error: string };
 
-export default function StartPage() {
+export default function Start() {
   const [resp, setResp] = useState<Resp | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  const create = async () => {
+  async function create() {
+    setLoading(true);
     setResp(null);
     try {
-      const r = await fetch("/api/admin/create-session", { cache: "no-store" });
-      const text = await r.text();
-      let json: any;
-      try {
-        json = text ? JSON.parse(text) : { ok: false, error: "Empty response from API" };
-      } catch {
-        json = { ok: false, error: `Bad JSON from API: ${text?.slice(0,400)}` };
-      }
-      setResp(json as Resp);
+      const r = await fetch("/api/dev/session", { method: "POST" });
+      const j = (await r.json()) as Resp;
+      setResp(j);
     } catch (e: any) {
-      setResp({ ok: false, error: String(e?.message ?? e) });
+      setResp({ ok: false, error: e?.message ?? "Unknown error" });
+    } finally {
+      setLoading(false);
     }
-  };
+  }
 
-  const ok = resp && (resp as any).ok === true;
-  const tokenText = ok ? (resp as Ok).token : "";
-  const openUrl   = ok ? (resp as Ok).url   : undefined;
-  const errorText = !ok && resp ? (resp as Err).error : undefined;
+  const tokenText = resp && "ok" in resp && resp.ok ? resp.token : "";
+  const openUrl   = resp && "ok" in resp && resp.ok ? resp.url   : undefined;
+  const errText   = resp && !("ok" in resp && resp.ok) ? (resp as any).error : undefined;
 
   return (
     <main style={{ padding: 24, maxWidth: 1000, margin: "0 auto" }}>
-      <h1 style={{ fontSize: 56, lineHeight: 1.05, fontWeight: 800 }}>
-        Start a Test (helper)
-      </h1>
-      <p>This creates a demo school, candidate, blueprint, and session link.</p>
+      <h1 style={{ fontSize: 64, lineHeight: 1.05, marginBottom: 16 }}>Start a Test (helper)</h1>
+      <p style={{ fontSize: 24, marginBottom: 24 }}>
+        This creates a demo school, candidate, blueprint, and session link.
+      </p>
 
       <button
         onClick={create}
+        disabled={loading}
         style={{
-          marginTop: 16,
-          padding: "14px 18px",
-          borderRadius: 10,
+          fontSize: 24,
+          padding: "12px 20px",
+          borderRadius: 12,
           border: "1px solid #111",
-          background: "#111",
-          color: "#fff",
-          fontWeight: 700,
-          cursor: "pointer",
+          background: loading ? "#ddd" : "black",
+          color: "white",
+          cursor: loading ? "not-allowed" : "pointer",
+          marginBottom: 24
         }}
       >
-        Create session link
+        {loading ? "Creating…" : "Create session link"}
       </button>
 
-      <section
-        style={{
-          border: "1px solid #e5e5e5",
-          borderRadius: 12,
-          padding: 16,
-          marginTop: 24,
-          fontSize: 20,
-        }}
-      >
-        <p><b>Token:</b> {tokenText}</p>
-        <p>
-          <b>Open:</b>{" "}
+      <section style={{ border: "1px solid #ddd", padding: 24, borderRadius: 12 }}>
+        <p style={{ fontSize: 28, margin: 0, fontWeight: 700 }}>Token: <span style={{ fontWeight: 400 }}>{tokenText}</span></p>
+        <p style={{ fontSize: 28, marginTop: 12, fontWeight: 700 }}>
+          Open:&nbsp;
           {openUrl ? (
-            <a href={openUrl} style={{ color: "#1d4ed8" }}>
-              {openUrl}
-            </a>
+            <a href={openUrl} style={{ fontWeight: 400, color: "#1d4ed8" }}>{openUrl}</a>
           ) : (
-            ""
+            <span style={{ fontWeight: 400 }} />
           )}
         </p>
 
-        {errorText && (
-          <pre style={{ color: "#b91c1c", whiteSpace: "pre-wrap" }}>
-            {errorText}
+        {errText && (
+          <pre style={{ color: "#b91c1c", whiteSpace: "pre-wrap", fontSize: 16, marginTop: 16 }}>
+            {errText}
           </pre>
         )}
       </section>
