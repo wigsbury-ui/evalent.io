@@ -1,7 +1,7 @@
-// app/t/[token]/page.tsx
+// app/dev/t/[token]/page.tsx
 import { redirect } from "next/navigation";
 
-export default function Page({ params }: { params: { token: string } }) {
-  // Redirect plain /t/[token] to your real runner under /dev
-  redirect(`/dev/t/${params.token}`);
+export default function DevTokenPage({ params }: { params: { token: string } }) {
+  // Normalize any /dev/t/[token] link to the actual runner:
+  redirect(`/dev/test?token=${params.token}`);
 }
