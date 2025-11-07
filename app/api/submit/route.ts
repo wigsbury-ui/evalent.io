@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import items from "@/data/items_full.json";
+// @ts-ignore
+import items from "../../../data/items_full.json";
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -23,15 +24,15 @@ export async function POST(req: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   if (!s)    return NextResponse.json({ error: "session not found" }, { status: 404 });
 
-  // record attempt
   await admin.from("attempts").insert({
     session_id: s.id,
     item_id: itemId,
     answer
   });
 
+  const bank = items as any[];
   const nextIndex = (s.item_index ?? 0) + 1;
-  const done = nextIndex >= (items as any[]).length;
+  const done = nextIndex >= bank.length;
 
   await admin
     .from("sessions")
