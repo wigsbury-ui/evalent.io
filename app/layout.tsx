@@ -1,12 +1,15 @@
-export const metadata = {
-  title: 'Evalent',
-  description: 'Admissions testing',
-};
+// app/layout.tsx
+export const dynamic = "force-dynamic";
+export const revalidate = 0; // valid: number or false
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en">
-      <body style={{ margin: 0, fontFamily: 'system-ui' }}>{children}</body>
+      <body>{children}</body>
     </html>
   );
 }
