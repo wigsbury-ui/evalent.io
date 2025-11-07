@@ -1,23 +1,36 @@
-// app/api/next-item/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { sbAdmin } from '@/lib/supabase';
+import { NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import items from "@/data/items_full.json";
 
-export async function POST(req: NextRequest) {
-  try {
-    const { token } = await req.json();
-    if (!token) return NextResponse.json({ ok: false, error: 'missing token' }, { status: 400 });
+const admin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  { auth: { persistSession: false } }
+);
 
-    const sb = sbAdmin();
-    const { data: session, error } = await sb
-      .from('sessions')
-      .select('id, status')
-      .eq('token', token)
-      .single();
-    if (error || !session) return NextResponse.json({ ok: false, error: 'session not found' }, { status: 404 });
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const token = searchParams.get("token");
+  if (!token) return NextResponse.json({ error: "token required" }, { status: 400 });
 
-    // Return a minimal placeholder payload (keeps build/runtime happy)
-    return NextResponse.json({ ok: true, session_id: session.id, status: session.status, item: null });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message || String(e) }, { status: 500 });
+  const { data: s, error } = await admin
+    .from("sessions")
+    .select("id,item_index,status")
+    .eq("public_token", token)
+    .maybeSingle();
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!s)    return NextResponse.json({ error: "session not found" }, { status: 404 });
+
+  const idx = s.item_index ?? 0;
+  if (idx >= items.length) {
+    await admin.from("sessions").update({ status: "finished" }).eq("id", s.id);
+    return NextResponse.json({ done: true });
   }
+
+  const item = (items as any[])[idx];
+  return NextResponse.json({
+    done: false,
+    item: { id: item.id, prompt: item.prompt, choices: item.choices }
+  });
 }
