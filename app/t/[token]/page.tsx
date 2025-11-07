@@ -56,3 +56,19 @@ export default async function RunnerPage({ params }: { params: { token: string }
     </main>
   );
 }
+// …existing code above…
+import dynamicRunner from "./RunnerClient"; // top of file
+
+// Replace the return with this block (keep your header/details if you like)
+  return (
+    <main style={{ padding: 24 }}>
+      <h1 style={{ fontSize: 64, lineHeight: 1.05 }}>Evalent Test Runner</h1>
+      <p style={{ fontSize: 22, marginTop: 8 }}>Token: <code>{params.token}</code></p>
+
+      {/* existing session details here if you want */}
+
+      {/* Interactive runner */}
+      {/* @ts-expect-error Server/Client boundary */}
+      <dynamicRunner token={params.token} />
+    </main>
+  );
