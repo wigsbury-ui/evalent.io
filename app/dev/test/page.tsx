@@ -1,5 +1,7 @@
-// app/dev/test/page.tsx  (NEW)
+// app/dev/test/page.tsx   (NEW — handles /dev/test?token=… and forwards to /test)
 import { redirect } from "next/navigation";
+
+export const dynamic = "force-dynamic";
 
 export default function DevTest({
   searchParams,
@@ -7,7 +9,6 @@ export default function DevTest({
   searchParams: { token?: string | string[] };
 }) {
   const raw = searchParams?.token;
-  const token = Array.isArray(raw) ? raw[0] : raw || "";
-  // Forward any /dev/test?token=… to the real runner at /test
+  const token = Array.isArray(raw) ? raw[0] : raw ?? "";
   redirect(`/test?token=${encodeURIComponent(token)}`);
 }
