@@ -1,4 +1,4 @@
-// app/t/[token]/page.tsx   (NEW or REPLACE — keeps old /t/<token> links working)
+// app/t/[token]/page.tsx
 import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
