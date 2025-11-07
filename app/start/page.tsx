@@ -1,73 +1,64 @@
-// app/start/page.tsx  (duplicate to app/dev/start/page.tsx if you keep both)
 "use client";
 
 import { useState } from "react";
 
 type Resp = { ok: true; token: string; url: string } | { ok: false; error: string };
 
-export default function Start() {
+export default function StartPage() {
   const [resp, setResp] = useState<Resp | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  async function create() {
-    setLoading(true);
+  const doCreate = async () => {
     setResp(null);
     try {
-      const r = await fetch("/api/dev/session", { method: "POST" });
+      const r = await fetch("/api/start", { method: "GET" });
       const j = (await r.json()) as Resp;
       setResp(j);
+      if ("ok" in j && j.ok && j.url) {
+        // Optional: auto-open
+        // window.location.href = j.url;
+      }
     } catch (e: any) {
-      setResp({ ok: false, error: e?.message ?? "Unknown error" });
-    } finally {
-      setLoading(false);
+      setResp({ ok: false, error: e?.message || "Failed to create session" });
     }
-  }
-
-  const tokenText = resp && "ok" in resp && resp.ok ? resp.token : "";
-  const openUrl   = resp && "ok" in resp && resp.ok ? resp.url   : undefined;
-  const errText   = resp && !("ok" in resp && resp.ok) ? (resp as any).error : undefined;
+  };
 
   return (
-    <main style={{ padding: 24, maxWidth: 1000, margin: "0 auto" }}>
-      <h1 style={{ fontSize: 64, lineHeight: 1.05, marginBottom: 16 }}>Start a Test (helper)</h1>
-      <p style={{ fontSize: 24, marginBottom: 24 }}>
+    <main style={{ padding: 24 }}>
+      <h1 style={{ fontSize: 64, lineHeight: 1.05 }}>Start a Test (helper)</h1>
+      <p style={{ fontSize: 20, marginTop: 8 }}>
         This creates a demo school, candidate, blueprint, and session link.
       </p>
 
       <button
-        onClick={create}
-        disabled={loading}
+        onClick={doCreate}
         style={{
-          fontSize: 24,
-          padding: "12px 20px",
+          marginTop: 24,
+          padding: "12px 16px",
           borderRadius: 12,
           border: "1px solid #111",
-          background: loading ? "#ddd" : "black",
-          color: "white",
-          cursor: loading ? "not-allowed" : "pointer",
-          marginBottom: 24
+          fontSize: 20,
+          cursor: "pointer",
         }}
       >
-        {loading ? "Creating…" : "Create session link"}
+        Create session link
       </button>
 
-      <section style={{ border: "1px solid #ddd", padding: 24, borderRadius: 12 }}>
-        <p style={{ fontSize: 28, margin: 0, fontWeight: 700 }}>Token: <span style={{ fontWeight: 400 }}>{tokenText}</span></p>
-        <p style={{ fontSize: 28, marginTop: 12, fontWeight: 700 }}>
-          Open:&nbsp;
-          {openUrl ? (
-            <a href={openUrl} style={{ fontWeight: 400, color: "#1d4ed8" }}>{openUrl}</a>
+      <div style={{ marginTop: 24, padding: 16, borderRadius: 12, border: "1px solid #e5e7eb" }}>
+        <div style={{ fontSize: 22, marginBottom: 8 }}>
+          <strong>Token:</strong> {resp && resp.ok ? (resp as any).token : ""}
+        </div>
+        <div style={{ fontSize: 22 }}>
+          <strong>Open:</strong>{" "}
+          {resp && resp.ok ? (
+            <a href={(resp as any).url} style={{ color: "#2563eb" }}>
+              {(resp as any).url}
+            </a>
+          ) : resp && !resp.ok ? (
+            <pre style={{ color: "#b91c1c", whiteSpace: "pre-wrap" }}>{(resp as any).error}</pre>
           ) : (
-            <span style={{ fontWeight: 400 }} />
+            ""
           )}
-        </p>
-
-        {errText && (
-          <pre style={{ color: "#b91c1c", whiteSpace: "pre-wrap", fontSize: 16, marginTop: 16 }}>
-            {errText}
-          </pre>
-        )}
-      </section>
+        </div>
+      </div>
     </main>
   );
 }
