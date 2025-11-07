@@ -1,2 +1,4 @@
 // app/dev/t/[token]/page.tsx
-export { default, dynamic } from "../../../t/[token]/page";
+// Wrapper so /dev/t/[token] mirrors /t/[token]
+export { default } from "../../../t/[token]/page";
+export const dynamic = "force-dynamic";
