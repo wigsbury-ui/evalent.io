@@ -1,14 +1,32 @@
-// app/dev/test/page.tsx   (NEW — handles /dev/test?token=… and forwards to /test)
-import { redirect } from "next/navigation";
+// app/test/page.tsx
+"use client";
 
-export const dynamic = "force-dynamic";
+import { useSearchParams } from "next/navigation";
 
-export default function DevTest({
-  searchParams,
-}: {
-  searchParams: { token?: string | string[] };
-}) {
-  const raw = searchParams?.token;
-  const token = Array.isArray(raw) ? raw[0] : raw ?? "";
-  redirect(`/test?token=${encodeURIComponent(token)}`);
+export const dynamic = "force-dynamic"; // opt out of SSG; no revalidate export
+
+export default function TestPage() {
+  const sp = useSearchParams();
+  const token = sp.get("token") ?? "";
+
+  return (
+    <main style={{ padding: "2rem", maxWidth: 800, margin: "0 auto" }}>
+      <h1 style={{ fontSize: "2rem", marginBottom: 8 }}>Evalent Test</h1>
+      {!token ? (
+        <p style={{ color: "#b91c1c" }}>
+          Missing <code>token</code> query param.
+        </p>
+      ) : (
+        <>
+          <p>
+            <strong>Token:</strong> {token}
+          </p>
+          <p>
+            (Placeholder runner so the route exists; it avoids 404 and you can
+            wire it to your APIs next.)
+          </p>
+        </>
+      )}
+    </main>
+  );
 }
