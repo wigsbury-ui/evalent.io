@@ -1,51 +1,65 @@
-// app/api/admin/create-session/route.ts
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 import { sbAdmin } from '@/lib/supabase';
 
 export async function POST(_req: Request) {
   try {
-    const sb = sbAdmin();
-    const code = randomUUID().slice(0, 6).toUpperCase();
+    const sb = sbAdmin; // sbAdmin is a client instance (not a function)
 
-    // 1) School (slug/short_code filled by your DB trigger/defaults)
+    // 1) School (DB fills short_code/slug via defaults/trigger)
     const { data: school, error: schErr } = await sb
       .from('schools')
-      .insert({ name: `Demo School ${code}` })
-      .select('id')
+      .insert({ name: 'Demo School' })
+      .select('id, short_code, slug')
       .single();
-    if (schErr || !school) return NextResponse.json({ ok: false, error: schErr?.message || 'school insert failed' }, { status: 500 });
+    if (schErr || !school) throw schErr ?? new Error('school insert failed');
 
-    // 2) Candidate (you added candidates.name)
+    // 2) Candidate (ensure a non-null name)
     const { data: cand, error: candErr } = await sb
       .from('candidates')
-      .insert({ name: `Candidate ${code}` })
+      .insert({ name: 'Candidate ' + String(school.short_code ?? '').toUpperCase() })
       .select('id')
       .single();
-    if (candErr || !cand) return NextResponse.json({ ok: false, error: candErr?.message || 'candidate insert failed' }, { status: 500 });
+    if (candErr || !cand) throw candErr ?? new Error('candidate insert failed');
 
-    // 3) Blueprint (config is jsonb not null default {})
+    // 3) Blueprint (name + {} config required)
     const { data: bp, error: bpErr } = await sb
       .from('blueprints')
-      .insert({ slug: `demo-${code.toLowerCase()}`, config: {} })
-      .select('id, slug')
+      .insert({
+        school_id: school.id,
+        name: 'Default',
+        config: {}, // jsonb
+      })
+      .select('id')
       .single();
-    if (bpErr || !bp) return NextResponse.json({ ok: false, error: bpErr?.message || 'blueprint insert failed' }, { status: 500 });
+    if (bpErr || !bp) throw bpErr ?? new Error('blueprint insert failed');
 
-    // 4) Session (status MUST be one of: pending | in_progress | finished | cancelled)
+    // 4) Session (status 'pending' is now valid; token drives test URL)
     const token = randomUUID().replace(/-/g, '');
-    const { error: sessErr } = await sb.from('sessions').insert({
-      school_id:    school.id,
-      candidate_id: cand.id,
-      blueprint_id: bp.id,
-      token,
-      status: 'pending',  // <-- critical: matches the DB check
-    });
-    if (sessErr) return NextResponse.json({ ok: false, error: sessErr.message }, { status: 500 });
+    const { data: sess, error: sessErr } = await sb
+      .from('sessions')
+      .insert({
+        token,
+        school_id: school.id,
+        candidate_id: cand.id,
+        blueprint_id: bp.id,
+        status: 'pending',
+        item_index: 0,
+      })
+      .select('id')
+      .single();
+    if (sessErr || !sess) throw sessErr ?? new Error('session insert failed');
 
-    // Return a simple payload; your UI can build a link from the token
-    return NextResponse.json({ ok: true, token });
+    return NextResponse.json({
+      ok: true,
+      session_id: sess.id,
+      token,
+      url: `/test/${token}`,
+    });
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: e?.message ?? String(e) },
+      { status: 400 }
+    );
   }
 }
