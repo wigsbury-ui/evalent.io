@@ -1,10 +1,16 @@
+// app/t/[token]/page.tsx
 import RunnerClient from "./RunnerClient";
 
-export default async function TokenPage({ params }: { params: { token: string } }) {
+export default function TokenPage({ params }: { params: { token: string } }) {
   return (
-    <main>
+    <main style={{ padding: 24 }}>
       <h1 style={{ fontSize: 64, lineHeight: 1.05 }}>Evalent Test Runner</h1>
-      <p style={{ fontSize: 20, opacity: 0.8 }}>Token: <code>{params.token}</code></p>
+      <p style={{ fontSize: 22, marginTop: 8 }}>
+        Token: <code>{params.token}</code>
+      </p>
+
+      {/* Client component */}
+      {/* @ts-expect-error Server/Client boundary */}
       <RunnerClient token={params.token} />
     </main>
   );
