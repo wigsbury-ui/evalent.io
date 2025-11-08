@@ -1,17 +1,51 @@
 // app/api/next-item/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { getItemByIndex } from "../../lib/items";
+import { NextResponse } from 'next/server';
+import { supa } from '../../../lib/db';
+import { items } from '../../../lib/items';
 
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const index = Number(searchParams.get("index") ?? "0");
-  const item = getItemByIndex(index);
-  return NextResponse.json({ ok: true, item, index });
-}
+export async function POST(req: Request) {
+  try {
+    const { token } = await req.json();
 
-export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => ({}));
-  const index = Number(body?.index ?? 0);
-  const item = getItemByIndex(index);
-  return NextResponse.json({ ok: true, item, index });
+    if (!token) {
+      return NextResponse.json({ ok: false, error: 'Missing token' }, { status: 400 });
+    }
+
+    // Find session by public_token
+    const { data: session, error } = await supa
+      .from('sessions')
+      .select('id, item_index, status')
+      .eq('public_token', token)
+      .single();
+
+    if (error || !session) {
+      return NextResponse.json({ ok: false, error: 'Session not found' }, { status: 404 });
+    }
+
+    const idx = session.item_index ?? 0;
+
+    if (idx >= items.length) {
+      // already finished
+      return NextResponse.json({ ok: true, done: true });
+    }
+
+    const item = items[idx];
+
+    // minimal payload for the client
+    return NextResponse.json({
+      ok: true,
+      done: false,
+      index: idx,
+      total: items.length,
+      item: {
+        id: item.id,
+        domain: item.domain,
+        type: item.type,
+        prompt: item.prompt,
+        options: item.type === 'mcq' ? item.options : undefined,
+      },
+    });
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e?.message ?? 'Server error' }, { status: 500 });
+  }
 }
