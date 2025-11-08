@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-// @ts-ignore - bundler handles JSON; TS type is not important here
-import items from "../../../data/items_full.json";
+import { ITEMS } from "../../../lib/items";
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,14 +23,13 @@ export async function GET(req: Request) {
   if (!s)    return NextResponse.json({ error: "session not found" }, { status: 404 });
 
   const idx = s.item_index ?? 0;
-  const bank = items as any[];
 
-  if (idx >= bank.length) {
+  if (idx >= ITEMS.length) {
     await admin.from("sessions").update({ status: "finished" }).eq("id", s.id);
     return NextResponse.json({ done: true });
   }
 
-  const item = bank[idx];
+  const item = ITEMS[idx];
   return NextResponse.json({
     done: false,
     item: { id: item.id, prompt: item.prompt, choices: item.choices }
