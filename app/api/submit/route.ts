@@ -1,16 +1,50 @@
 // app/api/submit/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { ITEMS, isCorrect } from "../../lib/items";
+import { NextResponse } from 'next/server';
+import { supa } from '../../../lib/db';
+import { items } from '../../../lib/items';
 
-export async function POST(req: NextRequest) {
-  const body = await req.json().catch(() => ({}));
-  const { item_id, response } = body ?? {};
+export async function POST(req: Request) {
+  try {
+    const body = await req.json();
+    const { token, itemId, answer } = body ?? {};
 
-  const item = ITEMS.find((x) => x.id === item_id);
-  if (!item) {
-    return NextResponse.json({ ok: false, error: "item_not_found" }, { status: 400 });
+    if (!token || !itemId) {
+      return NextResponse.json({ ok: false, error: 'Missing token or itemId' }, { status: 400 });
+    }
+
+    // Get the session to know where we are
+    const { data: session, error: sErr } = await supa
+      .from('sessions')
+      .select('id, item_index')
+      .eq('public_token', token)
+      .single();
+
+    if (sErr || !session) {
+      return NextResponse.json({ ok: false, error: 'Session not found' }, { status: 404 });
+    }
+
+    // (Optional) store attempt – you can add an attempts table later if you want.
+    // For now we just advance the pointer.
+
+    const nextIndex = (session.item_index ?? 0) + 1;
+    const finished  = nextIndex >= items.length;
+
+    const { error: uErr } = await supa
+      .from('sessions')
+      .update({
+        item_index: nextIndex,
+        last_answered_at: new Date().toISOString(),
+        finished_at: finished ? new Date().toISOString() : null,
+        status: finished ? 'finished' : 'pending',
+      })
+      .eq('id', session.id);
+
+    if (uErr) {
+      return NextResponse.json({ ok: false, error: uErr.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true, finished });
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e?.message ?? 'Server error' }, { status: 500 });
   }
-
-  const result = isCorrect(item, response);
-  return NextResponse.json({ ok: true, correct: result });
 }
