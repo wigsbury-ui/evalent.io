@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { items } from "@/lib/items";
+import { items } from "@/lib/item";
 import { supa } from "@/lib/db"; // your existing client
 
 export async function POST(req: Request) {
