@@ -1,103 +1,57 @@
 // lib/items.ts
 
-export type ItemType = "mcq" | "short";
-export type Domain = "English" | "Maths" | "Reasoning" | "Readiness";
-
-export interface Item {
+export type Item = {
   id: string;
-  domain: Domain;
-  type: ItemType;
+  domain: string;
+  type: "mcq" | "short";
   prompt: string;
-  // MCQ
   options?: string[];
-  answerIndex?: number; // 0-based index when type === "mcq"
-}
+  answerIndex?: number; // for MCQ
+};
 
+// --- Temporary demo items so the API works and the build passes.
+// Replace with your real item source later.
 export const ITEMS: Item[] = [
   {
-    id: "E-01",
-    domain: "English",
+    id: "MATH-1",
+    domain: "Maths",
     type: "mcq",
-    prompt: "Choose the correctly punctuated sentence.",
-    options: [
-      "lets go to the park",
-      "Let’s go to the park.",
-      "Lets go to the park.",
-      "Let’s go to the Park.",
-    ],
+    prompt: "What is 2 + 2?",
+    options: ["3", "4", "5", "22"],
     answerIndex: 1,
   },
   {
-    id: "M-01",
-    domain: "Maths",
-    type: "mcq",
-    prompt: "What is 7 × 8?",
-    options: ["48", "52", "54", "56"],
-    answerIndex: 3,
-  },
-  {
-    id: "R-01",
-    domain: "Reasoning",
-    type: "mcq",
-    prompt:
-      "Find the next number in the sequence: 3, 6, 12, 24, ?",
-    options: ["36", "42", "48", "50"],
-    answerIndex: 2,
-  },
-  {
-    id: "Rd-01",
-    domain: "Readiness",
-    type: "short",
-    prompt:
-      "In two sentences, describe how you stay focused during a long task.",
-  },
-  {
-    id: "E-02",
+    id: "ENG-1",
     domain: "English",
-    type: "mcq",
-    prompt: "Which word is a synonym of “rapid”?",
-    options: ["slow", "quick", "loud", "late"],
-    answerIndex: 1,
-  },
-  {
-    id: "M-02",
-    domain: "Maths",
-    type: "mcq",
-    prompt: "What is the value of 3² + 4² ?",
-    options: ["12", "18", "25", "49"],
-    answerIndex: 2,
-  },
-  {
-    id: "R-02",
-    domain: "Reasoning",
-    type: "mcq",
-    prompt:
-      "Which shape has the greatest number of lines of symmetry?",
-    options: ["Square", "Rectangle", "Parallelogram", "Kite"],
-    answerIndex: 0,
-  },
-  {
-    id: "Rd-02",
-    domain: "Readiness",
     type: "short",
-    prompt:
-      "Write one thing you enjoy about learning and why.",
+    prompt: "Write a synonym for “happy”.",
   },
 ];
 
-// Simple helpers for the demo
 export function getItemByIndex(index: number): Item {
-  const i = Math.max(0, index | 0) % ITEMS.length;
-  return ITEMS[i];
+  const i = Number.isFinite(index) ? Math.max(0, Math.floor(index)) : 0;
+  return ITEMS[i % ITEMS.length];
 }
 
 export function isCorrect(item: Item, response: unknown): boolean | null {
   if (item.type !== "mcq") return null;
-  const idx =
-    typeof response === "number"
-      ? response
-      : typeof response === "string"
-      ? Number(response)
-      : -1;
-  return idx === item.answerIndex;
+
+  // Accept either a number index or a string that parses to a number.
+  let chosen: number | undefined;
+
+  if (typeof response === "number") chosen = response;
+  else if (typeof response === "string") {
+    const parsed = Number(response);
+    if (Number.isFinite(parsed)) chosen = parsed;
+  } else if (
+    typeof response === "object" &&
+    response !== null &&
+    "choice" in (response as any)
+  ) {
+    const v = (response as any).choice;
+    if (typeof v === "number") chosen = v;
+  }
+
+  if (typeof chosen !== "number") return false;
+  return chosen === item.answerIndex;
 }
