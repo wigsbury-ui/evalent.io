@@ -85,3 +85,7 @@ export default function RunnerClient({ token }: { token: string }) {
     </section>
   );
 }
+const opts = React.useMemo(
+  () => item.options?.slice().sort(() => Math.random() - 0.5) ?? [],
+  [item]
+);
