@@ -1,6 +1,6 @@
 // app/api/next-item/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { getItemByIndex } from "../../../lib/items";
+import { getItemByIndex } from "../../lib/items";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
