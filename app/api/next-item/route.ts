@@ -1,30 +1,42 @@
 import { NextResponse } from "next/server";
-import { admin } from "@/lib/db";
-import { items } from "@/lib/item";
+import { items } from "@/lib/items";
+import { supa } from "@/lib/db"; // your existing client
 
-export async function GET(req: Request) {
+export async function POST(req: Request) {
   try {
-    const url = new URL(req.url);
-    const token = url.searchParams.get("token");
+    const { token } = await req.json();
     if (!token) return NextResponse.json({ ok: false, error: "Missing token" }, { status: 400 });
 
-    const supabase = admin();
-    const { data: rows, error } = await supabase.from("sessions").select("*").eq("public_token", token).limit(1);
-    if (error) throw error;
-    const row = rows?.[0];
-    if (!row) return NextResponse.json({ ok: false, error: "Session not found" }, { status: 404 });
+    const { data: session, error } = await supa
+      .from("sessions")
+      .select("id, item_index, status")
+      .eq("public_token", token)
+      .single();
 
-    const idx = row.item_index ?? 0;
-    if (idx >= items.length) return NextResponse.json({ ok: true, done: true });
+    if (error || !session) {
+      return NextResponse.json({ ok: false, error: "Session not found" }, { status: 404 });
+    }
 
-    const item = items[idx];
-    // Hide correctIndex from client for MCQ
-    const safe = item.type === "mcq"
-      ? { id: item.id, domain: item.domain, type: "mcq" as const, prompt: item.prompt, options: item.options }
-      : { id: item.id, domain: item.domain, type: "written" as const, prompt: item.prompt };
+    const idx = session.item_index ?? 0;
+    if (idx >= items.length) {
+      return NextResponse.json({ ok: true, done: true });
+    }
 
-    return NextResponse.json({ ok: true, done: false, item: safe });
-  } catch (e:any) {
-    return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
+    const it = items[idx];
+    return NextResponse.json({
+      ok: true,
+      done: false,
+      index: idx,
+      total: items.length,
+      item: {
+        id: it.id,
+        domain: it.domain,
+        type: it.type,
+        prompt: it.prompt,
+        options: it.type === "mcq" ? it.options : undefined,
+      },
+    });
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e?.message ?? "Server error" }, { status: 500 });
   }
 }
