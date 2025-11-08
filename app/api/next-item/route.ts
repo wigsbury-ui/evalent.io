@@ -1,7 +1,7 @@
 // app/api/next-item/route.ts
 import { NextResponse } from 'next/server';
-import { supa } from '../../../lib/db';
-import { items } from '../../../lib/items';
+import { supa } from '@/lib/db';
+import { items } from '@/lib/items';
 
 export async function POST(req: Request) {
   try {
@@ -11,7 +11,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'Missing token' }, { status: 400 });
     }
 
-    // Find session by public_token
     const { data: session, error } = await supa
       .from('sessions')
       .select('id, item_index, status')
@@ -25,13 +24,11 @@ export async function POST(req: Request) {
     const idx = session.item_index ?? 0;
 
     if (idx >= items.length) {
-      // already finished
       return NextResponse.json({ ok: true, done: true });
     }
 
     const item = items[idx];
 
-    // minimal payload for the client
     return NextResponse.json({
       ok: true,
       done: false,
