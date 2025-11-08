@@ -1,145 +1,110 @@
-// app/t/[token]/RunnerClient.tsx
 "use client";
 
 import { useEffect, useState } from "react";
 
-type ItemType = "mcq" | "short";
-
 type Item = {
   id: string;
   domain: string;
-  type: ItemType;
+  type: "mcq" | "short";
   prompt: string;
   options?: string[];
-  answerIndex?: number;
 };
 
 export default function RunnerClient({ token }: { token: string }) {
   const [index, setIndex] = useState(0);
-  const [loading, setLoading] = useState(false);
   const [item, setItem] = useState<Item | null>(null);
-  const [response, setResponse] = useState<string>("");
-  const [message, setMessage] = useState<string>("");
+  const [choice, setChoice] = useState<number | null>(null);
+  const [result, setResult] = useState<boolean | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
 
-  async function load(i: number) {
+  const load = async (i: number) => {
     setLoading(true);
-    setMessage("");
+    setErr(null);
+    setResult(null);
+    setChoice(null);
     try {
-      const res = await fetch("/api/next-item", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, index: i }),
-      });
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error || "Failed to load item");
-      setItem(data.item as Item);
-      setResponse("");
+      const res = await fetch(`/api/next-item?index=${i}`, { cache: "no-store" });
+      const json = await res.json();
+      if (!json?.ok) throw new Error(json?.error || "failed");
+      setItem(json.item);
     } catch (e: any) {
-      setMessage(e?.message ?? "Error loading item");
+      setErr(e.message || "load_failed");
     } finally {
       setLoading(false);
     }
-  }
+  };
 
-  async function submit() {
+  useEffect(() => {
+    load(index);
+  }, [index]);
+
+  const submit = async () => {
     if (!item) return;
     setLoading(true);
-    setMessage("");
+    setErr(null);
     try {
       const res = await fetch("/api/submit", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "content-type": "application/json" },
         body: JSON.stringify({
           token,
-          index,
-          itemId: item.id,
-          response: item.type === "mcq" ? Number(response) : response,
-          item,
+          item_id: item.id,
+          response: item.type === "mcq" ? choice : null,
         }),
       });
-      const data = await res.json();
-      if (!data.ok) throw new Error(data.error || "Failed to submit");
-      setIndex(data.nextIndex);
-      await load(data.nextIndex);
+      const json = await res.json();
+      if (!json?.ok) throw new Error(json?.error || "submit_failed");
+      setResult(json.correct);
     } catch (e: any) {
-      setMessage(e?.message ?? "Error submitting");
+      setErr(e.message || "submit_failed");
     } finally {
       setLoading(false);
     }
-  }
-
-  useEffect(() => {
-    load(0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  if (loading && !item) {
-    return <p style={{ fontSize: 18 }}>Loading…</p>;
-  }
+  };
 
   return (
-    <section style={{ marginTop: 24 }}>
-      {item ? (
-        <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 16 }}>
-          <p style={{ margin: 0, color: "#666" }}>
-            <strong>Domain:</strong> {item.domain} • <strong>Item:</strong> {item.id}
-          </p>
-          <h3 style={{ marginTop: 10 }}>{item.prompt}</h3>
+    <section style={{ marginTop: 24, padding: 16, border: "1px solid #ddd", borderRadius: 12 }}>
+      {loading && <p>Loading…</p>}
+      {err && <p style={{ color: "crimson" }}>Error: {err}</p>}
 
-          {item.type === "mcq" && Array.isArray(item.options) ? (
-            <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
-              {item.options.map((opt, i) => (
-                <label key={i} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      {item && (
+        <>
+          <h2 style={{ fontSize: 24, margin: 0 }}>{item.domain}</h2>
+          <p style={{ fontSize: 20 }}>{item.prompt}</p>
+
+          {item.type === "mcq" && item.options && (
+            <div style={{ marginTop: 8 }}>
+              {item.options.map((opt: string, i: number) => (
+                <label key={i} style={{ display: "block", marginBottom: 8 }}>
                   <input
                     type="radio"
-                    name="mcq"
+                    name="opt"
                     value={i}
-                    checked={response === String(i)}
-                    onChange={(e) => setResponse(e.target.value)}
-                  />
-                  <span>{opt}</span>
+                    checked={choice === i}
+                    onChange={() => setChoice(i)}
+                  />{" "}
+                  {opt}
                 </label>
               ))}
             </div>
-          ) : (
-            <textarea
-              value={response}
-              onChange={(e) => setResponse(e.target.value)}
-              rows={4}
-              style={{
-                width: "100%",
-                marginTop: 12,
-                padding: 10,
-                borderRadius: 8,
-                border: "1px solid #ccc",
-              }}
-              placeholder="Type your answer…"
-            />
           )}
 
-          <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
-            <button
-              onClick={submit}
-              disabled={loading || (item.type === "mcq" && response === "")}
-              style={{
-                padding: "10px 16px",
-                borderRadius: 10,
-                border: "1px solid #111",
-                cursor: "pointer",
-              }}
-            >
-              {loading ? "Submitting…" : "Submit"}
+          <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
+            <button onClick={submit} disabled={loading}>
+              Submit
+            </button>
+            <button onClick={() => setIndex((p) => p + 1)} disabled={loading}>
+              Next
             </button>
           </div>
 
-          {message && (
-            <p style={{ color: "crimson", marginTop: 12 }}>
-              {message}
+          {result !== null && (
+            <p style={{ marginTop: 8, color: result ? "green" : "crimson" }}>
+              {result ? "Correct!" : "Not quite."}
             </p>
           )}
-        </div>
-      ) : (
-        <p>No item loaded.</p>
+        </>
       )}
     </section>
   );
