@@ -1,41 +1,34 @@
+// app/api/submit/route.ts
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { ITEMS } from "../../../lib/items";
+import { isCorrect } from "../../../lib/items";
 
-const admin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { persistSession: false } }
-);
-
+// POST { token: string, index: number, itemId: string, response: any }
+// In a real build we’d write to attempts and update session progress.
+// For the demo we just echo correctness (for MCQ) and tell the client
+// to move on to the next index.
 export async function POST(req: Request) {
-  const { token, itemId, answer } = await req.json().catch(() => ({}));
-  if (!token || !itemId) {
-    return NextResponse.json({ error: "token and itemId required" }, { status: 400 });
+  try {
+    const { token, index, itemId, response, item } = await req.json();
+
+    if (!token || typeof token !== "string") {
+      return NextResponse.json(
+        { ok: false, error: "Missing token" },
+        { status: 400 }
+      );
+    }
+
+    // item is returned from the client; that’s fine for demo correctness checks
+    const correctness = item ? isCorrect(item, response) : null;
+
+    return NextResponse.json({
+      ok: true,
+      nextIndex: (Number(index) || 0) + 1,
+      correctness,
+    });
+  } catch (err: any) {
+    return NextResponse.json(
+      { ok: false, error: err?.message ?? "Unexpected error" },
+      { status: 500 }
+    );
   }
-
-  const { data: s, error } = await admin
-    .from("sessions")
-    .select("id,item_index")
-    .eq("public_token", token)
-    .maybeSingle();
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  if (!s)    return NextResponse.json({ error: "session not found" }, { status: 404 });
-
-  await admin.from("attempts").insert({
-    session_id: s.id,
-    item_id: itemId,
-    answer
-  });
-
-  const nextIndex = (s.item_index ?? 0) + 1;
-  const done = nextIndex >= ITEMS.length;
-
-  await admin
-    .from("sessions")
-    .update({ item_index: nextIndex, status: done ? "finished" : "active" })
-    .eq("id", s.id);
-
-  return NextResponse.json({ ok: true, done });
 }
