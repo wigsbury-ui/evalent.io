@@ -1,7 +1,7 @@
 // app/api/submit/route.ts
 import { NextResponse } from 'next/server';
-import { supa } from '../../../lib/db';
-import { items } from '../../../lib/items';
+import { supa } from '@/lib/db';
+import { items } from '@/lib/items';
 
 export async function POST(req: Request) {
   try {
@@ -12,7 +12,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'Missing token or itemId' }, { status: 400 });
     }
 
-    // Get the session to know where we are
     const { data: session, error: sErr } = await supa
       .from('sessions')
       .select('id, item_index')
@@ -22,9 +21,6 @@ export async function POST(req: Request) {
     if (sErr || !session) {
       return NextResponse.json({ ok: false, error: 'Session not found' }, { status: 404 });
     }
-
-    // (Optional) store attempt – you can add an attempts table later if you want.
-    // For now we just advance the pointer.
 
     const nextIndex = (session.item_index ?? 0) + 1;
     const finished  = nextIndex >= items.length;
