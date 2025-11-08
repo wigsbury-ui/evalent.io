@@ -1,84 +1,146 @@
+// app/t/[token]/RunnerClient.tsx
 "use client";
+
 import { useEffect, useState } from "react";
 
-type Item = { id: string; prompt: string; choices: string[] };
+type ItemType = "mcq" | "short";
+
+type Item = {
+  id: string;
+  domain: string;
+  type: ItemType;
+  prompt: string;
+  options?: string[];
+  answerIndex?: number;
+};
 
 export default function RunnerClient({ token }: { token: string }) {
+  const [index, setIndex] = useState(0);
+  const [loading, setLoading] = useState(false);
   const [item, setItem] = useState<Item | null>(null);
-  const [done, setDone] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [choice, setChoice] = useState<string | null>(null);
+  const [response, setResponse] = useState<string>("");
+  const [message, setMessage] = useState<string>("");
 
-  const load = async () => {
+  async function load(i: number) {
     setLoading(true);
-    setError(null);
+    setMessage("");
     try {
-      const r = await fetch(`/api/next-item?token=${encodeURIComponent(token)}`);
-      const j = await r.json();
-      if (j.error) throw new Error(j.error);
-      setDone(!!j.done);
-      setItem(j.done ? null : j.item);
-      setChoice(null);
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { load(); }, []);
-
-  const submit = async () => {
-    if (!item) return;
-    setLoading(true);
-    setError(null);
-    try {
-      const r = await fetch("/api/submit", {
+      const res = await fetch("/api/next-item", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, itemId: item.id, answer: { choice } })
+        body: JSON.stringify({ token, index: i }),
       });
-      const j = await r.json();
-      if (j.error) throw new Error(j.error);
-      if (j.done) { setDone(true); setItem(null); }
-      else { await load(); }
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Failed to load item");
+      setItem(data.item as Item);
+      setResponse("");
     } catch (e: any) {
-      setError(e.message);
+      setMessage(e?.message ?? "Error loading item");
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  if (loading)  return <p style={{ marginTop: 24 }}>Loading…</p>;
-  if (error)    return <p style={{ marginTop: 24, color: "#b91c1c" }}>Error: {error}</p>;
-  if (done)     return <p style={{ marginTop: 24 }}>All done. 🎉</p>;
-  if (!item)    return null;
+  async function submit() {
+    if (!item) return;
+    setLoading(true);
+    setMessage("");
+    try {
+      const res = await fetch("/api/submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token,
+          index,
+          itemId: item.id,
+          response: item.type === "mcq" ? Number(response) : response,
+          item,
+        }),
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Failed to submit");
+      setIndex(data.nextIndex);
+      await load(data.nextIndex);
+    } catch (e: any) {
+      setMessage(e?.message ?? "Error submitting");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    load(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (loading && !item) {
+    return <p style={{ fontSize: 18 }}>Loading…</p>;
+  }
 
   return (
     <section style={{ marginTop: 24 }}>
-      <h2 style={{ fontSize: 24, marginBottom: 12 }}>{item.prompt}</h2>
-      <div style={{ display: "grid", gap: 8, maxWidth: 520 }}>
-        {item.choices.map((c) => (
-          <label key={c} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            <input
-              type="radio"
-              name="choice"
-              value={c}
-              checked={choice === c}
-              onChange={() => setChoice(c)}
+      {item ? (
+        <div style={{ border: "1px solid #ddd", borderRadius: 12, padding: 16 }}>
+          <p style={{ margin: 0, color: "#666" }}>
+            <strong>Domain:</strong> {item.domain} • <strong>Item:</strong> {item.id}
+          </p>
+          <h3 style={{ marginTop: 10 }}>{item.prompt}</h3>
+
+          {item.type === "mcq" && Array.isArray(item.options) ? (
+            <div style={{ display: "grid", gap: 8, marginTop: 12 }}>
+              {item.options.map((opt, i) => (
+                <label key={i} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                  <input
+                    type="radio"
+                    name="mcq"
+                    value={i}
+                    checked={response === String(i)}
+                    onChange={(e) => setResponse(e.target.value)}
+                  />
+                  <span>{opt}</span>
+                </label>
+              ))}
+            </div>
+          ) : (
+            <textarea
+              value={response}
+              onChange={(e) => setResponse(e.target.value)}
+              rows={4}
+              style={{
+                width: "100%",
+                marginTop: 12,
+                padding: 10,
+                borderRadius: 8,
+                border: "1px solid #ccc",
+              }}
+              placeholder="Type your answer…"
             />
-            <span>{c}</span>
-          </label>
-        ))}
-      </div>
-      <button
-        onClick={submit}
-        disabled={!choice}
-        style={{ marginTop: 16, padding: "10px 14px", border: "1px solid #111", borderRadius: 10, cursor: "pointer" }}
-      >
-        Submit & Next
-      </button>
+          )}
+
+          <div style={{ marginTop: 16, display: "flex", gap: 10 }}>
+            <button
+              onClick={submit}
+              disabled={loading || (item.type === "mcq" && response === "")}
+              style={{
+                padding: "10px 16px",
+                borderRadius: 10,
+                border: "1px solid #111",
+                cursor: "pointer",
+              }}
+            >
+              {loading ? "Submitting…" : "Submit"}
+            </button>
+          </div>
+
+          {message && (
+            <p style={{ color: "crimson", marginTop: 12 }}>
+              {message}
+            </p>
+          )}
+        </div>
+      ) : (
+        <p>No item loaded.</p>
+      )}
     </section>
   );
 }
