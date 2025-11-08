@@ -9,8 +9,6 @@ export default function TokenPage({ params }: { params: { token: string } }) {
         Token: <code>{params.token}</code>
       </p>
 
-      {/* Client component */}
-      {/* @ts-expect-error Server/Client boundary */}
       <RunnerClient token={params.token} />
     </main>
   );
