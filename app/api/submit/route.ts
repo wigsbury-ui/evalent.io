@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-// @ts-ignore
-import items from "../../../data/items_full.json";
+import { ITEMS } from "../../../lib/items";
 
 const admin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -30,9 +29,8 @@ export async function POST(req: Request) {
     answer
   });
 
-  const bank = items as any[];
   const nextIndex = (s.item_index ?? 0) + 1;
-  const done = nextIndex >= bank.length;
+  const done = nextIndex >= ITEMS.length;
 
   await admin
     .from("sessions")
