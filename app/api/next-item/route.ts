@@ -1,37 +1,41 @@
+// app/api/next-item/route.ts
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { ITEMS } from "../../../lib/items";
+import { getItemByIndex } from "../../../lib/items";
 
-const admin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  { auth: { persistSession: false } }
-);
+// POST { token: string, index: number }
+// Returns the next item to show. For now we ignore DB progress and
+// just serve an item by the provided index to keep the demo flowing.
+export async function POST(req: Request) {
+  try {
+    const { token, index } = await req.json();
 
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const token = searchParams.get("token");
-  if (!token) return NextResponse.json({ error: "token required" }, { status: 400 });
+    if (!token || typeof token !== "string") {
+      return NextResponse.json(
+        { ok: false, error: "Missing token" },
+        { status: 400 }
+      );
+    }
 
-  const { data: s, error } = await admin
-    .from("sessions")
-    .select("id,item_index,status")
-    .eq("public_token", token)
-    .maybeSingle();
+    const i = Number(index) || 0;
+    const item = getItemByIndex(i);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  if (!s)    return NextResponse.json({ error: "session not found" }, { status: 404 });
-
-  const idx = s.item_index ?? 0;
-
-  if (idx >= ITEMS.length) {
-    await admin.from("sessions").update({ status: "finished" }).eq("id", s.id);
-    return NextResponse.json({ done: true });
+    return NextResponse.json({
+      ok: true,
+      item,
+      index: i,
+    });
+  } catch (err: any) {
+    return NextResponse.json(
+      { ok: false, error: err?.message ?? "Unexpected error" },
+      { status: 500 }
+    );
   }
+}
 
-  const item = ITEMS[idx];
-  return NextResponse.json({
-    done: false,
-    item: { id: item.id, prompt: item.prompt, choices: item.choices }
-  });
+// Optional GET for quick manual tests: /api/next-item?index=0
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const i = Number(url.searchParams.get("index") ?? "0") || 0;
+  const item = getItemByIndex(i);
+  return NextResponse.json({ ok: true, item, index: i });
 }
