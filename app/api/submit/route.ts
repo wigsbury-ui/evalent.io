@@ -1,42 +1,23 @@
-import { NextResponse } from "next/server";
-import { items } from "@/lib/items";
-import { supa } from "@/lib/db";
+// app/api/submit/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { items } from '../../../lib/item';
 
-export async function POST(req: Request) {
-  try {
-    const { token, itemId, answer } = await req.json();
-    if (!token || !itemId) {
-      return NextResponse.json({ ok: false, error: "Missing token or itemId" }, { status: 400 });
-    }
+declare global {
+  // eslint-disable-next-line no-var
+  var __EVALENT_SESS__: Record<string, number> | undefined;
+}
+const sessions: Record<string, number> =
+  globalThis.__EVALENT_SESS__ ?? (globalThis.__EVALENT_SESS__ = {});
 
-    const { data: session, error } = await supa
-      .from("sessions")
-      .select("id, item_index")
-      .eq("public_token", token)
-      .single();
+export async function POST(req: NextRequest) {
+  const body = await req.json().catch(() => ({}));
+  const token: string = body?.token ?? '';
+  if (!token) return NextResponse.json({ error: 'missing token' }, { status: 400 });
 
-    if (error || !session) {
-      return NextResponse.json({ ok: false, error: "Session not found" }, { status: 404 });
-    }
+  const current = sessions[token] ?? 0;
+  const next = Math.min(current + 1, items.length);
+  sessions[token] = next;
 
-    // Advance index; finish when past the last item
-    const nextIndex = (session.item_index ?? 0) + 1;
-    const finished = nextIndex >= items.length;
-
-    const { error: uErr } = await supa
-      .from("sessions")
-      .update({
-        item_index: nextIndex,
-        last_answered_at: new Date().toISOString(),
-        finished_at: finished ? new Date().toISOString() : null,
-        status: finished ? "finished" : "pending",
-      })
-      .eq("id", session.id);
-
-    if (uErr) return NextResponse.json({ ok: false, error: uErr.message }, { status: 500 });
-
-    return NextResponse.json({ ok: true, finished });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? "Server error" }, { status: 500 });
-  }
+  const done = next >= items.length;
+  return NextResponse.json({ ok: true, done, index: next, total: items.length });
 }
