@@ -1,65 +1,55 @@
-// app/api/start/route.ts
-export const runtime = 'nodejs'; // force Node, not Edge
+// app/start/page.tsx
+'use client';
+import { useState } from 'react';
 
-import { NextResponse } from 'next/server';
-import { randomBytes } from 'crypto';
-import { createClient } from '@supabase/supabase-js';
+export default function StartPage() {
+  const [pass, setPass] = useState('');
+  const [link, setLink] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-function supaAdmin() {
-  const url = process.env.SUPABASE_URL!;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-  return createClient(url, key, { auth: { persistSession: false } });
-}
-
-async function startImpl(passcodeProvided?: string) {
-  const expected =
-    String(process.env.NEXT_PUBLIC_START_PASSCODE ?? process.env.START_PASSCODE ?? '').trim();
-
-  if (!expected) {
-    return NextResponse.json({ error: 'Passcode not configured on server' }, { status: 500 });
+  async function create() {
+    setBusy(true); setErr(null); setLink(null);
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 10000);
+    try {
+      const res = await fetch('/api/start', {
+        method: 'POST',
+        headers: {'content-type':'application/json'},
+        body: JSON.stringify({ passcode: pass }),
+        signal: ctrl.signal
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { setErr(data?.error || `HTTP ${res.status}`); return; }
+      setLink(data.link);
+    } catch (e: any) {
+      setErr(e?.name === 'AbortError' ? 'Request timed out' : (e?.message || 'Network error'));
+    } finally {
+      clearTimeout(t);
+      setBusy(false);
+    }
   }
-  const provided = String(passcodeProvided ?? '').trim();
-  if (provided !== expected) {
-    return NextResponse.json({ error: 'Unauthorized: bad passcode' }, { status: 401 });
-  }
 
-  // sanity-check envs quickly
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return NextResponse.json({ error: 'Server DB envs missing' }, { status: 500 });
-  }
+  return (
+    <main style={{maxWidth:480, margin:'0 auto', padding:24}}>
+      <h1 style={{fontSize:36, fontWeight:700, marginBottom:16}}>Start a Test</h1>
+      <input
+        type="password"
+        placeholder="Passcode"
+        value={pass}
+        onChange={e=>setPass(e.target.value)}
+        style={{width:'100%', padding:10, border:'1px solid #ccc', borderRadius:6, marginBottom:12}}
+      />
+      <button
+        onClick={create}
+        disabled={busy}
+        style={{padding:'10px 16px', borderRadius:6, background:'#2563eb', color:'#fff', opacity:busy?0.6:1}}
+      >
+        {busy ? 'Creating…' : 'Create session'}
+      </button>
 
-  const supa = supaAdmin();
-  const schoolId = process.env.DEFAULT_SCHOOL_ID || null;
-  const token = randomBytes(6).toString('hex');
-
-  // insert session
-  const { data, error } = await supa
-    .from('sessions')
-    .insert([{ token, school_id: schoolId, status: 'active', item_index: 0 }])
-    .select('token')
-    .single();
-
-  if (error) {
-    return NextResponse.json({ error: `DB error: ${error.message}` }, { status: 500 });
-  }
-  return NextResponse.json({ token: data.token, link: `/t/${data.token}` });
-}
-
-export async function POST(req: Request) {
-  try {
-    let body: any = {};
-    try { body = await req.json(); } catch { body = {}; }
-    return await startImpl(body?.passcode);
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || String(e) }, { status: 500 });
-  }
-}
-
-export async function GET(req: Request) {
-  try {
-    const { searchParams } = new URL(req.url);
-    return await startImpl(searchParams.get('passcode') || undefined);
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || String(e) }, { status: 500 });
-  }
+      {err && <p style={{color:'#b91c1c', marginTop:12}}>{err}</p>}
+      {link && <p style={{marginTop:12}}>Session ready: <a href={link} style={{color:'#2563eb', textDecoration:'underline'}}>{link}</a></p>}
+    </main>
+  );
 }
