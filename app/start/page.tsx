@@ -1,50 +1,65 @@
-// app/start/page.tsx
-'use client';
-import { useState } from 'react';
+// app/api/start/route.ts
+export const runtime = 'nodejs'; // force Node, not Edge
 
-export default function StartPage() {
-  const [pass, setPass] = useState('');
-  const [link, setLink] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+import { NextResponse } from 'next/server';
+import { randomBytes } from 'crypto';
+import { createClient } from '@supabase/supabase-js';
 
-  async function create() {
-    setBusy(true); setErr(null); setLink(null);
-    const res = await fetch('/api/start', {
-      method: 'POST',
-      headers: {'content-type':'application/json'},
-      body: JSON.stringify({ passcode: pass })
-    });
-    const data = await res.json();
-    setBusy(false);
-    if (!res.ok) { setErr(data?.error || 'Error'); return; }
-    setLink(data.link);
+function supaAdmin() {
+  const url = process.env.SUPABASE_URL!;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  return createClient(url, key, { auth: { persistSession: false } });
+}
+
+async function startImpl(passcodeProvided?: string) {
+  const expected =
+    String(process.env.NEXT_PUBLIC_START_PASSCODE ?? process.env.START_PASSCODE ?? '').trim();
+
+  if (!expected) {
+    return NextResponse.json({ error: 'Passcode not configured on server' }, { status: 500 });
+  }
+  const provided = String(passcodeProvided ?? '').trim();
+  if (provided !== expected) {
+    return NextResponse.json({ error: 'Unauthorized: bad passcode' }, { status: 401 });
   }
 
-  return (
-    <main className="max-w-sm mx-auto p-6">
-      <h1 className="text-xl font-semibold mb-4">Start a Test</h1>
-      <input
-        type="password"
-        placeholder="Passcode"
-        value={pass}
-        onChange={e=>setPass(e.target.value)}
-        className="w-full border rounded p-2 mb-3"
-      />
-      <button
-        onClick={create}
-        disabled={busy}
-        className="px-4 py-2 rounded text-white bg-blue-600 disabled:opacity-50"
-      >
-        {busy ? 'Creating…' : 'Create session'}
-      </button>
+  // sanity-check envs quickly
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return NextResponse.json({ error: 'Server DB envs missing' }, { status: 500 });
+  }
 
-      {err && <p className="text-red-600 mt-3">{err}</p>}
-      {link && (
-        <p className="mt-4">
-          Session ready: <a className="text-blue-600 underline" href={link}>{link}</a>
-        </p>
-      )}
-    </main>
-  );
+  const supa = supaAdmin();
+  const schoolId = process.env.DEFAULT_SCHOOL_ID || null;
+  const token = randomBytes(6).toString('hex');
+
+  // insert session
+  const { data, error } = await supa
+    .from('sessions')
+    .insert([{ token, school_id: schoolId, status: 'active', item_index: 0 }])
+    .select('token')
+    .single();
+
+  if (error) {
+    return NextResponse.json({ error: `DB error: ${error.message}` }, { status: 500 });
+  }
+  return NextResponse.json({ token: data.token, link: `/t/${data.token}` });
+}
+
+export async function POST(req: Request) {
+  try {
+    let body: any = {};
+    try { body = await req.json(); } catch { body = {}; }
+    return await startImpl(body?.passcode);
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || String(e) }, { status: 500 });
+  }
+}
+
+export async function GET(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    return await startImpl(searchParams.get('passcode') || undefined);
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || String(e) }, { status: 500 });
+  }
 }
