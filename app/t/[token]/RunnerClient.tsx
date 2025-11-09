@@ -1,4 +1,3 @@
-// app/t/[token]/RunnerClient.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -63,9 +62,23 @@ export default function RunnerClient({ token }: { token: string }) {
     }
   };
 
-  const restart = async () => {
-    // cheap reset: change token param so you get a new session link
-    window.location.href = `/helper`;
+  // open a fresh /start helper to mint a new token
+  const restart = () => {
+    window.location.href = `/start`;
+  };
+
+  // client-side download of the summary JSON
+  const downloadJson = () => {
+    if (!summary) return;
+    const blob = new Blob([JSON.stringify({ token, ...summary }, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `evalent-results-${token}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   };
 
   useEffect(() => {
@@ -117,7 +130,10 @@ export default function RunnerClient({ token }: { token: string }) {
           </>
         )}
 
-        <button style={{ marginTop: 12 }} onClick={restart}>Restart session</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={downloadJson}>Download results (JSON)</button>
+          <button onClick={restart}>Restart session</button>
+        </div>
       </section>
     );
   }
