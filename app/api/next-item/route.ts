@@ -1,42 +1,22 @@
-import { NextResponse } from "next/server";
-import { items } from "@/lib/items";
-import { supa } from "@/lib/db"; // your existing client
+// app/api/next-item/route.ts
+import { NextRequest, NextResponse } from 'next/server';
+import { items } from '../../../lib/item';
 
-export async function POST(req: Request) {
-  try {
-    const { token } = await req.json();
-    if (!token) return NextResponse.json({ ok: false, error: "Missing token" }, { status: 400 });
+declare global {
+  // eslint-disable-next-line no-var
+  var __EVALENT_SESS__: Record<string, number> | undefined;
+}
+const sessions: Record<string, number> =
+  globalThis.__EVALENT_SESS__ ?? (globalThis.__EVALENT_SESS__ = {});
 
-    const { data: session, error } = await supa
-      .from("sessions")
-      .select("id, item_index, status")
-      .eq("public_token", token)
-      .single();
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url);
+  const token = searchParams.get('token') ?? '';
+  const index = sessions[token] ?? 0;
 
-    if (error || !session) {
-      return NextResponse.json({ ok: false, error: "Session not found" }, { status: 404 });
-    }
+  if (!token) return NextResponse.json({ error: 'missing token' }, { status: 400 });
+  if (index >= items.length) return NextResponse.json({ done: true });
 
-    const idx = session.item_index ?? 0;
-    if (idx >= items.length) {
-      return NextResponse.json({ ok: true, done: true });
-    }
-
-    const it = items[idx];
-    return NextResponse.json({
-      ok: true,
-      done: false,
-      index: idx,
-      total: items.length,
-      item: {
-        id: it.id,
-        domain: it.domain,
-        type: it.type,
-        prompt: it.prompt,
-        options: it.type === "mcq" ? it.options : undefined,
-      },
-    });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? "Server error" }, { status: 500 });
-  }
+  const item = items[index];
+  return NextResponse.json({ done: false, index, total: items.length, item });
 }
