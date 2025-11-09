@@ -1,36 +1,49 @@
 // app/start/page.tsx
 'use client';
-
 import { useState } from 'react';
 
-function newToken() {
-  // simple random hex – good enough for demo
-  return Array.from(crypto.getRandomValues(new Uint8Array(16)))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
-}
-
 export default function StartPage() {
-  const [token, setToken] = useState<string | null>(null);
+  const [pass, setPass] = useState('');
+  const [link, setLink] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
-  const create = () => {
-    const t = newToken();
-    setToken(t);
-  };
+  async function create() {
+    setBusy(true); setErr(null); setLink(null);
+    const res = await fetch('/api/start', {
+      method: 'POST',
+      headers: {'content-type':'application/json'},
+      body: JSON.stringify({ passcode: pass })
+    });
+    const data = await res.json();
+    setBusy(false);
+    if (!res.ok) { setErr(data?.error || 'Error'); return; }
+    setLink(data.link);
+  }
 
   return (
-    <main style={{ padding: 32 }}>
-      <h1 style={{ fontSize: 64, lineHeight: 1.05, marginTop: 0 }}>Start a Test</h1>
-      <p>This creates a demo session and gives you a runner link.</p>
-      <button onClick={create}>Create session link</button>
+    <main className="max-w-sm mx-auto p-6">
+      <h1 className="text-xl font-semibold mb-4">Start a Test</h1>
+      <input
+        type="password"
+        placeholder="Passcode"
+        value={pass}
+        onChange={e=>setPass(e.target.value)}
+        className="w-full border rounded p-2 mb-3"
+      />
+      <button
+        onClick={create}
+        disabled={busy}
+        className="px-4 py-2 rounded text-white bg-blue-600 disabled:opacity-50"
+      >
+        {busy ? 'Creating…' : 'Create session'}
+      </button>
 
-      {token && (
-        <div style={{ marginTop: 24 }}>
-          <div><b>Token:</b> {token}</div>
-          <div style={{ marginTop: 8 }}>
-            <a href={`/t/${token}`}>Open runner</a>
-          </div>
-        </div>
+      {err && <p className="text-red-600 mt-3">{err}</p>}
+      {link && (
+        <p className="mt-4">
+          Session ready: <a className="text-blue-600 underline" href={link}>{link}</a>
+        </p>
       )}
     </main>
   );
