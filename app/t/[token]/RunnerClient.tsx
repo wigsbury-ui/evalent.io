@@ -7,26 +7,41 @@ type Mcq = { id: string; domain: string; type: 'mcq'; prompt: string; options: s
 type Written = { id: string; domain: string; type: 'written'; prompt: string };
 type Item = Mcq | Written;
 
+type Summary = {
+  total: number;
+  correctMcq: number;
+  answered: number;
+  written: { id: string; prompt: string; answer: string }[];
+  mcq: { id: string; prompt: string; options: string[]; correctIndex: number; selectedIndex: number | null; correct: boolean }[];
+};
+
 export default function RunnerClient({ token }: { token: string }) {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
   const [item, setItem] = useState<Item | null>(null);
   const [answer, setAnswer] = useState<string>('');
+  const [summary, setSummary] = useState<Summary | null>(null);
 
-  const loadNext = async () => {
+  const fetchNext = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/next-item?token=${encodeURIComponent(token)}&t=${Date.now()}`, {
-        cache: 'no-store',
-      });
+      const res = await fetch(`/api/next-item?token=${encodeURIComponent(token)}&t=${Date.now()}`, { cache: 'no-store' });
       const data = await res.json();
       if (data.done) {
         setDone(true);
         setItem(null);
+        setSummary({
+          total: data.total,
+          correctMcq: data.correctMcq,
+          answered: data.answered,
+          written: data.written ?? [],
+          mcq: data.mcq ?? [],
+        });
       } else {
         setDone(false);
-        setItem(data.item);
+        setItem(data.item as Item);
         setAnswer('');
+        setSummary(null);
       }
     } finally {
       setLoading(false);
@@ -42,26 +57,76 @@ export default function RunnerClient({ token }: { token: string }) {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ token, answer }),
       });
-      await loadNext();
+      await fetchNext();
     } finally {
       setLoading(false);
     }
   };
 
+  const restart = async () => {
+    // cheap reset: change token param so you get a new session link
+    window.location.href = `/helper`;
+  };
+
   useEffect(() => {
-    loadNext();
+    fetchNext();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
   if (done) {
-    return <p style={{ fontSize: 22 }}>All items complete. 🎉</p>;
+    return (
+      <section style={{ border: '1px solid #ddd', padding: 20, borderRadius: 8 }}>
+        <h2 style={{ fontSize: 28, marginTop: 0 }}>All items complete. 🎉</h2>
+        {summary && (
+          <>
+            <p style={{ fontSize: 18, marginBottom: 12 }}>
+              MCQ Score: <b>{summary.correctMcq}</b> / {summary.mcq.length}
+            </p>
+
+            {summary.mcq.length > 0 && (
+              <>
+                <h3 style={{ marginTop: 12 }}>MCQ Review</h3>
+                <ul>
+                  {summary.mcq.map((m) => (
+                    <li key={m.id} style={{ marginBottom: 8 }}>
+                      <div><b>{m.prompt}</b></div>
+                      <div>
+                        Your answer: {m.selectedIndex != null ? m.options[m.selectedIndex] : <i>no answer</i>} &nbsp;|&nbsp;
+                        Correct: {m.options[m.correctIndex]} &nbsp;|&nbsp;
+                        {m.correct ? '✅' : '❌'}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+
+            {summary.written.length > 0 && (
+              <>
+                <h3 style={{ marginTop: 12 }}>Written Responses</h3>
+                <ul>
+                  {summary.written.map((w) => (
+                    <li key={w.id} style={{ marginBottom: 8 }}>
+                      <div><b>{w.prompt}</b></div>
+                      <div style={{ whiteSpace: 'pre-wrap' }}>{w.answer || <i>(empty)</i>}</div>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </>
+        )}
+
+        <button style={{ marginTop: 12 }} onClick={restart}>Restart session</button>
+      </section>
+    );
   }
 
   if (!item) return <p>Loading…</p>;
 
   return (
     <section style={{ border: '1px solid #ddd', padding: 20, borderRadius: 8 }}>
-      <h2 style={{ fontSize: 36, margin: 0 }}>{item.domain}</h2>
+      <h2 style={{ fontSize: 36, margin: 0 }}>{(item as any).domain}</h2>
       <p style={{ fontSize: 24 }}>{item.prompt}</p>
 
       {item.type === 'mcq' ? (
@@ -89,7 +154,7 @@ export default function RunnerClient({ token }: { token: string }) {
 
       <div style={{ display: 'flex', gap: 12 }}>
         <button disabled={loading} onClick={submit}>Submit</button>
-        <button disabled={loading} onClick={loadNext}>Next</button>
+        <button disabled={loading} onClick={fetchNext}>Next</button>
       </div>
     </section>
   );
