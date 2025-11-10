@@ -2,59 +2,77 @@
 
 import { useState } from 'react';
 
-export default function StartPage() {
-  const [passcode, setPasscode] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  async function tryPOST(): Promise<string | null> {
-    const res = await fetch('/api/start', {
+async function postWithTimeout(
+  url: string,
+  body: any,
+  timeoutMs = 10000
+): Promise<{ ok: boolean; data?: any; status: number; raw?: string }> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
       cache: 'no-store',
-      body: JSON.stringify({ passcode }),
+      signal: ctrl.signal,
     });
-
-    const raw = await res
-      .clone()
-      .text()
-      .catch(() => '');
+    const raw = await res.text().catch(() => '');
     let data: any = null;
     try {
       data = raw ? JSON.parse(raw) : null;
     } catch {
-      // leave data = null; we'll fall back
+      // leave data null; we’ll show raw
     }
-
-    if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
-    if (!data?.href) throw new Error('No token returned from server.');
-    return data.href as string;
+    return { ok: res.ok, data, status: res.status, raw };
+  } finally {
+    clearTimeout(timer);
   }
+}
 
-  function fallbackGETRedirect() {
-    // Robust fallback: hit GET route and let the server respond JSON or redirect (we handle client redirect)
+export default function StartPage() {
+  const [passcode, setPasscode] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [debug, setDebug] = useState<string | null>(null);
+
+  const gotoGET = () => {
     window.location.href = `/api/start?passcode=${encodeURIComponent(passcode)}`;
-  }
+  };
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErr(null);
+    setDebug(null);
     if (!passcode) {
       setErr('Enter passcode.');
       return;
     }
+
     setLoading(true);
     try {
-      const href = await tryPOST();
-      if (href) window.location.href = href;
-      else fallbackGETRedirect();
+      const r = await postWithTimeout('/api/start', { passcode }, 10000);
+
+      if (r.ok && r.data?.href) {
+        window.location.href = r.data.href as string;
+        return;
+      }
+
+      // Not OK: show everything we’ve got
+      const serverMsg =
+        r.data?.error ??
+        (r.raw && r.raw.length < 2000 ? r.raw : '(non-JSON / long response)');
+      setErr(`Start failed (HTTP ${r.status}).`);
+      setDebug(`Raw: ${serverMsg}`);
+
+      // Auto fallback to GET after 800ms
+      setTimeout(gotoGET, 800);
     } catch (e: any) {
-      // Surface error but also try the GET fallback in case POST is blocked/misrouted
-      setErr(e?.message ?? String(e));
-      // Give the user a moment to read, then attempt GET fallback
-      setTimeout(() => fallbackGETRedirect(), 600);
+      setErr(`Request failed: ${e?.name === 'AbortError' ? 'Timeout' : String(e?.message || e)}`);
+      setDebug('Falling back to GET…');
+      setTimeout(gotoGET, 400);
     } finally {
-      // keep loading true while redirecting intentionally
+      // keep button in "creating" state while we redirect
       setLoading(true);
     }
   }
@@ -82,28 +100,62 @@ export default function StartPage() {
           }}
         />
 
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            fontSize: '1.4rem',
-            padding: '0.9rem 1.25rem',
-            borderRadius: 10,
-            background: '#3b5bdd',
-            color: 'white',
-            border: 'none',
-            boxShadow: '0 3px 0 #1f2f8f',
-            cursor: loading ? 'not-allowed' : 'pointer',
-          }}
-        >
-          {loading ? 'Creating…' : 'Create session'}
-        </button>
+        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              fontSize: '1.4rem',
+              padding: '0.9rem 1.25rem',
+              borderRadius: 10,
+              background: '#3b5bdd',
+              color: 'white',
+              border: 'none',
+              boxShadow: '0 3px 0 #1f2f8f',
+              cursor: loading ? 'not-allowed' : 'pointer',
+            }}
+          >
+            {loading ? 'Creating…' : 'Create session'}
+          </button>
+
+          <button
+            type="button"
+            onClick={gotoGET}
+            disabled={loading && !err}
+            style={{
+              fontSize: '1rem',
+              padding: '0.65rem 0.9rem',
+              borderRadius: 8,
+              background: '#f1f1f1',
+              color: '#111',
+              border: '1px solid #ddd',
+              cursor: 'pointer',
+            }}
+            title="Direct GET fallback"
+          >
+            Use GET fallback
+          </button>
+        </div>
       </form>
 
       {err && (
-        <p style={{ color: '#b32121', fontSize: '1.25rem', marginTop: '1rem' }}>
+        <p style={{ color: '#b32121', fontSize: '1.2rem', marginTop: '1rem' }}>
           {err}
         </p>
+      )}
+      {debug && (
+        <pre
+          style={{
+            marginTop: '0.75rem',
+            background: '#fafafa',
+            border: '1px solid #eee',
+            borderRadius: 8,
+            padding: '0.75rem',
+            whiteSpace: 'pre-wrap',
+          }}
+        >
+          {debug}
+        </pre>
       )}
     </main>
   );
