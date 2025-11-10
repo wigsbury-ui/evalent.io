@@ -1,61 +1,42 @@
-// app/api/results/route.ts
 export const runtime = 'nodejs';
 
 import { NextResponse } from 'next/server';
 import { supaAdmin } from '@/lib/supa';
 
-type AttemptRow = {
-  is_correct: boolean | null;
-  // Supabase may return a single object OR an array for the joined table depending on FK metadata.
-  item?: { id: string; domain: string | null; prompt: string | null } | Array<{ id: string; domain: string | null; prompt: string | null }>;
-};
-
-type WrittenRow = {
-  answer_text: string | null;
-  item?: { id: string; domain: string | null; prompt: string | null } | Array<{ id: string; domain: string | null; prompt: string | null }>;
-};
-
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const token = searchParams.get('token');
-    if (!token) return NextResponse.json({ error: 'Missing token' }, { status: 400 });
+    const token = searchParams.get('token') ?? '';
+    if (!token) return NextResponse.json({ ok: false, error: 'missing_token' }, { status: 400 });
 
-    const { data: session, error: sErr } = await supaAdmin
+    const supa = supaAdmin();
+
+    const { data: session, error: sErr } = await supa
       .from('sessions')
       .select('id, status')
       .eq('token', token)
       .single();
-    if (sErr || !session) return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+    if (sErr) return NextResponse.json({ ok: false, error: sErr.message }, { status: 500 });
+    if (!session) return NextResponse.json({ ok: false, error: 'session_not_found' }, { status: 404 });
 
-    // MCQ attempts with item join
-    const { data: attemptsRaw, error: aErr } = await supaAdmin
+    // join attempts → items for domain and prompt
+    const { data: attempts, error: aErr } = await supa
       .from('attempts')
-      .select('is_correct, item:items(id, domain, prompt)')
+      .select('is_correct, item:items(domain, prompt)')
       .eq('session_id', session.id);
+    if (aErr) return NextResponse.json({ ok: false, error: aErr.message }, { status: 500 });
 
-    if (aErr) return NextResponse.json({ error: aErr.message }, { status: 400 });
-
-    const attempts = (attemptsRaw ?? []) as AttemptRow[];
-
-    // Written answers with item join
-    const { data: writtenRaw, error: wErr } = await supaAdmin
+    // written answers
+    const { data: written, error: wErr } = await supa
       .from('written_answers')
-      .select('answer_text, item:items(id, domain, prompt)')
+      .select('answer_text, item:items(prompt, domain)')
       .eq('session_id', session.id);
+    if (wErr) return NextResponse.json({ ok: false, error: wErr.message }, { status: 500 });
 
-    if (wErr) return NextResponse.json({ error: wErr.message }, { status: 400 });
-
-    const written = (writtenRaw ?? []) as WrittenRow[];
-
-    const total = attempts.length;
-    const correct = attempts.filter(a => a.is_correct === true).length;
-
-    // domain tally
+    // summarize
     const byDomain: Record<string, { total: number; correct: number }> = {};
-    for (const a of attempts) {
-      const joined = Array.isArray(a.item) ? a.item[0] : a.item;
-      const d = joined?.domain ?? 'General';
+    for (const a of attempts ?? []) {
+      const d = (a as any).item?.domain ?? 'General';
       byDomain[d] = byDomain[d] || { total: 0, correct: 0 };
       byDomain[d].total += 1;
       if (a.is_correct) byDomain[d].correct += 1;
@@ -64,26 +45,15 @@ export async function GET(req: Request) {
     return NextResponse.json({
       ok: true,
       status: session.status,
-      summary: { total, correct, percent: total ? Math.round((correct / total) * 100) : 0 },
-      byDomain,
-      attempts: attempts.map(a => {
-        const joined = Array.isArray(a.item) ? a.item[0] : a.item;
-        return {
-          domain: joined?.domain ?? null,
-          prompt: joined?.prompt ?? null,
-          is_correct: a.is_correct,
-        };
-      }),
-      written: written.map(w => {
-        const joined = Array.isArray(w.item) ? w.item[0] : w.item;
-        return {
-          domain: joined?.domain ?? null,
-          prompt: joined?.prompt ?? null,
-          answer_text: w.answer_text ?? '',
-        };
-      }),
+      summary: {
+        total: attempts?.length ?? 0,
+        correct: (attempts ?? []).filter((x) => x.is_correct).length,
+        byDomain,
+      },
+      attempts,
+      written,
     });
   } catch (e: any) {
-    return NextResponse.json({ error: String(e?.message ?? e) }, { status: 500 });
+    return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });
   }
 }
