@@ -25,9 +25,9 @@ const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 });
 
 async function createSession() {
-  // 12-hex token like "f3beec6a970a"
   const token = crypto.randomBytes(6).toString('hex');
-  // Insert minimal fields your schema expects
+
+  // Insert only columns that exist & have sane defaults elsewhere.
   const { error } = await supa.from('sessions').insert([
     {
       token,
@@ -36,36 +36,48 @@ async function createSession() {
       school_id: DEFAULT_SCHOOL_ID,
     },
   ]);
-  if (error) throw error;
+
+  if (error) {
+    // Log to Vercel function logs, and return useful details to client
+    console.error('[start/createSession] Supabase insert error:', error);
+    const msg = error.message || 'insert failed';
+    // Pass back explicit error info
+    throw new Error(`DB: ${msg}`);
+  }
+
   return token;
 }
 
-function bad(message: string, status = 400) {
-  return NextResponse.json({ ok: false, error: message }, { status });
+function j(ok: boolean, extra: Record<string, any> = {}, status = 200) {
+  return NextResponse.json({ ok, ...extra }, { status });
 }
 
 async function handle(passcode: string | null) {
-  if (!passcode) return bad('Missing passcode');
-  if (passcode !== PASSCODE) return bad('Invalid passcode', 401);
+  if (!passcode) return j(false, { error: 'Missing passcode' }, 400);
+  if (passcode !== PASSCODE) return j(false, { error: 'Invalid passcode' }, 401);
+
   const token = await createSession();
-  return NextResponse.json({ ok: true, token, href: `/t/${token}` });
+  return j(true, { token, href: `/t/${token}` });
 }
 
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({} as any));
-    return await handle(body?.passcode ?? null);
+    const pass = body?.passcode ?? null;
+    return await handle(pass);
   } catch (e: any) {
-    return bad(e?.message ?? 'Unknown error', 500);
+    console.error('[start/POST] error:', e);
+    return j(false, { error: String(e?.message || e) }, 500);
   }
 }
 
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
-    const passcode = url.searchParams.get('passcode');
-    return await handle(passcode);
+    const pass = url.searchParams.get('passcode');
+    return await handle(pass);
   } catch (e: any) {
-    return bad(e?.message ?? 'Unknown error', 500);
+    console.error('[start/GET] error:', e);
+    return j(false, { error: String(e?.message || e) }, 500);
   }
 }
