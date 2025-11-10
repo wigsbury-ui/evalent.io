@@ -1,48 +1,62 @@
 // app/api/submit/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { items } from '../../../lib/item';
+export const runtime = 'nodejs';
 
-type StoreEntry = {
-  index: number;
-  answers: Record<string, string>;
-  correctMcq: number;
-};
+import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 
-declare global {
-  // eslint-disable-next-line no-var
-  var __EVALENT_STORE__: Record<string, StoreEntry> | undefined;
-}
-const store: Record<string, StoreEntry> =
-  globalThis.__EVALENT_STORE__ ?? (globalThis.__EVALENT_STORE__ = {});
-
-function ensure(token: string): StoreEntry {
-  if (!store[token]) store[token] = { index: 0, answers: {}, correctMcq: 0 };
-  return store[token];
+function supaAdmin() {
+  return createClient(
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  );
 }
 
-export async function POST(req: NextRequest) {
+export async function POST(req: Request) {
   const body = await req.json().catch(() => ({}));
-  const token: string = body?.token ?? '';
-  const answer: string = (body?.answer ?? '').toString();
-  if (!token) return NextResponse.json({ error: 'missing token' }, { status: 400 });
-
-  const s = ensure(token);
-  const idx = s.index;
-  if (idx >= items.length) return NextResponse.json({ ok: true, done: true, index: s.index, total: items.length });
-
-  const current = items[idx];
-  // Save answer
-  s.answers[current.id] = answer;
-
-  // If MCQ, count correctness
-  if (current.type === 'mcq') {
-    const selected = Number(answer);
-    if (!Number.isNaN(selected) && selected === current.correctIndex) s.correctMcq += 1;
+  const { token, item_id, type, selected_index, answer_text } = body || {};
+  if (!token || !item_id || !type) {
+    return NextResponse.json({ error: 'Missing token/item_id/type' }, { status: 400 });
   }
 
-  // Advance
-  s.index = Math.min(s.index + 1, items.length);
+  const supa = supaAdmin();
 
-  const done = s.index >= items.length;
-  return NextResponse.json({ ok: true, done, index: s.index, total: items.length });
-}
+  // session
+  const { data: session, error: sErr } = await supa
+    .from('sessions')
+    .select('id, item_index, school_id')
+    .eq('token', token)
+    .single();
+  if (sErr || !session) return NextResponse.json({ error: 'Invalid token' }, { status: 404 });
+
+  // item (to compute correctness for MCQ)
+  const { data: item, error: iErr } = await supa
+    .from('items')
+    .select('id, correct_index, type')
+    .eq('id', item_id)
+    .single();
+  if (iErr || !item) return NextResponse.json({ error: 'Invalid item' }, { status: 400 });
+
+  if (type === 'mcq') {
+    const is_correct = selected_index === item.correct_index;
+    const ins = await supa.from('attempts').insert([{
+      session_id: session.id,
+      item_id: item.id,
+      selected_index,
+      is_correct
+    }]);
+    if (ins.error) return NextResponse.json({ error: ins.error.message }, { status: 500 });
+  } else if (type === 'written') {
+    const ins = await supa.from('written_answers').insert([{
+      session_id: session.id,
+      item_id: item.id,
+      answer_text: String(answer_text ?? '')
+    }]);
+    if (ins.error) return NextResponse.json({ error: ins.error.message }, { status: 500 });
+  }
+
+  // advance index
+  const upd = await supa
+    .from('sessions')
+    .update({ item_index: session.item_index + 1 })
+    .eq('id', session.id);
