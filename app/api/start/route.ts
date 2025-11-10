@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { createClient } from "@/lib/supa";
+
+export const runtime = "nodejs"; // service-role key requires Node, not Edge
 
 export async function GET(req: Request) {
   try {
@@ -19,16 +20,9 @@ export async function GET(req: Request) {
 
     const supa = createClient();
 
-    // Always insert a valid status + item_index
     const { data, error } = await supa
       .from("sessions")
-      .insert([
-        {
-          status: "active",        // <— guaranteed to pass the CHECK
-          item_index: 0,
-          school_id: schoolId
-        }
-      ])
+      .insert([{ status: "active", item_index: 0, school_id: schoolId }])
       .select("token")
       .single();
 
@@ -36,7 +30,6 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: `DB error: ${error.message}` }, { status: 500 });
     }
 
-    // return a link shape like the UI expects
     return NextResponse.json({ ok: true, href: `/t/${data.token}` });
   } catch (e: any) {
     return NextResponse.json({ error: String(e?.message || e) }, { status: 500 });
