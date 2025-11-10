@@ -1,55 +1,93 @@
 // app/start/page.tsx
 'use client';
+
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function StartPage() {
   const [pass, setPass] = useState('');
-  const [link, setLink] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const router = useRouter();
 
-  async function create() {
-    setBusy(true); setErr(null); setLink(null);
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), 10000);
+  async function handleCreate() {
+    setErr(null);
+    if (!pass.trim()) {
+      setErr('Enter the start passcode.');
+      return;
+    }
+    setBusy(true);
     try {
       const res = await fetch('/api/start', {
         method: 'POST',
-        headers: {'content-type':'application/json'},
-        body: JSON.stringify({ passcode: pass }),
-        signal: ctrl.signal
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ passcode: pass.trim() }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) { setErr(data?.error || `HTTP ${res.status}`); return; }
-      setLink(data.link);
+
+      const j = await res.json().catch(() => ({} as any));
+
+      if (!res.ok || !j?.ok) {
+        setErr(j?.error || `HTTP ${res.status}`);
+        setBusy(false);
+        return;
+      }
+
+      // Navigate to the runner
+      router.push(`/t/${j.token}`);
     } catch (e: any) {
-      setErr(e?.name === 'AbortError' ? 'Request timed out' : (e?.message || 'Network error'));
-    } finally {
-      clearTimeout(t);
+      setErr(String(e?.message || e));
       setBusy(false);
     }
   }
 
   return (
-    <main style={{maxWidth:480, margin:'0 auto', padding:24}}>
-      <h1 style={{fontSize:36, fontWeight:700, marginBottom:16}}>Start a Test</h1>
-      <input
-        type="password"
-        placeholder="Passcode"
-        value={pass}
-        onChange={e=>setPass(e.target.value)}
-        style={{width:'100%', padding:10, border:'1px solid #ccc', borderRadius:6, marginBottom:12}}
-      />
-      <button
-        onClick={create}
-        disabled={busy}
-        style={{padding:'10px 16px', borderRadius:6, background:'#2563eb', color:'#fff', opacity:busy?0.6:1}}
-      >
-        {busy ? 'Creating…' : 'Create session'}
-      </button>
+    <main style={{ maxWidth: 960, margin: '4rem auto', padding: '0 1rem' }}>
+      <h1 style={{ fontSize: '4rem', lineHeight: 1.1, marginBottom: '1.5rem' }}>
+        Start a Test
+      </h1>
 
-      {err && <p style={{color:'#b91c1c', marginTop:12}}>{err}</p>}
-      {link && <p style={{marginTop:12}}>Session ready: <a href={link} style={{color:'#2563eb', textDecoration:'underline'}}>{link}</a></p>}
+      <div style={{ maxWidth: 900 }}>
+        <input
+          type="password"
+          value={pass}
+          onChange={(e) => setPass(e.target.value)}
+          placeholder="Start passcode"
+          style={{
+            width: '100%',
+            fontSize: '1.6rem',
+            padding: '1rem 1.2rem',
+            borderRadius: 8,
+            border: '1px solid #ccc',
+            outline: 'none',
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleCreate();
+          }}
+        />
+        <div style={{ height: 16 }} />
+        <button
+          onClick={handleCreate}
+          disabled={busy}
+          style={{
+            fontSize: '1.6rem',
+            padding: '0.9rem 1.4rem',
+            borderRadius: 10,
+            background: '#3f5efb',
+            color: 'white',
+            border: 'none',
+            boxShadow: '0 2px 0 rgba(0,0,0,.25)',
+            cursor: busy ? 'not-allowed' : 'pointer',
+          }}
+        >
+          {busy ? 'Creating…' : 'Create session'}
+        </button>
+
+        {err && (
+          <p style={{ color: '#b21f2d', marginTop: 16, fontSize: '1.2rem' }}>
+            {err}
+          </p>
+        )}
+      </div>
     </main>
   );
 }
