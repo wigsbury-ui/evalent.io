@@ -1,162 +1,88 @@
+// app/page.tsx
 'use client';
 
 import { useState } from 'react';
-
-async function postWithTimeout(
-  url: string,
-  body: any,
-  timeoutMs = 10000
-): Promise<{ ok: boolean; data?: any; status: number; raw?: string }> {
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-      cache: 'no-store',
-      signal: ctrl.signal,
-    });
-    const raw = await res.text().catch(() => '');
-    let data: any = null;
-    try {
-      data = raw ? JSON.parse(raw) : null;
-    } catch {
-      // leave data null; we’ll show raw
-    }
-    return { ok: res.ok, data, status: res.status, raw };
-  } finally {
-    clearTimeout(timer);
-  }
-}
+import { useRouter } from 'next/navigation';
 
 export default function StartPage() {
-  const [passcode, setPasscode] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [pass, setPass] = useState('');
+  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [debug, setDebug] = useState<string | null>(null);
+  const router = useRouter();
 
-  const gotoGET = () => {
-    window.location.href = `/api/start?passcode=${encodeURIComponent(passcode)}`;
-  };
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleCreate() {
     setErr(null);
-    setDebug(null);
-    if (!passcode) {
-      setErr('Enter passcode.');
+    if (!pass.trim()) {
+      setErr('Enter the start passcode.');
       return;
     }
-
-    setLoading(true);
+    setBusy(true);
     try {
-      const r = await postWithTimeout('/api/start', { passcode }, 10000);
-
-      if (r.ok && r.data?.href) {
-        window.location.href = r.data.href as string;
+      const res = await fetch('/api/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ passcode: pass.trim() }),
+      });
+      const j = await res.json().catch(() => ({} as any));
+      if (!res.ok || !j?.ok) {
+        setErr(j?.error || `HTTP ${res.status}`);
+        setBusy(false);
         return;
       }
-
-      // Not OK: show everything we’ve got
-      const serverMsg =
-        r.data?.error ??
-        (r.raw && r.raw.length < 2000 ? r.raw : '(non-JSON / long response)');
-      setErr(`Start failed (HTTP ${r.status}).`);
-      setDebug(`Raw: ${serverMsg}`);
-
-      // Auto fallback to GET after 800ms
-      setTimeout(gotoGET, 800);
+      // Navigate to the runner
+      router.push(`/t/${j.token}`);
     } catch (e: any) {
-      setErr(`Request failed: ${e?.name === 'AbortError' ? 'Timeout' : String(e?.message || e)}`);
-      setDebug('Falling back to GET…');
-      setTimeout(gotoGET, 400);
-    } finally {
-      // keep button in "creating" state while we redirect
-      setLoading(true);
+      setErr(String(e?.message || e));
+      setBusy(false);
     }
   }
 
   return (
     <main style={{ maxWidth: 960, margin: '4rem auto', padding: '0 1rem' }}>
-      <h1 style={{ fontSize: '4rem', lineHeight: 1.1, marginBottom: '2rem' }}>
-        Start a Test
-      </h1>
+      <h1 style={{ fontSize: '4rem', lineHeight: 1.1, marginBottom: '1.5rem' }}>Start a Test</h1>
 
-      <form onSubmit={handleSubmit}>
+      <div style={{ maxWidth: 900 }}>
         <input
           type="password"
-          value={passcode}
-          onChange={(e) => setPasscode(e.target.value)}
-          placeholder="Passcode"
-          aria-label="Passcode"
+          value={pass}
+          onChange={(e) => setPass(e.target.value)}
+          placeholder="Start passcode"
           style={{
             width: '100%',
-            fontSize: '1.5rem',
-            padding: '0.9rem 1rem',
+            fontSize: '1.6rem',
+            padding: '1rem 1.2rem',
             borderRadius: 8,
-            border: '1px solid #c9c9c9',
-            marginBottom: '1.25rem',
+            border: '1px solid #ccc',
+            outline: 'none',
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') handleCreate();
           }}
         />
-
-        <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              fontSize: '1.4rem',
-              padding: '0.9rem 1.25rem',
-              borderRadius: 10,
-              background: '#3b5bdd',
-              color: 'white',
-              border: 'none',
-              boxShadow: '0 3px 0 #1f2f8f',
-              cursor: loading ? 'not-allowed' : 'pointer',
-            }}
-          >
-            {loading ? 'Creating…' : 'Create session'}
-          </button>
-
-          <button
-            type="button"
-            onClick={gotoGET}
-            disabled={loading && !err}
-            style={{
-              fontSize: '1rem',
-              padding: '0.65rem 0.9rem',
-              borderRadius: 8,
-              background: '#f1f1f1',
-              color: '#111',
-              border: '1px solid #ddd',
-              cursor: 'pointer',
-            }}
-            title="Direct GET fallback"
-          >
-            Use GET fallback
-          </button>
-        </div>
-      </form>
-
-      {err && (
-        <p style={{ color: '#b32121', fontSize: '1.2rem', marginTop: '1rem' }}>
-          {err}
-        </p>
-      )}
-      {debug && (
-        <pre
+        <div style={{ height: 16 }} />
+        <button
+          onClick={handleCreate}
+          disabled={busy}
           style={{
-            marginTop: '0.75rem',
-            background: '#fafafa',
-            border: '1px solid #eee',
-            borderRadius: 8,
-            padding: '0.75rem',
-            whiteSpace: 'pre-wrap',
+            fontSize: '1.6rem',
+            padding: '0.9rem 1.4rem',
+            borderRadius: 10,
+            background: '#3f5efb',
+            color: 'white',
+            border: 'none',
+            boxShadow: '0 2px 0 rgba(0,0,0,.25)',
+            cursor: busy ? 'not-allowed' : 'pointer',
           }}
         >
-          {debug}
-        </pre>
-      )}
+          {busy ? 'Creating…' : 'Create session'}
+        </button>
+
+        {err && (
+          <p style={{ color: '#b21f2d', marginTop: 16, fontSize: '1.2rem' }}>
+            {err}
+          </p>
+        )}
+      </div>
     </main>
   );
 }
