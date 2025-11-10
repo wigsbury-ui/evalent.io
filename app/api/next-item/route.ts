@@ -1,63 +1,73 @@
 // app/api/next-item/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { items } from '../../../lib/item';
+export const runtime = 'nodejs';
 
-type StoreEntry = {
-  index: number;                                   // next item index to serve
-  answers: Record<string, string>;                 // itemId -> answer (mcq stores index as string)
-  correctMcq: number;
-};
+import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 
-declare global {
-  // eslint-disable-next-line no-var
-  var __EVALENT_STORE__: Record<string, StoreEntry> | undefined;
-}
-const store: Record<string, StoreEntry> =
-  globalThis.__EVALENT_STORE__ ?? (globalThis.__EVALENT_STORE__ = {});
-
-function ensure(token: string): StoreEntry {
-  if (!store[token]) store[token] = { index: 0, answers: {}, correctMcq: 0 };
-  return store[token];
+function supaAdmin() {
+  return createClient(
+    process.env.SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { auth: { persistSession: false } }
+  );
 }
 
-export async function GET(req: NextRequest) {
+export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const token = searchParams.get('token') ?? '';
-  if (!token) return NextResponse.json({ error: 'missing token' }, { status: 400 });
+  const token = searchParams.get('token');
+  if (!token) return NextResponse.json({ error: 'Missing token' }, { status: 400 });
 
-  const s = ensure(token);
+  const supa = supaAdmin();
 
-  // Finished? Return a summary payload
-  if (s.index >= items.length) {
-    const written = items
-      .filter((it) => it.type === 'written')
-      .map((it) => ({ id: it.id, prompt: it.prompt, answer: s.answers[it.id] ?? '' }));
+  // 1) Load session
+  const { data: session, error: sErr } = await supa
+    .from('sessions')
+    .select('id, school_id, status, item_index')
+    .eq('token', token)
+    .single();
+  if (sErr || !session) return NextResponse.json({ error: 'Invalid token' }, { status: 404 });
 
-    const mcq = items
-      .filter((it) => it.type === 'mcq')
-      .map((it) => {
-        const selectedIndex = s.answers[it.id] != null ? Number(s.answers[it.id]) : null;
-        return {
-          id: it.id,
-          prompt: it.prompt,
-          options: it.options,
-          correctIndex: it.correctIndex,
-          selectedIndex,
-          correct: selectedIndex === it.correctIndex,
-        };
-      });
+  // 2) Count total active items for this school (fallback to NULL-scoped)
+  const { count: total, error: cErr } = await supa
+    .from('items')
+    .select('id', { count: 'exact', head: true })
+    .or(`school_id.eq.${session.school_id ?? '00000000-0000-0000-0000-000000000000'},school_id.is.null`)
+    .eq('active', true);
+  if (cErr) return NextResponse.json({ error: cErr.message }, { status: 500 });
 
-    return NextResponse.json({
-      done: true,
-      total: items.length,
-      correctMcq: s.correctMcq,
-      answered: Object.keys(s.answers).length,
-      written,
-      mcq,
-    });
+  // If we’re done
+  if (!total || session.item_index >= total) {
+    await supa.from('sessions').update({ status: 'complete' }).eq('id', session.id);
+    return NextResponse.json({ done: true, total, index: session.item_index });
   }
 
-  // Otherwise return the next item
-  const item = items[s.index];
-  return NextResponse.json({ done: false, index: s.index, total: items.length, item });
+  // 3) Get the one item at offset item_index
+  const { data: items, error: iErr } = await supa
+    .from('items')
+    .select('id, domain, type, prompt, options, correct_index, media_url')
+    .or(`school_id.eq.${session.school_id ?? '00000000-0000-0000-0000-000000000000'},school_id.is.null`)
+    .eq('active', true)
+    .order('created_at', { ascending: true })
+    .range(session.item_index, session.item_index); // exactly one
+  if (iErr) return NextResponse.json({ error: iErr.message }, { status: 500 });
+
+  const item = items?.[0];
+  if (!item) {
+    await supa.from('sessions').update({ status: 'complete' }).eq('id', session.id);
+    return NextResponse.json({ done: true, total, index: session.item_index });
+  }
+
+  return NextResponse.json({
+    done: false,
+    total,
+    index: session.item_index + 1,
+    item: {
+      id: item.id,
+      domain: item.domain,
+      type: item.type,
+      prompt: item.prompt,
+      options: item.options ?? null,
+      media_url: item.media_url ?? null
+    }
+  });
 }
