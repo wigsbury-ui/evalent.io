@@ -1,65 +1,51 @@
+// app/api/start/route.ts
 export const runtime = 'nodejs';
 
 import { NextResponse } from 'next/server';
 import { supaAdmin } from '@/lib/supa';
-import crypto from 'crypto';
 
-function need(name: string) {
-  const v = process.env[name];
-  if (!v) throw new Error(`Missing env: ${name}`);
-  return v;
-}
+// One place to read the passcode (keep it server-only if you can)
+// You currently store NEXT_PUBLIC_START_PASSCODE, so read that:
+const PASSCODE = process.env.NEXT_PUBLIC_START_PASSCODE || 'letmein';
+const DEFAULT_SCHOOL_ID = process.env.DEFAULT_SCHOOL_ID;
 
-export async function GET() {
-  // quick diag to confirm env + DB reachability
-  try {
-    const urlOK = !!process.env.SUPABASE_URL;
-    const keyOK = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const schoolOK = !!process.env.DEFAULT_SCHOOL_ID;
-    return NextResponse.json({
-      ok: true,
-      urlOK,
-      keyOK,
-      schoolOK,
-      passcodeSet: !!process.env.NEXT_PUBLIC_START_PASSCODE,
-    });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });
-  }
+function makeToken(): string {
+  return Math.random().toString(16).slice(2) + Math.random().toString(16).slice(2);
 }
 
 export async function POST(req: Request) {
   try {
-    // 1) Auth via passcode (kept simple)
-    const expected = process.env.NEXT_PUBLIC_START_PASSCODE || '';
-    const body = await req.json().catch(() => ({} as any));
-    const passcode = String(body?.passcode ?? '');
+    const { passcode } = (await req.json().catch(() => ({}))) as { passcode?: string };
 
-    if (expected && passcode !== expected) {
+    if (!passcode) {
+      return NextResponse.json({ ok: false, error: 'missing_passcode' }, { status: 400 });
+    }
+    if (passcode !== PASSCODE) {
       return NextResponse.json({ ok: false, error: 'bad_passcode' }, { status: 401 });
     }
+    if (!DEFAULT_SCHOOL_ID) {
+      return NextResponse.json({ ok: false, error: 'missing_DEFAULT_SCHOOL_ID' }, { status: 500 });
+    }
 
-    // 2) Create a session row
-    const schoolId = need('DEFAULT_SCHOOL_ID');
-    const token = crypto.randomUUID().replace(/-/g, '').slice(0, 12); // short human token
+    const token = makeToken();
 
-    const supa = supaAdmin();
-    const { data, error } = await supa
+    // create session with safe defaults
+    const { data, error } = await supaAdmin()
       .from('sessions')
       .insert({
         token,
-        status: 'active',       // must be one of: pending | active | complete
-        item_index: 0,          // start at first item
-        school_id: schoolId,    // optional but recommended if column exists
+        school_id: DEFAULT_SCHOOL_ID,
+        item_index: 0,
+        status: 'active',
       })
-      .select('token')
+      .select('id')
       .single();
 
     if (error) {
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, token: data.token });
+    return NextResponse.json({ ok: true, token, session_id: data?.id ?? null });
   } catch (e: any) {
     return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });
   }
