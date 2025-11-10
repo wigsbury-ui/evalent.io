@@ -1,83 +1,66 @@
-// app/api/start/route.ts
 export const runtime = 'nodejs';
 
 import { NextResponse } from 'next/server';
+import { supaAdmin } from '@/lib/supa';
 import crypto from 'crypto';
-import { createClient } from '@supabase/supabase-js';
 
-function envOrThrow(name: string) {
+function need(name: string) {
   const v = process.env[name];
   if (!v) throw new Error(`Missing env: ${name}`);
   return v;
 }
 
-const PASSCODE =
-  process.env.NEXT_PUBLIC_START_PASSCODE ||
-  process.env.START_PASSCODE ||
-  'letmein';
-
-const SUPABASE_URL = envOrThrow('SUPABASE_URL');
-const SUPABASE_SERVICE_ROLE_KEY = envOrThrow('SUPABASE_SERVICE_ROLE_KEY');
-const DEFAULT_SCHOOL_ID = envOrThrow('DEFAULT_SCHOOL_ID');
-
-const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: { persistSession: false },
-});
-
-async function createSession() {
-  const token = crypto.randomBytes(6).toString('hex');
-
-  // Insert only columns that exist & have sane defaults elsewhere.
-  const { error } = await supa.from('sessions').insert([
-    {
-      token,
-      status: 'active',
-      item_index: 0,
-      school_id: DEFAULT_SCHOOL_ID,
-    },
-  ]);
-
-  if (error) {
-    // Log to Vercel function logs, and return useful details to client
-    console.error('[start/createSession] Supabase insert error:', error);
-    const msg = error.message || 'insert failed';
-    // Pass back explicit error info
-    throw new Error(`DB: ${msg}`);
+export async function GET() {
+  // quick diag to confirm env + DB reachability
+  try {
+    const urlOK = !!process.env.SUPABASE_URL;
+    const keyOK = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const schoolOK = !!process.env.DEFAULT_SCHOOL_ID;
+    return NextResponse.json({
+      ok: true,
+      urlOK,
+      keyOK,
+      schoolOK,
+      passcodeSet: !!process.env.NEXT_PUBLIC_START_PASSCODE,
+    });
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });
   }
-
-  return token;
-}
-
-function j(ok: boolean, extra: Record<string, any> = {}, status = 200) {
-  return NextResponse.json({ ok, ...extra }, { status });
-}
-
-async function handle(passcode: string | null) {
-  if (!passcode) return j(false, { error: 'Missing passcode' }, 400);
-  if (passcode !== PASSCODE) return j(false, { error: 'Invalid passcode' }, 401);
-
-  const token = await createSession();
-  return j(true, { token, href: `/t/${token}` });
 }
 
 export async function POST(req: Request) {
   try {
+    // 1) Auth via passcode (kept simple)
+    const expected = process.env.NEXT_PUBLIC_START_PASSCODE || '';
     const body = await req.json().catch(() => ({} as any));
-    const pass = body?.passcode ?? null;
-    return await handle(pass);
-  } catch (e: any) {
-    console.error('[start/POST] error:', e);
-    return j(false, { error: String(e?.message || e) }, 500);
-  }
-}
+    const passcode = String(body?.passcode ?? '');
 
-export async function GET(req: Request) {
-  try {
-    const url = new URL(req.url);
-    const pass = url.searchParams.get('passcode');
-    return await handle(pass);
+    if (expected && passcode !== expected) {
+      return NextResponse.json({ ok: false, error: 'bad_passcode' }, { status: 401 });
+    }
+
+    // 2) Create a session row
+    const schoolId = need('DEFAULT_SCHOOL_ID');
+    const token = crypto.randomUUID().replace(/-/g, '').slice(0, 12); // short human token
+
+    const supa = supaAdmin();
+    const { data, error } = await supa
+      .from('sessions')
+      .insert({
+        token,
+        status: 'active',       // must be one of: pending | active | complete
+        item_index: 0,          // start at first item
+        school_id: schoolId,    // optional but recommended if column exists
+      })
+      .select('token')
+      .single();
+
+    if (error) {
+      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true, token: data.token });
   } catch (e: any) {
-    console.error('[start/GET] error:', e);
-    return j(false, { error: String(e?.message || e) }, 500);
+    return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });
   }
 }
