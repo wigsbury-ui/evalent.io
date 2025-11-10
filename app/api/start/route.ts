@@ -26,7 +26,7 @@ async function startImpl(passcodeProvided?: string) {
 
   const { data, error } = await supa
     .from('sessions')
-    .insert([{ token, school_id: schoolId, status: 'active', item_index: 0 }])
+    .insert([{ token, school_id: schoolId, status: 'in_progress', item_index: 0 }])
     .select('token')
     .single();
 
