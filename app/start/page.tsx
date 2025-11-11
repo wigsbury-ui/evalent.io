@@ -1,105 +1,183 @@
-'use client';
+"use client";
 
-import { Suspense, useEffect, useState } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
+import * as React from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
-function StartInner() {
-  const sp = useSearchParams();
+type Mode = "core" | "easy" | "hard";
+
+const PROGRAMMES = ["UK", "US", "IB"] as const;
+const GRADES = ["1","2","3","4","5","6","7","8","9","10","11","12"] as const;
+const MODES: { value: Mode; label: string }[] = [
+  { value: "core", label: "Core" },
+  { value: "easy", label: "Easy" },
+  { value: "hard", label: "Hard" },
+];
+
+export default function StartPage() {
   const router = useRouter();
+  const sp = useSearchParams();
 
-  const [passcode, setPasscode] = useState('');
-  const [programme, setProgramme] = useState(sp.get('programme') || 'UK');
-  const [grade, setGrade] = useState(sp.get('grade') || '3');
-  const [mode, setMode] = useState(sp.get('mode') || 'core');
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [passcode, setPasscode] = React.useState("");
+  const [programme, setProgramme] = React.useState<string>("UK");
+  const [grade, setGrade] = React.useState<string>("3");
+  const [mode, setMode] = React.useState<Mode>("core");
+  const [err, setErr] = React.useState<string>("");
+  const [loading, setLoading] = React.useState(false);
 
-  useEffect(() => {
-    const p = new URLSearchParams();
-    p.set('programme', programme);
-    p.set('grade', grade);
-    p.set('mode', mode);
-    window.history.replaceState(null, '', `/start?${p.toString()}`);
-  }, [programme, grade, mode]);
+  // Allow pre-filling via URL: /start?programme=UK&grade=3&mode=core
+  React.useEffect(() => {
+    const p = (sp.get("programme") || "").trim();
+    const g = (sp.get("grade") || "").trim();
+    const m = (sp.get("mode") || "").trim().toLowerCase() as Mode;
 
-  async function onSubmit(e: React.FormEvent) {
+    if (p && PROGRAMMES.includes(p as any)) setProgramme(p);
+    if (g && GRADES.includes(g as any)) setGrade(g);
+    if (m && (["core","easy","hard"] as const).includes(m)) setMode(m);
+  }, [sp]);
+
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setBusy(true);
-    setError(null);
+    setErr("");
+    setLoading(true);
 
-    const qs = new URLSearchParams({
-      passcode,
-      programme,
-      grade,
-      mode,
-    });
+    try {
+      const qs = new URLSearchParams({
+        passcode,
+        programme,
+        grade,
+        mode,
+      }).toString();
 
-    const res = await fetch(`/api/start?${qs.toString()}`, { method: 'GET' });
-    const j = await res.json().catch(() => ({}));
+      const res = await fetch(`/api/start?${qs}`, { cache: "no-store" });
+      const data = await res.json();
 
-    if (!res.ok || !j?.ok) {
-      setError(j?.error || `HTTP ${res.status}`);
-      setBusy(false);
-      return;
+      if (!res.ok || !data?.ok || !data?.token) {
+        setErr(data?.error || "start_failed");
+        return;
+      }
+
+      // Navigate to the runner with the session token
+      router.push(`/run?t=${encodeURIComponent(data.token)}`);
+    } catch (e: any) {
+      setErr("start_failed");
+    } finally {
+      setLoading(false);
     }
-    router.push(`/t/${j.token}`);
-  }
+  };
 
   return (
-    <div style={{ maxWidth: 720, margin: '4rem auto', padding: '0 1rem' }}>
-      <h1 style={{ fontSize: '64px', lineHeight: 1.1, marginBottom: 24 }}>Start a Test</h1>
+    <main style={{ maxWidth: 920, margin: "72px auto", padding: "0 24px" }}>
+      <h1 style={{ fontSize: 56, lineHeight: 1.1, marginBottom: 28 }}>
+        Start a Test
+      </h1>
 
-      <form onSubmit={onSubmit} style={{ display: 'grid', gap: 16 }}>
+      <form onSubmit={onSubmit}>
         <input
           type="password"
           value={passcode}
           onChange={(e) => setPasscode(e.target.value)}
-          placeholder="Enter passcode"
-          required
-          style={{ fontSize: 28, padding: 20, borderRadius: 8, border: '1px solid #ccc' }}
+          placeholder="Passcode"
+          aria-label="Passcode"
+          style={{
+            width: "100%",
+            height: 64,
+            fontSize: 28,
+            padding: "0 16px",
+            border: "1px solid #c9c9c9",
+            borderRadius: 8,
+          }}
         />
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-          <select value={programme} onChange={(e) => setProgramme(e.target.value)} aria-label="Programme"
-            style={{ fontSize: 20, padding: 14, borderRadius: 8 }}>
-            <option value="UK">UK</option>
-            <option value="US">US</option>
-            <option value="IB">IB</option>
-          </select>
-
-          <select value={grade} onChange={(e) => setGrade(e.target.value)} aria-label="Grade"
-            style={{ fontSize: 20, padding: 14, borderRadius: 8 }}>
-            {Array.from({ length: 13 }, (_, i) => String(i + 1)).map(g => (
-              <option key={g} value={g}>{g}</option>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr 1fr",
+            gap: 16,
+            marginTop: 16,
+          }}
+        >
+          <select
+            value={programme}
+            onChange={(e) => setProgramme(e.target.value)}
+            aria-label="Programme"
+            style={selectStyle}
+          >
+            {PROGRAMMES.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
             ))}
           </select>
 
-          <select value={mode} onChange={(e) => setMode(e.target.value)} aria-label="Mode"
-            style={{ fontSize: 20, padding: 14, borderRadius: 8 }}>
-            <option value="core">Core</option>
-            <option value="easy">Easy</option>
-            <option value="hard">Hard</option>
+          <select
+            value={grade}
+            onChange={(e) => setGrade(e.target.value)}
+            aria-label="Grade"
+            style={selectStyle}
+          >
+            {GRADES.map((g) => (
+              <option key={g} value={g}>
+                {g}
+              </option>
+            ))}
+          </select>
+
+          <select
+            value={mode}
+            onChange={(e) => setMode(e.target.value as Mode)}
+            aria-label="Mode"
+            style={selectStyle}
+          >
+            {MODES.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
           </select>
         </div>
 
         <button
           type="submit"
-          disabled={busy}
-          style={{ fontSize: 28, padding: '16px 24px', width: 320, borderRadius: 12,
-                   background: '#4457f2', color: '#fff', border: 'none', cursor: 'pointer' }}>
-          {busy ? 'Starting…' : 'Create session'}
+          disabled={loading}
+          style={{
+            marginTop: 20,
+            height: 64,
+            padding: "0 28px",
+            fontSize: 26,
+            fontWeight: 600,
+            background: "#3b5bfd",
+            color: "#fff",
+            border: 0,
+            borderRadius: 10,
+            cursor: "pointer",
+            opacity: loading ? 0.7 : 1,
+          }}
+        >
+          {loading ? "Creating…" : "Create session"}
         </button>
 
-        {error && <div style={{ color: '#8b0000', fontSize: 20 }}>{error}</div>}
+        {err && (
+          <div
+            style={{
+              color: "#8b1e1e",
+              marginTop: 14,
+              fontSize: 18,
+              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace",
+            }}
+          >
+            {err}
+          </div>
+        )}
       </form>
-    </div>
+    </main>
   );
 }
 
-export default function StartPage() {
-  return (
-    <Suspense fallback={<div style={{ padding: 32 }}>Loading…</div>}>
-      <StartInner />
-    </Suspense>
-  );
-}
+const selectStyle: React.CSSProperties = {
+  height: 56,
+  fontSize: 20,
+  padding: "0 12px",
+  border: "1px solid #c9c9c9",
+  borderRadius: 8,
+  background: "#fff",
+};
