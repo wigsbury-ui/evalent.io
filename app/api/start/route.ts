@@ -1,120 +1,71 @@
 // app/api/start/route.ts
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import db from "@/lib/db";
 import {
   START_PASSCODE,
-  SHEETS_BLUEPRINTS_CSV,
-  BLUEPRINTS_CSV_URL,
   DEFAULT_SCHOOL_ID,
-  SUPABASE_URL,
-  SUPABASE_SERVICE_ROLE_KEY,
+  SHEETS_BLUEPRINTS_CSV,
 } from "@/lib/env";
+import { loadCsv } from "@/lib/loaders";
 
-// ---------- Supabase (admin) ----------
-const supa = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-  auth: { persistSession: false },
-});
+// small helpers
+const safeNum = (v: unknown) =>
+  Number(String(v ?? "").replace(/[^0-9.\-]/g, ""));
+const norm = (s: string) =>
+  String(s ?? "").replace(/\uFEFF/g, "").replace(/\u00A0/g, " ").trim().toLowerCase();
 
-// ---------- CSV + blueprint helpers ----------
-function norm(s: unknown): string {
-  return String(s ?? "")
-    .replace(/\uFEFF/g, "") // BOM
-    .replace(/\u00A0/g, " ") // nbsp
-    .trim();
-}
-function normKey(s: unknown): string {
-  return norm(s).toLowerCase();
-}
-type CsvRow = Record<string, string>;
+const newToken = () => crypto.randomUUID().replace(/-/g, "");
+const minutesFromNow = (m: number) =>
+  new Date(Date.now() + m * 60 * 1000).toISOString();
 
-function parseCsv(text: string): CsvRow[] {
-  const lines = text.split(/\r?\n/).filter(Boolean);
-  if (lines.length === 0) return [];
-  const headers = lines[0].split(",").map(norm);
-  const rows: CsvRow[] = [];
-  for (let i = 1; i < lines.length; i++) {
-    const cols = lines[i].split(",");
-    const row: CsvRow = {};
-    for (let j = 0; j < headers.length; j++) row[headers[j]] = norm(cols[j] ?? "");
-    rows.push(row);
-  }
-  return rows;
-}
-function toNumberOrNaN(v: unknown): number {
-  const n = Number(String(v ?? "").replace(/[^0-9.\-]/g, ""));
-  return Number.isFinite(n) ? n : NaN;
-}
-
-/** Build countsBySubject for programme/grade/mode, supporting two schemas:
- * A) subject + [easy_count|core_count|hard_count]
- * B) programme, grade, year, domains, total  (use domains as subject and total as count)
- */
-function countsFromBlueprint(rows: CsvRow[], programme: string, grade: string, mode: string) {
-  const p = normKey(programme);
-  const g = norm(grade);
-  const filtered = rows.filter((r) => {
-    const rk = Object.fromEntries(Object.entries(r).map(([k, v]) => [normKey(k), v]));
-    return normKey(rk["programme"]) === p && norm(rk["grade"]) === g;
-  });
-
-  const countsBySubject: Record<string, number> = {};
-  for (const r of filtered) {
-    const subjectKey =
-      Object.keys(r).find((k) => normKey(k) === "subject") ??
-      Object.keys(r).find((k) => normKey(k) === "domains");
-    if (!subjectKey) continue;
-
-    const subject = norm(r[subjectKey]);
-    if (!subject) continue;
-
-    const modeKey = Object.keys(r).find((k) => normKey(k) === `${mode.toLowerCase()}_count`);
-    const totalKey = Object.keys(r).find((k) => normKey(k) === "total");
-    const raw = modeKey ? r[modeKey] : totalKey ? r[totalKey] : undefined;
-
-    const n = toNumberOrNaN(raw);
-    if (Number.isFinite(n) && n > 0) countsBySubject[subject] = n;
-  }
-  return countsBySubject;
-}
-
-// ---------- GET handler ----------
 export async function GET(req: Request) {
   try {
+    // -------- query params ----------
     const url = new URL(req.url);
-    const passcode = norm(url.searchParams.get("passcode"));
-    const programme = norm(url.searchParams.get("programme"));
-    const grade = norm(url.searchParams.get("grade"));
-    const mode = norm(url.searchParams.get("mode") || "core"); // easy|core|hard
+    const passcode = url.searchParams.get("passcode") || "";
+    const programme = (url.searchParams.get("programme") || "").trim();
+    const grade = (url.searchParams.get("grade") || "").trim();
+    const mode = (url.searchParams.get("mode") || "core").trim().toLowerCase();
 
-    if (!passcode || !programme || !grade) {
-      return NextResponse.json(
-        { ok: false, error: "missing_programme_or_grade" },
-        { status: 400 }
-      );
-    }
-    if (passcode !== START_PASSCODE) {
+    if (passcode !== START_PASSCODE)
       return NextResponse.json({ ok: false, error: "bad_passcode" }, { status: 401 });
-    }
 
-    const BLUEPRINTS_URL = SHEETS_BLUEPRINTS_CSV || BLUEPRINTS_CSV_URL;
-    if (!BLUEPRINTS_URL) {
+    if (!programme || !grade)
+      return NextResponse.json({ ok: false, error: "missing_programme_or_grade" }, { status: 400 });
+
+    // -------- load blueprints CSV ----------
+    if (!SHEETS_BLUEPRINTS_CSV)
       return NextResponse.json(
-        { ok: false, error: "start_failed", detail: "missing_SHEETS_BLUEPRINTS_CSV (or BLUEPRINTS_CSV_URL)" },
-        { status: 400 }
+        { ok: false, error: "start_failed", detail: "missing_SHEETS_BLUEPRINTS_CSV" },
+        { status: 500 }
       );
+
+    const rows = await loadCsv(SHEETS_BLUEPRINTS_CSV); // returns array of objects
+
+    // filter for programme + grade
+    const filtered = rows.filter((r: any) => {
+      const p = String(r.programme ?? r.Programme ?? "").trim();
+      const g = String(r.grade ?? r.Grade ?? "").trim();
+      return p === programme && g === grade;
+    });
+
+    // count map by subject/domains using <mode>_count or total
+    const countsBySubject: Record<string, number> = {};
+    for (const r of filtered) {
+      const keys = Object.keys(r);
+      const kSubject =
+        keys.find((k) => norm(k) === "subject") ??
+        keys.find((k) => norm(k) === "domains");
+      const subject = String(kSubject ? r[kSubject] : "").trim();
+      if (!subject) continue;
+
+      const kMode = keys.find((k) => norm(k) === `${mode}_count`);
+      const kTotal = keys.find((k) => norm(k) === "total");
+      const raw = kMode ? r[kMode] : kTotal ? r[kTotal] : undefined;
+      const n = safeNum(raw);
+      if (Number.isFinite(n) && n > 0) countsBySubject[subject] = n;
     }
 
-    const csvRes = await fetch(BLUEPRINTS_URL, { cache: "no-store" });
-    if (!csvRes.ok) {
-      return NextResponse.json(
-        { ok: false, error: "blueprints_fetch_failed", status: csvRes.status },
-        { status: 502 }
-      );
-    }
-    const csvText = await csvRes.text();
-    const csvRows = parseCsv(csvText);
-
-    const countsBySubject = countsFromBlueprint(csvRows, programme, grade, mode);
     if (!Object.values(countsBySubject).some((v) => v > 0)) {
       return NextResponse.json(
         { ok: false, error: `blueprint_has_no_positive_counts_for_mode_${mode}` },
@@ -122,26 +73,60 @@ export async function GET(req: Request) {
       );
     }
 
-    const plan = { programme, grade, mode, countsBySubject, t: Date.now() };
+    // -------- create session ----------
+    const plan = {
+      t: Date.now(),
+      programme,
+      grade,
+      mode,
+      countsBySubject,
+    };
 
-    const { data, error } = await supa
+    // insert session (status defaults to 'active' in your schema; we set it explicitly)
+    const { data: inserted, error: iErr } = await db
       .from("sessions")
-      .insert([{ school_id: DEFAULT_SCHOOL_ID, plan, status: "active" }])
-      .select()
+      .insert({
+        school_id: DEFAULT_SCHOOL_ID,
+        status: "active",
+        plan,
+      })
+      .select("id, token, public_token")
       .single();
 
-    if (error) {
-      return NextResponse.json(
-        { ok: false, error: "db_insert_failed", detail: error.message },
-        { status: 500 }
-      );
+    if (iErr || !inserted)
+      return NextResponse.json({ ok: false, error: "db_insert_failed", detail: iErr?.message }, { status: 500 });
+
+    let token = inserted.token;
+    // ensure we have a session token the runner can use
+    if (!token) {
+      token = newToken();
+      const { data: updated, error: uErr } = await db
+        .from("sessions")
+        .update({
+          token,
+          not_after: minutesFromNow(120),
+        })
+        .eq("id", inserted.id)
+        .select("id, token, public_token")
+        .single();
+
+      if (uErr || !updated)
+        return NextResponse.json({ ok: false, error: "db_update_failed", detail: uErr?.message }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, session: data });
-  } catch (err: any) {
-    return NextResponse.json(
-      { ok: false, error: "start_failed", detail: String(err?.message ?? err) },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      ok: true,
+      session: {
+        id: inserted.id,
+        status: "active",
+        mode,
+        grade,
+        programme,
+      },
+      token, // <— the runner needs this
+      plan,
+    });
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: "start_failed", detail: String(e?.message || e) }, { status: 500 });
   }
 }
