@@ -99,3 +99,43 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: e?.message || 'start_failed' }, { status: 500 });
   }
 }
+
+// Build countsBySubject from blueprint rows, supporting both schemas:
+// (A) subject + [easy_count|core_count|hard_count]
+// (B) domains + total (treated as the active mode's count)
+//
+// Also normalizes headers (lowercase, trims, strips BOM/nbsp)
+const normalize = (s: string) =>
+  String(s ?? '')
+    .replace(/\uFEFF/g, '')
+    .replace(/\u00A0/g, ' ')
+    .trim()
+    .toLowerCase();
+
+const countsBySubject: Record<string, number> = {};
+
+for (const row of filtered) {
+  // find a subject-like column
+  const subjectKey =
+    Object.keys(row).find(k => normalize(k) === 'subject') ??
+    Object.keys(row).find(k => normalize(k) === 'domains'); // fallback
+
+  const subject = String(subjectKey ? row[subjectKey] : '').trim();
+  if (!subject) continue;
+
+  // find the numeric count: prefer "<mode>_count"; else "total"
+  const modeKey = Object.keys(row).find(k => normalize(k) === `${mode}_count`);
+  const totalKey = Object.keys(row).find(k => normalize(k) === 'total');
+
+  const raw = modeKey ? row[modeKey] : totalKey ? row[totalKey] : undefined;
+  const n = Number(String(raw ?? '').replace(/[^0-9.\-]/g, ''));
+
+  if (Number.isFinite(n) && n > 0) countsBySubject[subject] = n;
+}
+
+if (!Object.values(countsBySubject).some(v => v > 0)) {
+  return NextResponse.json(
+    { ok: false, error: `blueprint_has_no_positive_counts_for_mode_${mode}` },
+    { status: 400 }
+  );
+}
