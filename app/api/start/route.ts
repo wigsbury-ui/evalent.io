@@ -1,30 +1,38 @@
-import { NextRequest, NextResponse } from 'next/server';
+// --- build countsBySubject from blueprint rows (supports both schemas) ---
+const normalize = (s: any) =>
+  String(s ?? '')
+    .replace(/\uFEFF/g, '')       // strip BOM
+    .replace(/\u00A0/g, ' ')      // strip nbsp
+    .trim()
+    .toLowerCase();
 
-// Your existing GET implementation should already exist.
-// We'll factor the handler so GET and POST can both call it.
+const countsBySubject: Record<string, number> = {};
 
-async function handleStart(params: URLSearchParams) {
-  // >>> call the same logic you use inside GET right now <<<
-  // i.e., read programme/grade/mode/passcode from params,
-  // load blueprints/items/assets, build counts, create session, return JSON.
+for (const row of rows as any[]) {
+  // subject can be "subject" (old) or "domains" (new)
+  const subjectKey =
+    Object.keys(row).find(k => normalize(k) === 'subject') ??
+    Object.keys(row).find(k => normalize(k) === 'domains');
+
+  const subject = String(subjectKey ? row[subjectKey] : '').trim();
+  if (!subject) continue;
+
+  // count can be "<mode>_count" (old) or "total" (new)
+  const modeKey   = Object.keys(row).find(k => normalize(k) === `${mode}_count`);
+  const totalKey  = Object.keys(row).find(k => normalize(k) === 'total');
+
+  const raw = modeKey ? row[modeKey] : totalKey ? row[totalKey] : undefined;
+  const n = Number(String(raw ?? '').replace(/[^0-9.\-]/g, ''));
+
+  if (Number.isFinite(n) && n > 0) {
+    countsBySubject[subject] = n;
+  }
 }
 
-// KEEP your GET as-is, or adapt it to call handleStart
-export async function GET(req: NextRequest) {
-  const url = new URL(req.url);
-  return handleStart(url.searchParams);
+if (!Object.values(countsBySubject).some(v => v > 0)) {
+  return NextResponse.json(
+    { ok: false, error: `blueprint_has_no_positive_counts_for_mode_${mode}` },
+    { status: 400 }
+  );
 }
-
-// NEW: accept JSON { passcode, programme, grade, mode }
-export async function POST(req: NextRequest) {
-  const url = new URL(req.url);
-  const body = await req.json().catch(() => ({} as any));
-
-  const params = new URLSearchParams(url.searchParams);
-  if (body.passcode) params.set('passcode', String(body.passcode));
-  if (body.programme) params.set('programme', String(body.programme));
-  if (body.grade) params.set('grade', String(body.grade));
-  if (body.mode) params.set('mode', String(body.mode));
-
-  return handleStart(params);
-}
+// ------------------------------------------------------------------------
