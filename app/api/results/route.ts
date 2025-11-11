@@ -8,14 +8,14 @@ type ItemRow = {
   id: string;
   domain?: string | null;
   prompt?: string | null;
-  options?: any[] | null; // MCQ options if present
+  options?: any[] | null;
 };
 
 type AttemptRow = {
   id: string;
   is_correct: boolean | null;
   selected_index: number | null;
-  item?: ItemRow | null; // joined via item:items(...)
+  item?: ItemRow | null;
 };
 
 export async function GET(req: Request) {
@@ -28,7 +28,7 @@ export async function GET(req: Request) {
 
     const supa = supaAdmin();
 
-    // session
+    // 1) Session lookup
     const { data: session, error: sErr } = await supa
       .from('sessions')
       .select('id, school_id')
@@ -38,7 +38,7 @@ export async function GET(req: Request) {
     if (sErr) return NextResponse.json({ ok: false, error: sErr.message }, { status: 400 });
     if (!session) return NextResponse.json({ ok: false, error: 'session not found' }, { status: 404 });
 
-    // attempts + joined item (note: no "kind" column is assumed)
+    // 2) Attempts + joined item (item may come back as an array — normalize it)
     const { data, error: aErr } = await supa
       .from('attempts')
       .select('id, is_correct, selected_index, item:items(id, domain, prompt, options)')
@@ -47,9 +47,29 @@ export async function GET(req: Request) {
 
     if (aErr) return NextResponse.json({ ok: false, error: aErr.message }, { status: 400 });
 
-    const attempts: AttemptRow[] = (data ?? []) as AttemptRow[];
+    const raw = (data ?? []) as any[];
 
-    // Score by domain
+    const attempts: AttemptRow[] = raw.map((r) => {
+      // Supabase can return relation aliases as object OR single-element array depending on path
+      const joined = Array.isArray(r.item) ? (r.item[0] ?? null) : r.item ?? null;
+      const item: ItemRow | null = joined
+        ? {
+            id: String(joined.id),
+            domain: joined.domain ?? null,
+            prompt: joined.prompt ?? null,
+            options: joined.options ?? null,
+          }
+        : null;
+
+      return {
+        id: String(r.id),
+        is_correct: r.is_correct ?? null,
+        selected_index: r.selected_index ?? null,
+        item,
+      };
+    });
+
+    // 3) Score by domain
     const byDomain: Record<string, { total: number; correct: number }> = {};
     for (const a of attempts) {
       const d = a.item?.domain ?? 'General';
@@ -58,7 +78,7 @@ export async function GET(req: Request) {
       if (a.is_correct) byDomain[d].correct += 1;
     }
 
-    // Add computed_kind for convenience (MCQ if options present)
+    // 4) Add computed kind (mcq if options exist)
     const normalized = attempts.map((a) => {
       const kind =
         Array.isArray(a.item?.options) && (a.item?.options?.length ?? 0) > 0
