@@ -1,7 +1,8 @@
 // app/api/start/route.ts
 import { NextResponse } from 'next/server';
-import { db } from '../../../lib/db'; // present for compatibility if you later persist sessions
-import { loadBlueprints } from '../../../lib/loaders';
+// (db is optional for now; kept for future session persistence)
+import { db } from '@/app/lib/db';
+import { loadBlueprints } from '@/app/lib/loaders';
 
 type Counts = Record<string, number>;
 
@@ -21,40 +22,26 @@ function safeNum(v: any): number {
 /**
  * Build countsBySubject from blueprint rows, supporting both schemas:
  *  A) columns: programme, grade, subject, easy_count|core_count|hard_count
- *  B) columns: programme, grade, domains, total   (treat total as the <mode> count)
+ *  B) columns: programme, grade, domains, total  (treat total as the mode's count)
  */
 function buildCounts(rows: Record<string, string>[], programme: string, grade: string, mode: string): Counts {
   const filtered = rows.filter(
-    (r) =>
-      lower(r['programme']) === lower(programme) &&
-      clean(r['grade']) === clean(grade)
+    (r) => lower(r['programme']) === lower(programme) && clean(r['grade']) === clean(grade)
   );
 
   const counts: Counts = {};
+  const modeKey = `${lower(mode)}_count`;
 
   for (const r of filtered) {
-    // subject name can be under 'subject' or 'domains'
-    const subject =
-      clean(r['subject']) ||
-      clean(r['domains']) ||
-      '';
-
+    const subject = clean(r['subject']) || clean(r['domains']) || '';
     if (!subject) continue;
 
-    // prefer "<mode>_count"
-    const modeKey = `${lower(mode)}_count`;
     let n = 0;
-
-    if (r.hasOwnProperty(modeKey)) {
-      n = safeNum(r[modeKey]);
-    } else if (r.hasOwnProperty('total')) {
-      // fallback schema: domains + total
-      n = safeNum(r['total']);
-    }
+    if (r.hasOwnProperty(modeKey)) n = safeNum(r[modeKey]);
+    else if (r.hasOwnProperty('total')) n = safeNum(r['total']);
 
     if (n > 0) counts[subject] = n;
   }
-
   return counts;
 }
 
@@ -81,22 +68,17 @@ export async function POST(req: Request) {
     }
 
     const countsBySubject = buildCounts(blueprints, programme, grade, mode);
-
-    if (!Object.values(countsBySubject).some((v) => v > 0)) {
+    if (!Object.values(countsBySubject).some(v => v > 0)) {
       return NextResponse.json(
         { ok: false, error: `blueprint_has_no_positive_counts_for_mode_${mode}` },
         { status: 400 }
       );
     }
 
-    // Generate a lightweight token so the UI can proceed; you can persist if desired.
-    const token = [
-      'T',
-      Date.now().toString(36),
-      Math.random().toString(36).slice(2, 8),
-    ].join('_');
+    // Lightweight token (you can persist if needed)
+    const token = ['T', Date.now().toString(36), Math.random().toString(36).slice(2, 8)].join('_');
 
-    // If you later want to persist, uncomment and ensure the table exists:
+    // Example persistence (optional):
     // await db.from('sessions').insert({
     //   token,
     //   item_index: 0,
@@ -117,7 +99,7 @@ export async function POST(req: Request) {
   }
 }
 
-// GET → 405 (clarifies the /start endpoint is POST-only)
+// Clarify method
 export async function GET() {
   return NextResponse.json({ ok: false, error: 'method_not_allowed' }, { status: 405 });
 }
