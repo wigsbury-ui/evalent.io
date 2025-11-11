@@ -4,10 +4,15 @@
 import { useEffect, useState } from 'react';
 
 type ItemRow = { id: string; domain: string | null; prompt: string; kind: 'mcq' | 'free'; options: string[] | null };
-type NextOk =
-  | { ok: true; done: true; index: number; total: number }
-  | { ok: true; done: false; index: number; total: number; item: ItemRow };
+
+type NextOkDone = { ok: true; done: true; index: number; total: number };
+type NextOkItem = { ok: true; done: false; index: number; total: number; item: ItemRow };
+type NextOk = NextOkDone | NextOkItem;
 type NextErr = { ok: false; error: string };
+
+function hasItem(x: NextOk): x is NextOkItem {
+  return (x as NextOkItem).done === false && 'item' in (x as any);
+}
 
 export default function Runner({ params }: { params: { token: string } }) {
   const token = params.token;
@@ -25,22 +30,30 @@ export default function Runner({ params }: { params: { token: string } }) {
     try {
       const res = await fetch(`/api/next-item?token=${encodeURIComponent(token)}`);
       const json: NextOk | NextErr = await res.json();
+
       if (!('ok' in json) || (json as any).ok !== true) {
         setErr((json as NextErr).error ?? 'Failed to load');
         setItem(null);
         return;
       }
+
       const ok = json as NextOk;
+
       if (ok.done) {
-        // go to results page
         window.location.href = `/results?token=${encodeURIComponent(token)}`;
         return;
       }
-      setIdx(ok.index + 1);
-      setTotal(ok.total);
-      setItem(ok.item);
-      setChoice(null);
-      setFree('');
+
+      if (hasItem(ok)) {
+        setIdx(ok.index + 1);
+        setTotal(ok.total);
+        setItem(ok.item);
+        setChoice(null);
+        setFree('');
+      } else {
+        setErr('unexpected_response');
+        setItem(null);
+      }
     } catch (e: any) {
       setErr(e?.message ?? 'network_error');
       setItem(null);
@@ -66,14 +79,17 @@ export default function Runner({ params }: { params: { token: string } }) {
     setLoading(true);
     setErr(null);
     try {
-      const res = await fetch('/api/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      const res = await fetch('/api/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
       const json = await res.json();
       if (!json?.ok) {
         setErr(json?.error ?? 'submit_failed');
         setLoading(false);
         return;
       }
-      // fetch next
       await loadNext();
     } catch (e: any) {
       setErr(e?.message ?? 'submit_failed');
@@ -91,19 +107,33 @@ export default function Runner({ params }: { params: { token: string } }) {
       {err && <div style={{ color: '#b91c1c', marginBottom: 12 }}>{err}</div>}
       {item && (
         <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 16 }}>
-          <div style={{ marginBottom: 8 }}>{idx} of {total} • {item.domain ?? 'General'}</div>
+          <div style={{ marginBottom: 8 }}>
+            {idx} of {total} • {item.domain ?? 'General'}
+          </div>
           <h2 style={{ fontSize: 36, lineHeight: 1.2 }}>{item.prompt}</h2>
 
           {item.kind === 'mcq' ? (
             <div style={{ marginTop: 16 }}>
               {(item.options ?? []).map((opt, i) => (
                 <label key={i} style={{ marginRight: 16, fontSize: 24 }}>
-                  <input type="radio" name="opt" checked={choice === i} onChange={() => setChoice(i)} style={{ marginRight: 8 }} />{opt}
+                  <input
+                    type="radio"
+                    name="opt"
+                    checked={choice === i}
+                    onChange={() => setChoice(i)}
+                    style={{ marginRight: 8 }}
+                  />
+                  {opt}
                 </label>
               ))}
             </div>
           ) : (
-            <textarea value={free} onChange={e => setFree(e.target.value)} rows={5} style={{ width: '100%', marginTop: 12 }} />
+            <textarea
+              value={free}
+              onChange={(e) => setFree(e.target.value)}
+              rows={5}
+              style={{ width: '100%', marginTop: 12 }}
+            />
           )}
 
           <div style={{ marginTop: 16 }}>
