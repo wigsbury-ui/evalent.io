@@ -14,9 +14,8 @@ type Report = {
   };
 };
 
-type ApiRes =
-  | { ok: true; report: Report }
-  | { ok: false; error: string };
+// Discriminated union, but we’ll narrow via `'report' in j` to keep TS calm.
+type ApiRes = { ok: true; report: Report } | { ok: false; error: string };
 
 export default function ResultsPage({ params }: { params: { token: string } }) {
   const token = params.token;
@@ -32,8 +31,11 @@ export default function ResultsPage({ params }: { params: { token: string } }) {
       try {
         const r = await fetch(`/api/results?token=${encodeURIComponent(token)}&t=${Date.now()}`, { cache: 'no-store' });
         const j: ApiRes = await r.json();
+
         if (!alive) return;
-        if (j.ok) {
+
+        // Narrow by property presence instead of ok-flag
+        if ('report' in j) {
           setData(j.report);
         } else {
           setErr(j.error || 'Failed to load results');
@@ -48,14 +50,14 @@ export default function ResultsPage({ params }: { params: { token: string } }) {
     return () => { alive = false; };
   }, [token]);
 
-  function pct(n: number) {
-    return `${Math.round(n)}%`;
-  }
+  const pct = (n: number) => `${Math.round(n)}%`;
 
   return (
     <main style={{ maxWidth: 900, margin: '40px auto', padding: '0 20px' }}>
       <h1 style={{ fontSize: 52, lineHeight: 1.05, marginBottom: 8 }}>Results</h1>
-      <p style={{ fontFamily: 'ui-monospace, Menlo, monospace' }}>Token: <strong>{token}</strong></p>
+      <p style={{ fontFamily: 'ui-monospace, Menlo, monospace' }}>
+        Token: <strong>{token}</strong>
+      </p>
 
       {loading && <div>Loading…</div>}
       {err && <div style={{ color: '#a11', marginTop: 10 }}>{err}</div>}
@@ -64,7 +66,9 @@ export default function ResultsPage({ params }: { params: { token: string } }) {
         <>
           <section style={{ marginTop: 18 }}>
             <h2 style={{ fontSize: 28, marginBottom: 6 }}>Overall</h2>
-            <div>MCQ: <strong>{data.mcq.correct}/{data.mcq.total}</strong> ({pct(data.mcq.percent)})</div>
+            <div>
+              MCQ: <strong>{data.mcq.correct}/{data.mcq.total}</strong> ({pct(data.mcq.percent)})
+            </div>
           </section>
 
           <section style={{ marginTop: 22 }}>
