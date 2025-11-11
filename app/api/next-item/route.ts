@@ -1,7 +1,7 @@
 // app/api/next-item/route.ts
 import { NextRequest, NextResponse } from "next/server";
-
-// --- Helpers ---------------------------------------------------------------
+import { promises as fs } from "fs";
+import path from "path";
 
 function err(message: string, status = 400) {
   return NextResponse.json({ ok: false, error: message }, { status });
@@ -16,27 +16,26 @@ function norm(x: unknown): string {
     .trim();
 }
 
-// Load items JSON at runtime (keeps build simple and allows “no-store”)
+// Load items from /data/items_full.json relative to repo root
 async function loadItems() {
-  // Path is relative to app root when bundled by Next
-  // Using dynamic import so it stays server-only
+  const file = path.join(process.cwd(), "data", "items_full.json");
   try {
-    const mod = await import("../../../data/items_full.json");
-    // Some bundlers stick data under .default
-    return (mod as any).default ?? (mod as any);
+    const buf = await fs.readFile(file, "utf8");
+    const json = JSON.parse(buf);
+    if (!Array.isArray(json)) throw new Error("items_json_not_array");
+    return json;
   } catch (e) {
-    throw new Error("items_data_missing");
+    // Surface a consistent error for easier debugging
+    const msg = (e as any)?.message || "items_read_failed";
+    throw new Error(`items_data_missing:${msg}`);
   }
 }
-
-// --- GET -------------------------------------------------------------------
 
 export async function GET(req: NextRequest) {
   try {
     const sp = req.nextUrl.searchParams;
 
-    // required for trace only (keeps parity with runner calls)
-    const t = norm(sp.get("t")); // token (optional but recommended)
+    const t = norm(sp.get("t")); // optional trace token
     const programme = norm(sp.get("programme")).toUpperCase();
     const grade = norm(sp.get("grade"));
     const mode = (norm(sp.get("mode")).toLowerCase() || "core") as
@@ -46,31 +45,20 @@ export async function GET(req: NextRequest) {
     const iRaw = sp.get("i");
     const index = Math.max(0, Number.isFinite(Number(iRaw)) ? Number(iRaw) : 0);
 
-    if (!programme || !grade) {
-      return err("missing_programme_or_grade", 400);
-    }
+    if (!programme || !grade) return err("missing_programme_or_grade", 400);
 
-    // Load and filter items
     const all = await loadItems();
 
-    // Items can have various key casings; normalize defensively
-    const items = (Array.isArray(all) ? all : []).filter((it: any) => {
-      const p =
-        norm(it.programme ?? it.Programme ?? it.PROGRAMME).toUpperCase();
+    const items = all.filter((it: any) => {
+      const p = norm(it.programme ?? it.Programme ?? it.PROGRAMME).toUpperCase();
       const g = norm(it.grade ?? it.Grade ?? it.GRADE);
       return p === programme && g === grade;
     });
 
-    if (items.length === 0) {
-      return err("no_items_for_programme_and_grade", 404);
-    }
-
-    // Optionally you could filter by subject based on your plan distribution here
-    // e.g., choose subject by remaining counts in client-provided plan.
+    if (items.length === 0) return err("no_items_for_programme_and_grade", 404);
 
     const pick = items[index % items.length];
 
-    // Minimal, runner-friendly shape. We pass through common fields if present.
     const payload = {
       ok: true,
       index,
@@ -84,46 +72,23 @@ export async function GET(req: NextRequest) {
         grade,
         subject:
           pick.subject ?? pick.domain ?? pick.Domains ?? pick.domains ?? null,
-        // Common fields in our banks; pass raw so the runner can render
-        stem:
-          pick.stem ??
-          pick.question ??
-          pick.text ??
-          pick.prompt ??
-          null,
-        options:
-          pick.options ??
-          pick.answers ??
-          pick.choices ??
-          null,
-        answer:
-          pick.answer ??
-          pick.correct ??
-          pick.correct_answer ??
-          null,
-        // Everything else as raw fallback
+        stem: pick.stem ?? pick.question ?? pick.text ?? pick.prompt ?? null,
+        options: pick.options ?? pick.answers ?? pick.choices ?? null,
+        answer: pick.answer ?? pick.correct ?? pick.correct_answer ?? null,
         raw: pick,
       },
     };
 
-    // no-store so the client can step index with cache busters safely
     const res = ok(payload, 200);
     res.headers.set("Cache-Control", "no-store, max-age=0");
     return res;
   } catch (e: any) {
     const msg = e?.message || "next_item_failed";
-    const status = msg === "items_data_missing" ? 500 : 500;
+    const status = msg.startsWith("items_data_missing") ? 500 : 500;
     return err(msg, status);
   }
 }
 
-// Other verbs blocked
-export async function POST() {
-  return err("method_not_allowed", 405);
-}
-export async function PUT() {
-  return err("method_not_allowed", 405);
-}
-export async function DELETE() {
-  return err("method_not_allowed", 405);
-}
+export async function POST() { return err("method_not_allowed", 405); }
+export async function PUT() { return err("method_not_allowed", 405); }
+export async function DELETE() { return err("method_not_allowed", 405); }
