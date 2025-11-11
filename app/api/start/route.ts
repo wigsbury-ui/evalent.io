@@ -1,132 +1,140 @@
-// app/api/start/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { supaAdmin } from '@/app/lib/supa';
 import { loadBlueprints } from '@/app/lib/sheets';
 
-type Mode = 'easy' | 'core' | 'hard';
+export const dynamic = 'force-dynamic';
 
-const normalize = (s: string) =>
-  String(s ?? '')
-    .replace(/\uFEFF/g, '')   // strip BOM
-    .replace(/\u00A0/g, ' ')  // strip nbsp
+type Counts = Record<string, number>;
+
+function norm(s: unknown): string {
+  return String(s ?? '')
+    .replace(/\uFEFF/g, '')      // BOM
+    .replace(/\u00A0/g, ' ')     // nbsp
     .trim()
     .toLowerCase();
-
-const pickCountKey = (mode: Mode) =>
-  (mode === 'easy' ? 'easy_count' : mode === 'hard' ? 'hard_count' : 'core_count') as
-    | 'easy_count'
-    | 'core_count'
-    | 'hard_count';
-
-function makeToken(): string {
-  return Array.from(crypto.getRandomValues(new Uint8Array(16)))
-    .map((b) => b.toString(16).padStart(2, '0'))
-    .join('');
 }
 
-export async function GET(req: NextRequest) {
-  try {
-    const url = req.nextUrl;
-    const passcode = url.searchParams.get('passcode') ?? '';
-    const programme = (url.searchParams.get('programme') ?? '').trim();
-    const grade = (url.searchParams.get('grade') ?? '').trim();
-    const mode = ((url.searchParams.get('mode') ?? 'core').trim().toLowerCase() ||
-      'core') as Mode;
+function safeNum(v: unknown): number {
+  const n = Number(String(v ?? '').replace(/[^0-9.\-]/g, ''));
+  return Number.isFinite(n) ? n : 0;
+}
 
-    const required = process.env.NEXT_PUBLIC_START_PASSCODE || 'letmein';
-    if (!passcode || passcode !== required) {
-      return NextResponse.json({ ok: false, error: 'bad_passcode' }, { status: 401 });
-    }
-    if (!programme || !grade) {
-      return NextResponse.json(
-        { ok: false, error: 'missing_programme_or_grade' },
-        { status: 400 },
-      );
-    }
+async function createSession(passcode: string, programme: string, grade: string, mode: string) {
+  // simple passcode check
+  const required =
+    process.env.NEXT_PUBLIC_START_PASSCODE ||
+    process.env.START_PASSCODE ||
+    '';
+  if (required && passcode !== required) {
+    return NextResponse.json({ ok: false, error: 'bad_passcode' }, { status: 401 });
+  }
 
-    // Load blueprints (CSV defined by SHEETS_BLUEPRINTS_CSV)
-    const bp = (await loadBlueprints()) as Record<string, any>[];
-    const modeKeyWanted = pickCountKey(mode);
+  // load blueprints CSV
+  const all = await loadBlueprints();
 
-    // Keys may come with stray casing/spacing/BOM; resolve them per row.
-    const filtered = bp.filter((row) => {
-      const keys = Object.keys(row);
+  // filter for programme+grade
+  const rows = all.filter((r: Record<string, unknown>) => {
+    const p = norm((r as any)['programme']);
+    const g = String((r as any)['grade'] ?? '').trim();
+    return p === norm(programme) && g === String(grade);
+  });
 
-      const programmeKey =
-        keys.find((k) => normalize(k) === 'programme') ??
-        keys.find((k) => normalize(k) === 'program'); // just in case
+  // build countsBySubject (supports either schema)
+  const countsBySubject: Counts = {};
+  for (const r of rows as Record<string, unknown>[]) {
+    // subject header can be "subject" or "domains"
+    const subjectKey =
+      Object.keys(r).find(k => norm(k) === 'subject') ??
+      Object.keys(r).find(k => norm(k) === 'domains');
 
-      const gradeKey = keys.find((k) => normalize(k) === 'grade');
+    const subject = String(subjectKey ? (r as any)[subjectKey] : '').trim();
+    if (!subject) continue;
 
-      const p = programmeKey ? String(row[programmeKey]).trim().toLowerCase() : '';
-      const g = gradeKey ? String(row[gradeKey]).trim() : '';
+    // prefer "<mode>_count" else "total"
+    const modeKey = Object.keys(r).find(k => norm(k) === `${mode}_count`);
+    const totalKey = Object.keys(r).find(k => norm(k) === 'total');
 
-      return p === programme.toLowerCase() && g === grade;
-    });
+    const raw = modeKey ? (r as any)[modeKey] : totalKey ? (r as any)[totalKey] : undefined;
+    const n = safeNum(raw);
+    if (n > 0) countsBySubject[subject] = n;
+  }
 
-    // Build countsBySubject from blueprint rows, supporting both schemas:
-    // (A) subject + [easy_count|core_count|hard_count]
-    // (B) domains + total (treated as the active mode's count)
-    const countsBySubject: Record<string, number> = {};
+  if (!Object.values(countsBySubject).some(v => v > 0)) {
+    return NextResponse.json(
+      { ok: false, error: `blueprint_has_no_positive_counts_for_mode_${mode}` },
+      { status: 400 }
+    );
+  }
 
-    for (const row of filtered) {
-      const keys = Object.keys(row);
-
-      // subject key can be 'subject' OR 'domains'
-      const subjectKey =
-        keys.find((k) => normalize(k) === 'subject') ??
-        keys.find((k) => normalize(k) === 'domains');
-
-      const subject = subjectKey ? String(row[subjectKey]).trim() : '';
-      if (!subject) continue;
-
-      // preferred: "<mode>_count"; fallback: "total"
-      const modeCountKey = keys.find((k) => normalize(k) === normalize(modeKeyWanted));
-      const totalKey = keys.find((k) => normalize(k) === 'total');
-
-      const raw = modeCountKey
-        ? row[modeCountKey]
-        : totalKey
-        ? row[totalKey]
-        : undefined;
-
-      // coerce numeric: strip non-numeric (keeps dot/minus)
-      const n = Number(String(raw ?? '').replace(/[^0-9.\-]/g, ''));
-      if (Number.isFinite(n) && n > 0) countsBySubject[subject] = n;
-    }
-
-    if (!Object.values(countsBySubject).some((v) => v > 0)) {
-      return NextResponse.json(
-        { ok: false, error: `blueprint_has_no_positive_counts_for_mode_${mode}` },
-        { status: 400 },
-      );
-    }
-
-    // Create a session
-    const token = makeToken();
-    const plan = { programme, grade, mode, countsBySubject };
-
-    const db = supaAdmin();
-    const { error: sErr } = await db.from('sessions').insert({
+  // create session in DB
+  const token = crypto.randomUUID();
+  const db = supaAdmin();
+  const { error } = await db
+    .from('sessions' as any)
+    .insert({
       token,
       status: 'active',
       item_index: 0,
-      plan,
-      meta: {},
-    });
+      plan: { mode, counts: countsBySubject },
+      meta: { programme, grade, mode },
+    } as any);
 
-    if (sErr) {
-      return NextResponse.json(
-        { ok: false, error: 'session_insert_failed', detail: sErr.message },
-        { status: 500 },
-      );
-    }
-
-    return NextResponse.json({ ok: true, token });
-  } catch (e: any) {
-    return NextResponse.json(
-      { ok: false, error: 'start_exception', detail: e?.message ?? String(e) },
-      { status: 500 },
-    );
+  if (error) {
+    return NextResponse.json({ ok: false, error: error.message || 'db_insert_failed' }, { status: 500 });
   }
+
+  return NextResponse.json({ ok: true, token });
+}
+
+function readParams(req: NextRequest) {
+  const url = req.nextUrl;
+  const passcode = url.searchParams.get('passcode') ?? '';
+  const programme = url.searchParams.get('programme') ?? '';
+  const grade = url.searchParams.get('grade') ?? '';
+  const mode = (url.searchParams.get('mode') ?? 'core').toLowerCase();
+  return { passcode, programme, grade, mode };
+}
+
+// GET support (useful for query-string starts)
+export async function GET(req: NextRequest) {
+  const { passcode, programme, grade, mode } = readParams(req);
+  return createSession(passcode, programme, grade, mode);
+}
+
+// POST support (what the UI uses)
+export async function POST(req: NextRequest) {
+  // prefer body, but also allow query-string
+  let passcode = '';
+  let programme = '';
+  let grade = '';
+  let mode = 'core';
+
+  try {
+    const ct = req.headers.get('content-type') || '';
+    if (ct.includes('application/json')) {
+      const body = (await req.json()) as any;
+      passcode = body?.passcode ?? '';
+      programme = body?.programme ?? '';
+      grade = body?.grade ?? '';
+      mode = (body?.mode ?? 'core').toLowerCase();
+    } else if (ct.includes('application/x-www-form-urlencoded')) {
+      const fd = await req.formData();
+      passcode = String(fd.get('passcode') ?? '');
+      programme = String(fd.get('programme') ?? '');
+      grade = String(fd.get('grade') ?? '');
+      mode = String(fd.get('mode') ?? 'core').toLowerCase();
+    }
+  } catch {
+    // fall through to query parsing
+  }
+
+  if (!programme || !grade) {
+    const q = readParams(req);
+    passcode ||= q.passcode;
+    programme ||= q.programme;
+    grade ||= q.grade;
+    mode ||= q.mode;
+  }
+
+  return createSession(passcode, programme, grade, mode);
 }
