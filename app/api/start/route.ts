@@ -1,105 +1,127 @@
 // app/api/start/route.ts
-import { NextResponse } from 'next/server';
-// (db is optional for now; kept for future session persistence)
-import { db } from '@/app/lib/db';
-import { loadBlueprints } from '@/app/lib/loaders';
+import { NextRequest, NextResponse } from "next/server";
 
-type Counts = Record<string, number>;
+// ---- env helpers ----
+function requireEnv(name: string): string {
+  const v = process.env[name];
+  if (!v || !v.trim()) throw new Error(`Missing env: ${name}`);
+  return v;
+}
+const START_PASSCODE = requireEnv("NEXT_PUBLIC_START_PASSCODE");
+const SHEETS_BLUEPRINTS_CSV = requireEnv("SHEETS_BLUEPRINTS_CSV");
 
-const clean = (s: string) =>
-  String(s ?? '')
-    .replace(/\uFEFF/g, '')
-    .replace(/\u00A0/g, ' ')
+// ---- utils ----
+const ok = (body: unknown, init: number = 200) =>
+  NextResponse.json(body as any, { status: init });
+const bad = (msg: string, init: number = 400) =>
+  NextResponse.json({ ok: false, error: msg }, { status: init });
+
+function norm(s: unknown): string {
+  return String(s ?? "")
+    .replace(/\uFEFF/g, "") // strip BOM
+    .replace(/\u00A0/g, " ") // nbsp
     .trim();
+}
 
-const lower = (s: string) => clean(s).toLowerCase();
+// CSV → objects
+async function fetchBlueprintRows(): Promise<Record<string, string>[]> {
+  const r = await fetch(SHEETS_BLUEPRINTS_CSV, { cache: "no-store" });
+  if (!r.ok) throw new Error(`blueprints_csv_fetch_failed_${r.status}`);
+  const text = await r.text();
 
-function safeNum(v: any): number {
-  const n = Number(String(v ?? '').replace(/[^0-9.\-]/g, ''));
+  const lines = text.split(/\r?\n/).filter(Boolean);
+  if (lines.length === 0) return [];
+  const headers = lines[0]
+    .split(",")
+    .map((h) => norm(h).toLowerCase());
+
+  return lines.slice(1).map((line) => {
+    const cols = line.split(",");
+    const row: Record<string, string> = {};
+    headers.forEach((h, i) => (row[h] = norm(cols[i])));
+    return row;
+  });
+}
+
+function numeric(x: unknown): number {
+  const n = Number(String(x ?? "").replace(/[^0-9.\-]/g, ""));
   return Number.isFinite(n) ? n : 0;
 }
 
-/**
- * Build countsBySubject from blueprint rows, supporting both schemas:
- *  A) columns: programme, grade, subject, easy_count|core_count|hard_count
- *  B) columns: programme, grade, domains, total  (treat total as the mode's count)
- */
-function buildCounts(rows: Record<string, string>[], programme: string, grade: string, mode: string): Counts {
-  const filtered = rows.filter(
-    (r) => lower(r['programme']) === lower(programme) && clean(r['grade']) === clean(grade)
-  );
-
-  const counts: Counts = {};
-  const modeKey = `${lower(mode)}_count`;
-
-  for (const r of filtered) {
-    const subject = clean(r['subject']) || clean(r['domains']) || '';
-    if (!subject) continue;
-
-    let n = 0;
-    if (r.hasOwnProperty(modeKey)) n = safeNum(r[modeKey]);
-    else if (r.hasOwnProperty('total')) n = safeNum(r['total']);
-
-    if (n > 0) counts[subject] = n;
-  }
-  return counts;
-}
-
-export async function POST(req: Request) {
+// ---- GET handler ----
+export async function GET(req: NextRequest) {
   try {
-    const body = await req.json().catch(() => ({}));
-    const programme = String(body?.programme ?? '').trim();
-    const grade = String(body?.grade ?? '').trim();
-    const mode = String(body?.mode ?? 'core').trim().toLowerCase();
+    const sp = req.nextUrl.searchParams;
+
+    const passcode = norm(sp.get("passcode"));
+    const programme = norm(sp.get("programme")).toUpperCase();
+    const grade = norm(sp.get("grade"));
+    const mode = (norm(sp.get("mode")).toLowerCase() || "core") as
+      | "core"
+      | "easy"
+      | "hard";
 
     if (!programme || !grade) {
-      return NextResponse.json(
-        { ok: false, error: 'missing_programme_or_grade' },
-        { status: 400 }
-      );
+      return bad("missing_programme_or_grade", 400);
+    }
+    if (passcode !== START_PASSCODE) {
+      return bad("invalid_passcode", 401);
     }
 
-    const blueprints = await loadBlueprints();
-    if (!blueprints.length) {
-      return NextResponse.json(
-        { ok: false, error: 'no_blueprints_loaded_from_csv' },
-        { status: 400 }
-      );
+    // Pull CSV once and filter
+    const rows = await fetchBlueprintRows();
+    const filtered = rows.filter(
+      (r) => r["programme"]?.toUpperCase() === programme && r["grade"] === grade
+    );
+
+    // Build countsBySubject supporting either:
+    //  (A) subject + {core_count|easy_count|hard_count}
+    //  (B) domains + total   (treated as active mode’s count)
+    const countsBySubject: Record<string, number> = {};
+
+    for (const r of filtered) {
+      const subjectKey =
+        ["subject", "domains"].find((k) => k in r) ?? "subject";
+      const countKeyCandidates = [`${mode}_count`, "total"];
+      const countKey =
+        countKeyCandidates.find((k) => k in r) ?? `${mode}_count`;
+
+      const subject = norm((r as any)[subjectKey]);
+      const n = numeric((r as any)[countKey]);
+
+      if (subject && n > 0) countsBySubject[subject] = n;
     }
 
-    const countsBySubject = buildCounts(blueprints, programme, grade, mode);
-    if (!Object.values(countsBySubject).some(v => v > 0)) {
-      return NextResponse.json(
-        { ok: false, error: `blueprint_has_no_positive_counts_for_mode_${mode}` },
-        { status: 400 }
-      );
+    if (!Object.values(countsBySubject).some((v) => v > 0)) {
+      return bad(`blueprint_has_no_positive_counts_for_mode_${mode}`, 400);
     }
 
-    // Lightweight token (you can persist if needed)
-    const token = ['T', Date.now().toString(36), Math.random().toString(36).slice(2, 8)].join('_');
-
-    // Example persistence (optional):
-    // await db.from('sessions').insert({
-    //   token,
-    //   item_index: 0,
-    //   status: 'active',
-    //   plan: { programme, grade, mode, countsBySubject },
-    // });
-
-    return NextResponse.json({
+    // Return a lightweight “session” (no DB write here)
+    const token = crypto.randomUUID();
+    return ok({
       ok: true,
-      token,
-      plan: { programme, grade, mode, countsBySubject },
+      session: {
+        id: crypto.randomUUID(),
+        status: "active",
+        token,
+        programme,
+        grade,
+        mode,
+        plan: { countsBySubject },
+      },
     });
   } catch (e: any) {
-    return NextResponse.json(
-      { ok: false, error: e?.message || 'start_route_unexpected_error' },
-      { status: 500 }
-    );
+    return bad(e?.message ?? "start_failed", 500);
   }
 }
 
-// Clarify method
-export async function GET() {
-  return NextResponse.json({ ok: false, error: 'method_not_allowed' }, { status: 405 });
+// Fallback for other verbs
+export async function POST() {
+  return bad("method_not_allowed", 405);
+}
+export async function PUT() {
+  return bad("method_not_allowed", 405);
+}
+export async function DELETE() {
+  return bad("method_not_allowed", 405);
 }
