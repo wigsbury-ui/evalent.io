@@ -5,20 +5,22 @@ import { loadBlueprints } from '@/app/lib/sheets';
 
 type Mode = 'easy' | 'core' | 'hard';
 
-function pickCountKey(mode: Mode): 'easy_count' | 'core_count' | 'hard_count' {
-  if (mode === 'easy') return 'easy_count';
-  if (mode === 'hard') return 'hard_count';
-  return 'core_count';
-}
+const normalize = (s: string) =>
+  String(s ?? '')
+    .replace(/\uFEFF/g, '')   // strip BOM
+    .replace(/\u00A0/g, ' ')  // strip nbsp
+    .trim()
+    .toLowerCase();
 
-function safeNum(x: any): number {
-  const n = Number(x);
-  return Number.isFinite(n) ? n : 0;
-}
+const pickCountKey = (mode: Mode) =>
+  (mode === 'easy' ? 'easy_count' : mode === 'hard' ? 'hard_count' : 'core_count') as
+    | 'easy_count'
+    | 'core_count'
+    | 'hard_count';
 
 function makeToken(): string {
   return Array.from(crypto.getRandomValues(new Uint8Array(16)))
-    .map(b => b.toString(16).padStart(2, '0'))
+    .map((b) => b.toString(16).padStart(2, '0'))
     .join('');
 }
 
@@ -31,74 +33,92 @@ export async function GET(req: NextRequest) {
     const mode = ((url.searchParams.get('mode') ?? 'core').trim().toLowerCase() ||
       'core') as Mode;
 
-    // Optional passcode gate (kept to match your earlier flow)
     const required = process.env.NEXT_PUBLIC_START_PASSCODE || 'letmein';
     if (!passcode || passcode !== required) {
-      return NextResponse.json(
-        { ok: false, error: 'bad_passcode' },
-        { status: 401 }
-      );
+      return NextResponse.json({ ok: false, error: 'bad_passcode' }, { status: 401 });
     }
-
     if (!programme || !grade) {
       return NextResponse.json(
         { ok: false, error: 'missing_programme_or_grade' },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // Load blueprints (CSV via env SHEETS_BLUEPRINTS_CSV)
-    const blueprints = await loadBlueprints();
-    const countKey = pickCountKey(mode);
+    // Load blueprints (CSV defined by SHEETS_BLUEPRINTS_CSV)
+    const bp = (await loadBlueprints()) as Record<string, any>[];
+    const modeKeyWanted = pickCountKey(mode);
 
-    // Filter rows for this (programme, grade)
-    const rows = blueprints.filter((r: any) => {
-      const p = String(r?.programme ?? '').trim().toLowerCase();
-      const g = String(r?.grade ?? '').trim();
+    // Keys may come with stray casing/spacing/BOM; resolve them per row.
+    const filtered = bp.filter((row) => {
+      const keys = Object.keys(row);
+
+      const programmeKey =
+        keys.find((k) => normalize(k) === 'programme') ??
+        keys.find((k) => normalize(k) === 'program'); // just in case
+
+      const gradeKey = keys.find((k) => normalize(k) === 'grade');
+
+      const p = programmeKey ? String(row[programmeKey]).trim().toLowerCase() : '';
+      const g = gradeKey ? String(row[gradeKey]).trim() : '';
+
       return p === programme.toLowerCase() && g === grade;
     });
 
-    // Build counts by subject from the selected countKey
+    // Build countsBySubject from blueprint rows, supporting both schemas:
+    // (A) subject + [easy_count|core_count|hard_count]
+    // (B) domains + total (treated as the active mode's count)
     const countsBySubject: Record<string, number> = {};
-    for (const r of rows) {
-      const subject = String(r?.subject ?? '').trim();
+
+    for (const row of filtered) {
+      const keys = Object.keys(row);
+
+      // subject key can be 'subject' OR 'domains'
+      const subjectKey =
+        keys.find((k) => normalize(k) === 'subject') ??
+        keys.find((k) => normalize(k) === 'domains');
+
+      const subject = subjectKey ? String(row[subjectKey]).trim() : '';
       if (!subject) continue;
-      const n = safeNum((r as any)[countKey]);
-      if (n > 0) countsBySubject[subject] = n;
+
+      // preferred: "<mode>_count"; fallback: "total"
+      const modeCountKey = keys.find((k) => normalize(k) === normalize(modeKeyWanted));
+      const totalKey = keys.find((k) => normalize(k) === 'total');
+
+      const raw = modeCountKey
+        ? row[modeCountKey]
+        : totalKey
+        ? row[totalKey]
+        : undefined;
+
+      // coerce numeric: strip non-numeric (keeps dot/minus)
+      const n = Number(String(raw ?? '').replace(/[^0-9.\-]/g, ''));
+      if (Number.isFinite(n) && n > 0) countsBySubject[subject] = n;
     }
 
-    // ---- THIS WAS THE CRASHING SPOT BEFORE; now it's inside the function ----
-    if (!Object.values(countsBySubject).some(v => v > 0)) {
+    if (!Object.values(countsBySubject).some((v) => v > 0)) {
       return NextResponse.json(
         { ok: false, error: `blueprint_has_no_positive_counts_for_mode_${mode}` },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Create a session
     const token = makeToken();
-    const plan = {
-      programme,
-      grade,
-      mode,
-      countsBySubject,
-    };
+    const plan = { programme, grade, mode, countsBySubject };
 
     const db = supaAdmin();
-    const { error: sErr } = await db
-      .from('sessions')
-      .insert({
-        token,
-        status: 'active',
-        item_index: 0,
-        plan,
-        meta: {},
-      });
+    const { error: sErr } = await db.from('sessions').insert({
+      token,
+      status: 'active',
+      item_index: 0,
+      plan,
+      meta: {},
+    });
 
     if (sErr) {
       return NextResponse.json(
         { ok: false, error: 'session_insert_failed', detail: sErr.message },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -106,7 +126,7 @@ export async function GET(req: NextRequest) {
   } catch (e: any) {
     return NextResponse.json(
       { ok: false, error: 'start_exception', detail: e?.message ?? String(e) },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
