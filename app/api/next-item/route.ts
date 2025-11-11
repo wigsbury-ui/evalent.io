@@ -6,11 +6,15 @@ export async function GET(req: NextRequest) {
   const token = req.nextUrl.searchParams.get('token') ?? '';
   if (!token) return NextResponse.json({ ok: false, error: 'missing token' }, { status: 400 });
 
-  const { data: session, error: sErr } = await supaAdmin
-    .from('sessions')
-    .select('id, item_index, status, plan, meta')
-    .eq('token', token)
-    .single();
+// AFTER
+const db = supaAdmin();  // <— instantiate the client
+
+const { data: session, error: sErr } = await db
+  .from('sessions')
+  .select('id, item_index, status, plan, meta')
+  .eq('token', token)
+  .single();
+
 
   if (sErr || !session) return NextResponse.json({ ok: false, error: 'session not found' }, { status: 404 });
 
