@@ -50,15 +50,28 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // 2) Load all items once (from Sheets)
-    const allItems = await loadItems();
-    // Filter by programme & grade and only subjects that have quotas in the plan
-    const allowedSubjects = new Set(Object.keys(countsBySubject));
-    const candidates = allItems.filter(
-      it =>
-        String(it.programme || '').toLowerCase() === programme.toLowerCase() &&
-        String(it.grade || '') === grade &&
-        allowedSubjects.has(String(it.subject || '').trim())
+// 2) Load all items once (from Sheets)
+const allItems = await loadItems();
+
+// Build subject quota set (normalize to lowercase)
+const allowedSubjects = new Set(
+  Object.keys(countsBySubject).map(s => String(s).trim().toLowerCase())
+);
+
+// Normalizer
+const norm = (v: unknown) => String(v ?? '').trim().toLowerCase();
+const gNorm = (v: unknown) => String(v ?? '').trim(); // grade compare as string
+
+const candidates = allItems.filter((row) => {
+  const it = row as any; // tolerate extra CSV columns
+  return (
+    norm(it?.programme) === norm(programme) &&
+    gNorm(it?.grade) === gNorm(grade) &&
+    allowedSubjects.has(norm(it?.subject))
+  );
+});
+
+
     );
 
     // 3) Find what was already asked in this session
