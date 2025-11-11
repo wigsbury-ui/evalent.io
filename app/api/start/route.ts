@@ -1,70 +1,86 @@
 // app/api/start/route.ts
-import { NextResponse } from "next/server";
-import db from "@/lib/db";
-import {
-  START_PASSCODE,
-  DEFAULT_SCHOOL_ID,
-  SHEETS_BLUEPRINTS_CSV,
-} from "@/lib/env";
-import { loadCsv } from "@/lib/loaders";
+import { NextResponse } from 'next/server';
+import { db } from '../../../lib/db'; // present for compatibility if you later persist sessions
+import { loadBlueprints } from '../../../lib/loaders';
 
-// small helpers
-const safeNum = (v: unknown) =>
-  Number(String(v ?? "").replace(/[^0-9.\-]/g, ""));
-const norm = (s: string) =>
-  String(s ?? "").replace(/\uFEFF/g, "").replace(/\u00A0/g, " ").trim().toLowerCase();
+type Counts = Record<string, number>;
 
-const newToken = () => crypto.randomUUID().replace(/-/g, "");
-const minutesFromNow = (m: number) =>
-  new Date(Date.now() + m * 60 * 1000).toISOString();
+const clean = (s: string) =>
+  String(s ?? '')
+    .replace(/\uFEFF/g, '')
+    .replace(/\u00A0/g, ' ')
+    .trim();
 
-export async function GET(req: Request) {
-  try {
-    // -------- query params ----------
-    const url = new URL(req.url);
-    const passcode = url.searchParams.get("passcode") || "";
-    const programme = (url.searchParams.get("programme") || "").trim();
-    const grade = (url.searchParams.get("grade") || "").trim();
-    const mode = (url.searchParams.get("mode") || "core").trim().toLowerCase();
+const lower = (s: string) => clean(s).toLowerCase();
 
-    if (passcode !== START_PASSCODE)
-      return NextResponse.json({ ok: false, error: "bad_passcode" }, { status: 401 });
+function safeNum(v: any): number {
+  const n = Number(String(v ?? '').replace(/[^0-9.\-]/g, ''));
+  return Number.isFinite(n) ? n : 0;
+}
 
-    if (!programme || !grade)
-      return NextResponse.json({ ok: false, error: "missing_programme_or_grade" }, { status: 400 });
+/**
+ * Build countsBySubject from blueprint rows, supporting both schemas:
+ *  A) columns: programme, grade, subject, easy_count|core_count|hard_count
+ *  B) columns: programme, grade, domains, total   (treat total as the <mode> count)
+ */
+function buildCounts(rows: Record<string, string>[], programme: string, grade: string, mode: string): Counts {
+  const filtered = rows.filter(
+    (r) =>
+      lower(r['programme']) === lower(programme) &&
+      clean(r['grade']) === clean(grade)
+  );
 
-    // -------- load blueprints CSV ----------
-    if (!SHEETS_BLUEPRINTS_CSV)
-      return NextResponse.json(
-        { ok: false, error: "start_failed", detail: "missing_SHEETS_BLUEPRINTS_CSV" },
-        { status: 500 }
-      );
+  const counts: Counts = {};
 
-    const rows = await loadCsv(SHEETS_BLUEPRINTS_CSV); // returns array of objects
+  for (const r of filtered) {
+    // subject name can be under 'subject' or 'domains'
+    const subject =
+      clean(r['subject']) ||
+      clean(r['domains']) ||
+      '';
 
-    // filter for programme + grade
-    const filtered = rows.filter((r: any) => {
-      const p = String(r.programme ?? r.Programme ?? "").trim();
-      const g = String(r.grade ?? r.Grade ?? "").trim();
-      return p === programme && g === grade;
-    });
+    if (!subject) continue;
 
-    // count map by subject/domains using <mode>_count or total
-    const countsBySubject: Record<string, number> = {};
-    for (const r of filtered) {
-      const keys = Object.keys(r);
-      const kSubject =
-        keys.find((k) => norm(k) === "subject") ??
-        keys.find((k) => norm(k) === "domains");
-      const subject = String(kSubject ? r[kSubject] : "").trim();
-      if (!subject) continue;
+    // prefer "<mode>_count"
+    const modeKey = `${lower(mode)}_count`;
+    let n = 0;
 
-      const kMode = keys.find((k) => norm(k) === `${mode}_count`);
-      const kTotal = keys.find((k) => norm(k) === "total");
-      const raw = kMode ? r[kMode] : kTotal ? r[kTotal] : undefined;
-      const n = safeNum(raw);
-      if (Number.isFinite(n) && n > 0) countsBySubject[subject] = n;
+    if (r.hasOwnProperty(modeKey)) {
+      n = safeNum(r[modeKey]);
+    } else if (r.hasOwnProperty('total')) {
+      // fallback schema: domains + total
+      n = safeNum(r['total']);
     }
+
+    if (n > 0) counts[subject] = n;
+  }
+
+  return counts;
+}
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json().catch(() => ({}));
+    const programme = String(body?.programme ?? '').trim();
+    const grade = String(body?.grade ?? '').trim();
+    const mode = String(body?.mode ?? 'core').trim().toLowerCase();
+
+    if (!programme || !grade) {
+      return NextResponse.json(
+        { ok: false, error: 'missing_programme_or_grade' },
+        { status: 400 }
+      );
+    }
+
+    const blueprints = await loadBlueprints();
+    if (!blueprints.length) {
+      return NextResponse.json(
+        { ok: false, error: 'no_blueprints_loaded_from_csv' },
+        { status: 400 }
+      );
+    }
+
+    const countsBySubject = buildCounts(blueprints, programme, grade, mode);
 
     if (!Object.values(countsBySubject).some((v) => v > 0)) {
       return NextResponse.json(
@@ -73,60 +89,35 @@ export async function GET(req: Request) {
       );
     }
 
-    // -------- create session ----------
-    const plan = {
-      t: Date.now(),
-      programme,
-      grade,
-      mode,
-      countsBySubject,
-    };
+    // Generate a lightweight token so the UI can proceed; you can persist if desired.
+    const token = [
+      'T',
+      Date.now().toString(36),
+      Math.random().toString(36).slice(2, 8),
+    ].join('_');
 
-    // insert session (status defaults to 'active' in your schema; we set it explicitly)
-    const { data: inserted, error: iErr } = await db
-      .from("sessions")
-      .insert({
-        school_id: DEFAULT_SCHOOL_ID,
-        status: "active",
-        plan,
-      })
-      .select("id, token, public_token")
-      .single();
-
-    if (iErr || !inserted)
-      return NextResponse.json({ ok: false, error: "db_insert_failed", detail: iErr?.message }, { status: 500 });
-
-    let token = inserted.token;
-    // ensure we have a session token the runner can use
-    if (!token) {
-      token = newToken();
-      const { data: updated, error: uErr } = await db
-        .from("sessions")
-        .update({
-          token,
-          not_after: minutesFromNow(120),
-        })
-        .eq("id", inserted.id)
-        .select("id, token, public_token")
-        .single();
-
-      if (uErr || !updated)
-        return NextResponse.json({ ok: false, error: "db_update_failed", detail: uErr?.message }, { status: 500 });
-    }
+    // If you later want to persist, uncomment and ensure the table exists:
+    // await db.from('sessions').insert({
+    //   token,
+    //   item_index: 0,
+    //   status: 'active',
+    //   plan: { programme, grade, mode, countsBySubject },
+    // });
 
     return NextResponse.json({
       ok: true,
-      session: {
-        id: inserted.id,
-        status: "active",
-        mode,
-        grade,
-        programme,
-      },
-      token, // <— the runner needs this
-      plan,
+      token,
+      plan: { programme, grade, mode, countsBySubject },
     });
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: "start_failed", detail: String(e?.message || e) }, { status: 500 });
+    return NextResponse.json(
+      { ok: false, error: e?.message || 'start_route_unexpected_error' },
+      { status: 500 }
+    );
   }
+}
+
+// GET → 405 (clarifies the /start endpoint is POST-only)
+export async function GET() {
+  return NextResponse.json({ ok: false, error: 'method_not_allowed' }, { status: 405 });
 }
