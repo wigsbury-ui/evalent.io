@@ -1,114 +1,91 @@
+// app/t/[token]/results/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
-
-export const dynamic = 'force-dynamic';
 
 type Report = {
   session: { id: string; status: string };
   mcq: { total: number; correct: number; percent: number };
   domains: { domain: string; total: number; correct: number; percent: number }[];
   review: {
-    mcq: { prompt: string; domain: string | null; yourIndex: number | null; correctIndex: number | null }[];
+    mcq: { prompt: string; domain: string; yourIndex: number | null; correctIndex: number | null }[];
     written: { prompt: string; answer: string }[];
   };
 };
-
-// Discriminated union, but we’ll narrow via `'report' in j` to keep TS calm.
-type ApiRes = { ok: true; report: Report } | { ok: false; error: string };
 
 export default function ResultsPage({ params }: { params: { token: string } }) {
   const token = params.token;
   const [data, setData] = useState<Report | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let alive = true;
     (async () => {
-      setLoading(true);
-      setErr(null);
       try {
         const r = await fetch(`/api/results?token=${encodeURIComponent(token)}&t=${Date.now()}`, { cache: 'no-store' });
-        const j: ApiRes = await r.json();
-
-        if (!alive) return;
-
-        // Narrow by property presence instead of ok-flag
-        if ('report' in j) {
-          setData(j.report);
-        } else {
+        const j = await r.json();
+        if (!j.ok) {
           setErr(j.error || 'Failed to load results');
+        } else {
+          setData(j.report);
         }
       } catch (e: any) {
-        if (!alive) return;
-        setErr(e?.message || 'Failed to load results');
-      } finally {
-        if (alive) setLoading(false);
+        setErr(e.message || 'Network error');
       }
     })();
-    return () => { alive = false; };
   }, [token]);
 
-  const pct = (n: number) => `${Math.round(n)}%`;
-
   return (
-    <main style={{ maxWidth: 900, margin: '40px auto', padding: '0 20px' }}>
-      <h1 style={{ fontSize: 52, lineHeight: 1.05, marginBottom: 8 }}>Results</h1>
-      <p style={{ fontFamily: 'ui-monospace, Menlo, monospace' }}>
-        Token: <strong>{token}</strong>
+    <div style={{ maxWidth: 880, margin: '60px auto', padding: '0 16px', fontFamily: 'Georgia, serif' }}>
+      <h1 style={{ fontSize: 64, margin: 0 }}>Results</h1>
+      <p style={{ fontSize: 22, color: '#333' }}>
+        Token: <code>{token}</code>
       </p>
-
-      {loading && <div>Loading…</div>}
-      {err && <div style={{ color: '#a11', marginTop: 10 }}>{err}</div>}
-
-      {data && (
+      {err && <div style={{ color: '#8b1a1a', fontSize: 22, marginTop: 8 }}>{err}</div>}
+      {!data ? (
+        <div style={{ padding: 24 }}>Loading…</div>
+      ) : (
         <>
           <section style={{ marginTop: 18 }}>
-            <h2 style={{ fontSize: 28, marginBottom: 6 }}>Overall</h2>
-            <div>
-              MCQ: <strong>{data.mcq.correct}/{data.mcq.total}</strong> ({pct(data.mcq.percent)})
-            </div>
+            <h3 style={{ fontSize: 28, margin: '6px 0' }}>Overall</h3>
+            <div style={{ fontSize: 20 }}>MCQ: <b>{data.mcq.correct}/{data.mcq.total}</b> ({data.mcq.percent}%)</div>
           </section>
 
-          <section style={{ marginTop: 22 }}>
-            <h2 style={{ fontSize: 28, marginBottom: 6 }}>By Domain</h2>
+          <section style={{ marginTop: 18 }}>
+            <h3 style={{ fontSize: 28, margin: '6px 0' }}>By Domain</h3>
             <ul>
               {data.domains.map((d, i) => (
-                <li key={i}>
-                  {d.domain || 'General'} — {d.correct}/{d.total} ({pct(d.percent)})
+                <li key={i} style={{ fontSize: 20 }}>
+                  {d.domain} — {d.correct}/{d.total} ({d.percent}%)
                 </li>
               ))}
             </ul>
           </section>
 
-          <section style={{ marginTop: 22 }}>
-            <h2 style={{ fontSize: 28, marginBottom: 6 }}>Review — MCQ</h2>
+          <section style={{ marginTop: 18 }}>
+            <h3 style={{ fontSize: 28, margin: '6px 0' }}>Review — MCQ</h3>
             <ol>
               {data.review.mcq.map((r, i) => (
-                <li key={i} style={{ marginBottom: 10 }}>
-                  <div style={{ fontWeight: 600 }}>{r.prompt}</div>
-                  <div style={{ fontSize: 14, color: '#444' }}>
-                    Your answer: {r.yourIndex ?? '—'} • Correct: {r.correctIndex ?? '—'}
-                  </div>
+                <li key={i} style={{ margin: '8px 0', fontSize: 20 }}>
+                  <div><b dangerouslySetInnerHTML={{ __html: r.prompt }} /></div>
+                  <div>Your answer: {r.yourIndex ?? '—'} • Correct: {r.correctIndex ?? '—'}</div>
                 </li>
               ))}
             </ol>
           </section>
 
-          <section style={{ marginTop: 22 }}>
-            <h2 style={{ fontSize: 28, marginBottom: 6 }}>Review — Written</h2>
+          <section style={{ marginTop: 18 }}>
+            <h3 style={{ fontSize: 28, margin: '6px 0' }}>Review — Written</h3>
             <ol>
               {data.review.written.map((r, i) => (
-                <li key={i} style={{ marginBottom: 10 }}>
-                  <div style={{ fontWeight: 600 }}>{r.prompt}</div>
-                  <div style={{ whiteSpace: 'pre-wrap' }}>{r.answer}</div>
+                <li key={i} style={{ margin: '8px 0', fontSize: 20 }}>
+                  <div><b dangerouslySetInnerHTML={{ __html: r.prompt }} /></div>
+                  <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'inherit', fontSize: 18 }}>{r.answer}</pre>
                 </li>
               ))}
             </ol>
           </section>
         </>
       )}
-    </main>
+    </div>
   );
 }
