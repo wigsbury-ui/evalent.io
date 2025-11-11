@@ -1,54 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { loadBlueprints } from '@/app/lib/sheets';
 
-// normalise a header/key for robust matching
-const norm = (s: any) => String(s ?? '')
-  .replace(/\uFEFF/g, '')        // BOM
-  .replace(/\u00A0/g, ' ')       // NBSP → space
-  .trim()
-  .toLowerCase();
+export const dynamic = 'force-dynamic';
+
+function norm(s: unknown): string {
+  return String(s ?? '')
+    .replace(/\uFEFF/g, '')
+    .replace(/\u00A0/g, ' ')
+    .trim()
+    .toLowerCase();
+}
 
 export async function GET(req: NextRequest) {
-  try {
-    const programme = (req.nextUrl.searchParams.get('programme') ?? '').trim();
-    const grade     = (req.nextUrl.searchParams.get('grade') ?? '').trim();
-    const mode      = (req.nextUrl.searchParams.get('mode') ?? 'core').trim().toLowerCase();
+  const sp = req.nextUrl.searchParams;
+  const programme = sp.get('programme') ?? '';
+  const grade = sp.get('grade') ?? '';
+  const mode = (sp.get('mode') ?? 'core').toLowerCase();
 
-    const rows = await loadBlueprints();
+  const all = await loadBlueprints();
+  const filtered = all.filter((r: Record<string, unknown>) => {
+    return norm(r['programme']) === norm(programme) &&
+           String(r['grade'] ?? '').trim() === String(grade);
+  });
 
-    // show headers we actually parsed
-    const headerSet = new Set<string>();
-    for (const r of rows) Object.keys(r).forEach(k => headerSet.add(norm(k)));
+  const headers = filtered.length ? Object.keys(filtered[0]).map(k => norm(k)) : [];
 
-    const filtered = rows.filter(r =>
-      norm(r['programme'] ?? r['Programme']) === norm(programme) &&
-      String(r['grade'] ?? r['Grade'] ?? '').trim() === grade
-    );
+  const rows = filtered.map((r: Record<string, unknown>) => {
+    const subjectKey =
+      Object.keys(r).find(k => norm(k) === 'subject') ??
+      Object.keys(r).find(k => norm(k) === 'domains');
 
-    // Build a compact view of what we matched and what each row has for *_count
-    const sample = filtered.slice(0, 10).map((r) => {
-      const subjectKey = Object.keys(r).find(k => norm(k) === 'subject') ?? '';
-      const countKey   = Object.keys(r).find(k => norm(k) === `${mode}_count`) ?? '';
-      const rawCount   = countKey ? r[countKey] : undefined;
+    const modeKey = Object.keys(r).find(k => norm(k) === `${mode}_count`);
+    const totalKey = Object.keys(r).find(k => norm(k) === 'total');
 
-      return {
-        subject_key: subjectKey,
-        subject: subjectKey ? r[subjectKey] : undefined,
-        count_key: countKey || `(not found for mode=${mode})`,
-        raw_count: rawCount,
-        parsed_count: Number(String(rawCount ?? '').replace(/[^0-9.\-]/g, '')),
-        all_keys_seen: Object.keys(r),
-      };
-    });
+    return {
+      subject_key: subjectKey || '',
+      count_key: modeKey ? `${mode}_count` : totalKey ? 'total' : '(not found)',
+      raw_subject: subjectKey ? r[subjectKey] : '',
+      raw_count: modeKey ? r[modeKey!] : totalKey ? r[totalKey!] : '',
+    };
+  });
 
-    return NextResponse.json({
-      ok: true,
-      received: { programme, grade, mode },
-      parsed_headers_seen: Array.from(headerSet).sort(),
-      filtered_rows: filtered.length,
-      rows: sample,
-    });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message || 'debug_failed' }, { status: 500 });
-  }
+  return NextResponse.json({
+    ok: true,
+    received: { programme, grade, mode },
+    parsed_headers_seen: headers,
+    filtered_rows: filtered.length,
+    rows,
+  });
 }
