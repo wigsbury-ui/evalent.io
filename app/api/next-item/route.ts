@@ -1,186 +1,129 @@
 // app/api/next-item/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { supaAdmin } from '@/app/lib/supabase';
-import { loadItems, loadAssets, toVimeoEmbedFromShare } from '@/app/lib/sheets';
+import { NextRequest, NextResponse } from "next/server";
 
-// Decide which subject still has remaining quota
-function pickSubject(
-  countsBySubject: Record<string, number>,
-  askedBySubject: Record<string, number>
-): string | null {
-  for (const [subject, quota] of Object.entries(countsBySubject)) {
-    const done = askedBySubject[subject] ?? 0;
-    if (done < quota) return subject;
-  }
-  return null;
+// --- Helpers ---------------------------------------------------------------
+
+function err(message: string, status = 400) {
+  return NextResponse.json({ ok: false, error: message }, { status });
 }
+function ok(body: unknown, status = 200) {
+  return NextResponse.json(body as any, { status });
+}
+function norm(x: unknown): string {
+  return String(x ?? "")
+    .replace(/\uFEFF/g, "")
+    .replace(/\u00A0/g, " ")
+    .trim();
+}
+
+// Load items JSON at runtime (keeps build simple and allows “no-store”)
+async function loadItems() {
+  // Path is relative to app root when bundled by Next
+  // Using dynamic import so it stays server-only
+  try {
+    const mod = await import("../../../data/items_full.json");
+    // Some bundlers stick data under .default
+    return (mod as any).default ?? (mod as any);
+  } catch (e) {
+    throw new Error("items_data_missing");
+  }
+}
+
+// --- GET -------------------------------------------------------------------
 
 export async function GET(req: NextRequest) {
   try {
-    const token = req.nextUrl.searchParams.get('token') ?? '';
-    if (!token) {
-      return NextResponse.json({ ok: false, error: 'missing_token' }, { status: 400 });
+    const sp = req.nextUrl.searchParams;
+
+    // required for trace only (keeps parity with runner calls)
+    const t = norm(sp.get("t")); // token (optional but recommended)
+    const programme = norm(sp.get("programme")).toUpperCase();
+    const grade = norm(sp.get("grade"));
+    const mode = (norm(sp.get("mode")).toLowerCase() || "core") as
+      | "core"
+      | "easy"
+      | "hard";
+    const iRaw = sp.get("i");
+    const index = Math.max(0, Number.isFinite(Number(iRaw)) ? Number(iRaw) : 0);
+
+    if (!programme || !grade) {
+      return err("missing_programme_or_grade", 400);
     }
 
-    const db = supaAdmin();
+    // Load and filter items
+    const all = await loadItems();
 
-    // 1) Load session (must include plan saved at /start)
-    const { data: session, error: sErr } = await db
-      .from('sessions')
-      .select('id, item_index, status, plan')
-      .eq('token', token)
-      .single();
-
-    if (sErr || !session) {
-      return NextResponse.json({ ok: false, error: sErr?.message || 'session_not_found' }, { status: 400 });
-    }
-
-    const plan = (session as any).plan || {};
-    const programme: string = String(plan.programme ?? '').trim();
-    const grade: string = String(plan.grade ?? '').trim();
-    const countsBySubject: Record<string, number> = plan.countsBySubject || {};
-
-    // If there is no plan (old sessions), signal done
-    if (!programme || !grade || !Object.keys(countsBySubject).length) {
-      return NextResponse.json({
-        ok: true,
-        done: true,
-        index: session.item_index || 0,
-        total: 0,
-      });
-    }
-
-    // 2) Load all items once (from Sheets)
-    const allItems = await loadItems();
-
-    // Build subject quota set (normalize to lowercase)
-    const allowedSubjects = new Set(
-      Object.keys(countsBySubject).map((s) => String(s).trim().toLowerCase())
-    );
-
-    // Helpers to normalize values
-    const norm = (v: unknown) => String(v ?? '').trim().toLowerCase();
-    const gstr = (v: unknown) => String(v ?? '').trim(); // grade: compare as string
-
-    // Filter by programme, grade, and allowed subjects
-    const candidates = (allItems as any[]).filter((row: any) =>
-      norm(row?.programme) === norm(programme) &&
-      gstr(row?.grade) === gstr(grade) &&
-      allowedSubjects.has(norm(row?.subject))
-    );
-
-    // 3) Find what was already asked in this session
-    const { data: attempts, error: aErr } = await db
-      .from('attempts')
-      .select('item_id')
-      .eq('session_id', session.id);
-
-    if (aErr) {
-      return NextResponse.json({ ok: false, error: aErr.message }, { status: 400 });
-    }
-
-    const askedIds = new Set((attempts ?? []).map((a: any) => a.item_id));
-    const askedBySubject: Record<string, number> = {};
-    for (const a of attempts ?? []) {
-      const itm = (allItems as any[]).find((x: any) => x.id === a.item_id);
-      const subj = String(itm?.subject ?? '').trim();
-      if (!subj) continue;
-      askedBySubject[subj] = (askedBySubject[subj] ?? 0) + 1;
-    }
-
-    // 4) Decide which subject to serve next
-    let nextSubj = pickSubject(countsBySubject, askedBySubject);
-    if (!nextSubj) {
-      // Plan exhausted
-      return NextResponse.json({
-        ok: true,
-        done: true,
-        index: session.item_index || 0,
-        total: Object.values(countsBySubject).reduce((a, b) => a + b, 0),
-      });
-    }
-
-    // 5) Pick the next unused item for that subject
-    let pool = candidates.filter(
-      (it: any) => norm(it?.subject) === norm(nextSubj) && !askedIds.has(it.id)
-    );
-
-    // If no unused item for that subject, try the next subject that still has quota
-    if (!pool.length) {
-      const pretendAsked = { ...askedBySubject, [nextSubj]: countsBySubject[nextSubj] };
-      nextSubj = pickSubject(countsBySubject, pretendAsked);
-      if (!nextSubj) {
-        return NextResponse.json({
-          ok: true,
-          done: true,
-          index: session.item_index || 0,
-          total: Object.values(countsBySubject).reduce((a, b) => a + b, 0),
-        });
-      }
-      pool = candidates.filter(
-        (it: any) => norm(it?.subject) === norm(nextSubj) && !askedIds.has(it.id)
-      );
-      if (!pool.length) {
-        // Nothing left anywhere → done
-        return NextResponse.json({
-          ok: true,
-          done: true,
-          index: session.item_index || 0,
-          total: Object.values(countsBySubject).reduce((a, b) => a + b, 0),
-        });
-      }
-    }
-
-    const chosen = pool[Math.floor(Math.random() * pool.length)];
-
-    // 6) Optional: attach video (from Assets; vimeo share → embed)
-    let video_embed: string | undefined;
-    try {
-      const assetsMaybe = await loadAssets();
-      // Normalize to an array in case typings say it's a single object
-      const assetsArr = Array.isArray(assetsMaybe)
-        ? (assetsMaybe as any[])
-        : (assetsMaybe ? [assetsMaybe as any] : []);
-
-      const a = assetsArr.find(
-        (x: any) => String(x?.item_id ?? '') === String(chosen?.id ?? '')
-      );
-      const vimeo = toVimeoEmbedFromShare(a?.share_url || a?.video_url || '');
-      if (vimeo) video_embed = vimeo;
-    } catch {
-      // ignore asset failures
-    }
-
-    // 7) Return the item
-    const idx = (session.item_index ?? 0) + 1;
-    return NextResponse.json({
-      ok: true,
-      done: false,
-      index: idx,
-      total: Object.values(countsBySubject).reduce((a, b) => a + b, 0),
-      item: {
-        id: chosen.id,
-        subject: chosen.subject,
-        domain: chosen.subject, // UI uses this line under "1 of N • …"
-        prompt: chosen.prompt || chosen.text || chosen.text_or_html || '',
-        kind: chosen.kind || 'mcq',
-        options:
-          chosen.options ||
-          chosen.option_list ||
-          (typeof chosen.options_joined === 'string'
-            ? String(chosen.options_joined)
-                .split('\n')
-                .map((s: string) => s.trim())
-                .filter(Boolean)
-            : []),
-        correct_index:
-          typeof chosen.correct_index === 'number'
-            ? chosen.correct_index
-            : Number(chosen.correct ?? -1),
-        video_embed,
-      },
+    // Items can have various key casings; normalize defensively
+    const items = (Array.isArray(all) ? all : []).filter((it: any) => {
+      const p =
+        norm(it.programme ?? it.Programme ?? it.PROGRAMME).toUpperCase();
+      const g = norm(it.grade ?? it.Grade ?? it.GRADE);
+      return p === programme && g === grade;
     });
+
+    if (items.length === 0) {
+      return err("no_items_for_programme_and_grade", 404);
+    }
+
+    // Optionally you could filter by subject based on your plan distribution here
+    // e.g., choose subject by remaining counts in client-provided plan.
+
+    const pick = items[index % items.length];
+
+    // Minimal, runner-friendly shape. We pass through common fields if present.
+    const payload = {
+      ok: true,
+      index,
+      total: items.length,
+      remaining: Math.max(0, items.length - (index + 1)),
+      token: t || null,
+      mode,
+      item: {
+        id: pick.id ?? pick.item_id ?? `${programme}-${grade}-${index}`,
+        programme,
+        grade,
+        subject:
+          pick.subject ?? pick.domain ?? pick.Domains ?? pick.domains ?? null,
+        // Common fields in our banks; pass raw so the runner can render
+        stem:
+          pick.stem ??
+          pick.question ??
+          pick.text ??
+          pick.prompt ??
+          null,
+        options:
+          pick.options ??
+          pick.answers ??
+          pick.choices ??
+          null,
+        answer:
+          pick.answer ??
+          pick.correct ??
+          pick.correct_answer ??
+          null,
+        // Everything else as raw fallback
+        raw: pick,
+      },
+    };
+
+    // no-store so the client can step index with cache busters safely
+    const res = ok(payload, 200);
+    res.headers.set("Cache-Control", "no-store, max-age=0");
+    return res;
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message || 'next_failed' }, { status: 500 });
+    const msg = e?.message || "next_item_failed";
+    const status = msg === "items_data_missing" ? 500 : 500;
+    return err(msg, status);
   }
+}
+
+// Other verbs blocked
+export async function POST() {
+  return err("method_not_allowed", 405);
+}
+export async function PUT() {
+  return err("method_not_allowed", 405);
+}
+export async function DELETE() {
+  return err("method_not_allowed", 405);
 }
