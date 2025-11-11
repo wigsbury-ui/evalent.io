@@ -26,12 +26,11 @@ export default function RunnerPage() {
   const [index, setIndex] = useState(0);
   const [total, setTotal] = useState(0);
 
-  // form state (switches UI depending on item type)
+  // UI state
   const isMCQ = useMemo(() => (item?.options ?? []).length > 0, [item]);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [answerText, setAnswerText] = useState('');
 
-  // load first/next item
   async function loadNext() {
     setFetching(true);
     setErr(null);
@@ -43,7 +42,8 @@ export default function RunnerPage() {
       const json: NextItemRes = await res.json();
 
       if (!json.ok) {
-        setErr(json.error || 'Failed to fetch item');
+        const msg = 'error' in json ? json.error : 'Failed to fetch item';
+        setErr(msg);
         setItem(null);
         setIndex(0);
         setTotal(0);
@@ -64,12 +64,10 @@ export default function RunnerPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  // submit current response (MCQ or written)
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!item) return;
 
-    // Validate required field depending on item type
     if (isMCQ && (selectedIndex === null || selectedIndex < 0)) {
       setErr('Please select an option.');
       return;
@@ -95,16 +93,14 @@ export default function RunnerPage() {
       const json = await res.json();
 
       if (!res.ok || !json.ok) {
-        setErr(json?.error || 'Submit failed');
+        setErr((json && (json.error || json.message)) || 'Submit failed');
         setLoading(false);
         return;
       }
 
-      // load next item or go to results
+      // fetch next; if none, go to results
       await loadNext();
-      if (!json.has_more) {
-        router.push(`/t/${token}/results`);
-      }
+      if (!json.has_more) router.push(`/t/${token}/results`);
     } catch (e: any) {
       setErr(e?.message || 'Network error');
     } finally {
@@ -122,7 +118,10 @@ export default function RunnerPage() {
       {fetching ? (
         <div className="text-lg">Loading…</div>
       ) : !item ? (
-        <div className="rounded-lg border p-6 text-xl">All items complete. 🎉 <a className="underline" href={`/t/${token}/results`}>View results</a></div>
+        <div className="rounded-lg border p-6 text-xl">
+          All items complete. 🎉{' '}
+          <a className="underline" href={`/t/${token}/results`}>View results</a>
+        </div>
       ) : (
         <form onSubmit={onSubmit} className="rounded-xl border p-6">
           <div className="text-lg text-gray-700 mb-4">
@@ -131,8 +130,7 @@ export default function RunnerPage() {
 
           <h2 className="text-3xl font-extrabold mb-5">{item.prompt}</h2>
 
-          {/* MCQ */}
-          {isMCQ && (
+          {isMCQ ? (
             <div className="space-y-3 mb-6">
               {item.options!.map((opt, i) => (
                 <label key={i} className="flex items-center gap-3 cursor-pointer">
@@ -147,10 +145,7 @@ export default function RunnerPage() {
                 </label>
               ))}
             </div>
-          )}
-
-          {/* Written */}
-          {!isMCQ && (
+          ) : (
             <textarea
               className="w-full min-h-[8rem] rounded-md border p-3 text-lg mb-6"
               placeholder="Type your answer here…"
