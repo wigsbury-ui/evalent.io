@@ -1,39 +1,29 @@
 // app/lib/item.ts
-import type { ItemRow, BlueprintRow } from './sheets';
+// Broader shape to match the real columns coming from the Items CSV.
+// We keep everything optional so existing code stays compatible.
 
-export type PlanMeta = {
-  programme?: string | null;
-  grade?: string | null;
-};
+export type ItemRow = {
+  // identity
+  id: string;
 
-export const filterByBlueprint = (
-  items: ItemRow[],
-  blueprints: BlueprintRow[],
-  meta?: PlanMeta | null
-): { pool: ItemRow[]; total: number } => {
-  if (!meta?.programme && !meta?.grade) {
-    return { pool: items, total: items.length };
-  }
-  // Find first matching blueprint
-  const bp = blueprints.find(b =>
-    (!b.programme || b.programme?.toLowerCase() === (meta.programme || '').toLowerCase()) &&
-    (!b.grade || b.grade?.toLowerCase() === (meta.grade || '').toLowerCase() ||
-     !b.year || b.year?.toLowerCase() === (meta.grade || '').toLowerCase())
-  );
-  if (!bp) return { pool: items, total: items.length };
+  // blueprint filters (present in your sheet)
+  programme?: string;   // e.g. "UK"
+  grade?: string;       // e.g. "3"
+  subject?: string;     // e.g. "Mathematics" | "English" | "Reasoning"
 
-  let pool = items;
-  if (bp.domains && bp.domains.length) {
-    const set = new Set(bp.domains.map(d => d.toLowerCase()));
-    pool = items.filter(i => set.has(i.domain.toLowerCase()));
-  }
-  const total = bp.total && bp.total > 0 ? Math.min(bp.total, pool.length) : pool.length;
-  return { pool, total };
-};
+  // content fields (as they appear in your sheet; optional and flexible)
+  kind?: 'mcq' | 'free' | string;
+  prompt?: string;
+  text?: string;
+  text_or_html?: string;
 
-// deterministic “next item” picker (simply uses index within filtered pool)
-export const selectByIndex = (pool: ItemRow[], index: number): ItemRow | null => {
-  if (!pool.length) return null;
-  if (index >= pool.length) return null;
-  return pool[index];
+  // options / answers (we tolerate several header styles)
+  options?: string[];           // already-parsed list (if loader builds it)
+  options_joined?: string;      // newline-joined options from sheet
+  option_list?: string[];       // alternative list key if present
+  correct_index?: number;       // 0-based index
+  correct?: number | string;    // sometimes given as number/string in sheet
+
+  // any other columns we don't rely on
+  [key: string]: unknown;
 };
