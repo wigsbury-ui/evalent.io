@@ -3,218 +3,196 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-export const dynamic = 'force-dynamic';
-
 type ItemRow = {
   id: string;
   kind: 'mcq' | 'free';
   domain: string | null;
   prompt: string;
-  options?: string[] | null;
+  options?: (string | { text: string })[] | null; // for MCQ
 };
 
-type NextOk = {
-  ok: true;
-  done?: boolean;
-  index: number;
-  total: number;
-  item?: ItemRow;
-};
-type NextErr = { ok: false; error: string };
-type NextRes = NextOk | NextErr;
+type NextRes =
+  | { ok: true; done: true; index: number; total: number }
+  | { ok: true; done?: false; item: ItemRow; index: number; total: number }
+  | { ok: false; error: string };
 
-function isErr(res: NextRes): res is NextErr {
-  return res.ok === false;
-}
-
-type Params = { params: { token: string } };
-
-export default function TestRunnerPage({ params }: Params) {
-  const router = useRouter();
+export default function TestPage({ params }: { params: { token: string } }) {
   const token = params.token;
+  const router = useRouter();
 
+  const [item, setItem] = useState<ItemRow | null>(null);
   const [idx, setIdx] = useState(0);
   const [total, setTotal] = useState(0);
-  const [item, setItem] = useState<ItemRow | null>(null);
-  const [choice, setChoice] = useState<number | null>(null);
-  const [free, setFree] = useState<string>('');
   const [err, setErr] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  async function loadNext() {
-    setLoading(true);
-    setErr(null);
-    try {
-      const res = await fetch(
-        `/api/next-item?token=${encodeURIComponent(token)}&t=${Date.now()}`,
-        { cache: 'no-store' }
-      );
-      const j: NextRes = await res.json();
+  // answers
+  const [choice, setChoice] = useState<number | null>(null);
+  const [free, setFree] = useState('');
 
-      if (isErr(j)) {
-        setErr(j.error || 'Failed to fetch next item');
-        setItem(null);
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      setErr(null);
+      setLoading(true);
+      setItem(null); // prevent rendering stale item (fixes the flash)
+      try {
+        const r = await fetch(`/api/next-item?token=${encodeURIComponent(token)}&t=${Date.now()}`);
+        const j: NextRes = await r.json();
+        if (!alive) return;
+        if (!j.ok) {
+          setErr((j as any).error || 'Failed to fetch item');
+          setLoading(false);
+          return;
+        }
+        if ('done' in j && j.done) {
+          router.replace(`/t/${token}/results`);
+          return;
+        }
+        const ok = j as Extract<NextRes, { ok: true; item: ItemRow }>;
+        setIdx(ok.index + 1);
+        setTotal(ok.total);
+        setItem(ok.item);
+        setChoice(null);
+        setFree('');
+        setLoading(false);
+      } catch (e: any) {
+        if (!alive) return;
+        setErr(e?.message || 'Failed to fetch item');
+        setLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [token, router]);
+
+  async function submit() {
+    if (!item) return;
+
+    setErr(null);
+    setLoading(true);
+    setItem(null); // clear immediately so the last question can’t flash again
+
+    try {
+      const body: any = {
+        token,
+        item_id: item.id,
+        kind: item.kind,
+      };
+      if (item.kind === 'mcq') body.selected_index = choice;
+      else body.answer_text = free ?? '';
+
+      const r = await fetch('/api/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const j = await r.json();
+      if (!j.ok) {
+        setErr(j.error || 'Submit failed');
         setLoading(false);
         return;
       }
 
-      if (j.done) {
+      // fetch next item
+      const r2 = await fetch(`/api/next-item?token=${encodeURIComponent(token)}&t=${Date.now()}`);
+      const n: NextRes = await r2.json();
+      if (!n.ok) {
+        setErr((n as any).error || 'Failed to fetch next item');
+        setLoading(false);
+        return;
+      }
+      if ('done' in n && n.done) {
+        // Go straight to results — no item to render, so no flash.
         router.replace(`/t/${token}/results`);
         return;
       }
-
-      setIdx(j.index + 1);
-      setTotal(j.total);
-      setItem(j.item!);
+      const ok = n as Extract<NextRes, { ok: true; item: ItemRow }>;
+      setIdx(ok.index + 1);
+      setTotal(ok.total);
+      setItem(ok.item);
       setChoice(null);
       setFree('');
+      setLoading(false);
     } catch (e: any) {
-      setErr(e?.message || 'Network error');
-      setItem(null);
-    } finally {
+      setErr(e?.message || 'Unexpected error');
       setLoading(false);
     }
   }
 
-  useEffect(() => {
-    loadNext();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token]);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!item || submitting) return;
-
-    if (item.kind === 'mcq' && (choice === null || choice === undefined)) {
-      setErr('Please select an option.');
-      return;
-    }
-    if (item.kind === 'free' && !free.trim()) {
-      setErr('Please enter an answer.');
-      return;
-    }
-
-    setSubmitting(true);
-    setErr(null);
-    try {
-      const payload =
-        item.kind === 'mcq'
-          ? {
-              token,
-              item_id: item.id,
-              kind: 'mcq' as const,
-              selected_index: choice,
-            }
-          : {
-              token,
-              item_id: item.id,
-              kind: 'free' as const,
-              answer_text: free,
-            };
-
-      const res = await fetch('/api/submit', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(payload),
-        cache: 'no-store',
-      });
-      const j: { ok: boolean; done?: boolean; error?: string } = await res.json();
-
-      if (!j.ok) {
-        setErr(j.error || 'Submit failed');
-        return;
-      }
-      if (j.done) {
-        router.replace(`/t/${token}/results`);
-        return;
-      }
-
-      await loadNext();
-    } catch (e: any) {
-      setErr(e?.message || 'Submit failed');
-    } finally {
-      setSubmitting(false);
-    }
-  }
+  const disabled = loading || !item || (item.kind === 'mcq' && choice == null);
 
   return (
-    <main style={{ maxWidth: 900, margin: '40px auto', padding: '0 20px' }}>
-      <h1 style={{ fontSize: 56, lineHeight: 1.05, marginBottom: 8 }}>
-        Evalent Test Runner
-      </h1>
-      <p style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
-        Token: <strong>{token}</strong>
-      </p>
+    <div style={{ maxWidth: 900, margin: '2rem auto', padding: '0 1rem' }}>
+      <h1 style={{ fontSize: '3rem', lineHeight: 1.1, fontWeight: 800 }}>Evalent Test Runner</h1>
+      <p><strong>Token:</strong> {token}</p>
 
-      {err && (
-        <div style={{ color: '#a11', fontSize: 18, margin: '12px 0' }}>{err}</div>
+      {err && <p style={{ color: '#8b1d1d' }}>{err}</p>}
+
+      {loading && (
+        <div
+          style={{
+            padding: '1.5rem',
+            border: '1px solid #ddd',
+            borderRadius: 8,
+            marginTop: '1rem',
+            fontStyle: 'italic',
+          }}
+        >
+          Loading…
+        </div>
       )}
 
-      {loading && <div style={{ fontSize: 18 }}>Loading…</div>}
-
       {!loading && item && (
-        <form onSubmit={handleSubmit} style={{ marginTop: 16 }}>
-          <div style={{ fontSize: 20, color: '#444', marginBottom: 12 }}>
-            {idx} of {total} • {item.domain || 'General'}
-          </div>
-
-          <h2 style={{ fontSize: 40, lineHeight: 1.2, margin: '8px 0 18px' }}>
-            {item.prompt}
-          </h2>
+        <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: '1.25rem', marginTop: '1rem' }}>
+          <p style={{ marginTop: 0 }}>{idx} of {total} • {item.domain ?? 'General'}</p>
+          <h2 style={{ marginTop: 0 }}>{item.prompt}</h2>
 
           {item.kind === 'mcq' ? (
-            <div style={{ margin: '8px 0 18px' }}>
-              {(item.options || []).map((opt, i) => (
-                <label key={i} style={{ marginRight: 16, fontSize: 22 }}>
-                  <input
-                    type="radio"
-                    name="mcq"
-                    checked={choice === i}
-                    onChange={() => setChoice(i)}
-                    style={{ marginRight: 8 }}
-                  />
-                  {opt}
-                </label>
-              ))}
+            <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
+              {(item.options ?? []).map((opt, i) => {
+                const label = typeof opt === 'string' ? opt : (opt?.text ?? String(opt));
+                return (
+                  <label key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    <input
+                      type="radio"
+                      name="mcq"
+                      checked={choice === i}
+                      onChange={() => setChoice(i)}
+                    />
+                    <span>{label}</span>
+                  </label>
+                );
+              })}
             </div>
           ) : (
-            <div style={{ marginBottom: 18 }}>
-              <textarea
-                value={free}
-                onChange={(e) => setFree(e.target.value)}
-                rows={6}
-                style={{ width: '100%', fontSize: 18, padding: 12 }}
-                placeholder="Type your answer…"
-              />
-            </div>
+            <textarea
+              value={free}
+              onChange={(e) => setFree(e.target.value)}
+              rows={5}
+              style={{ width: '100%', marginTop: '0.75rem' }}
+            />
           )}
 
           <button
-            type="submit"
-            disabled={
-              submitting ||
-              (item.kind === 'mcq' ? choice === null : !free.trim())
-            }
+            onClick={submit}
+            disabled={disabled}
             style={{
-              padding: '10px 18px',
-              fontSize: 18,
-              borderRadius: 6,
-              border: '1px solid #2b50d9',
-              background: '#3b5bfd',
-              color: 'white',
-              cursor: 'pointer',
-              opacity:
-                submitting ||
-                (item.kind === 'mcq' ? choice === null : !free.trim())
-                  ? 0.6
-                  : 1,
+              marginTop: '1rem',
+              padding: '0.6rem 1rem',
+              borderRadius: 8,
+              border: '1px solid #2b50a2',
+              background: disabled ? '#c7d2fe' : '#3b5ccc',
+              color: '#fff',
+              cursor: disabled ? 'not-allowed' : 'pointer',
+              boxShadow: '0 2px 0 rgba(0,0,0,0.1)'
             }}
           >
-            {submitting ? 'Submitting…' : 'Submit'}
+            Submit
           </button>
-        </form>
+        </div>
       )}
-    </main>
+    </div>
   );
 }
