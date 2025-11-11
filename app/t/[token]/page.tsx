@@ -1,117 +1,172 @@
-// app/t/[token]/page.tsx
 'use client';
-import { useEffect, useState } from 'react';
 
-type Item = {
+import { useEffect, useMemo, useState } from 'react';
+import { useParams, useRouter } from 'next/navigation';
+
+type ItemRow = {
   id: string;
   domain: string | null;
-  type: 'mcq' | 'written' | string;
   prompt: string;
-  options?: string[] | null;
-  index?: number;   // 1-based
-  total?: number;
+  options: string[] | null; // MCQ when length > 0
 };
 
-export default function Runner({ params }: { params: { token: string } }) {
-  const token = params.token;
-  const [item, setItem]   = useState<Item | null>(null);
-  const [done, setDone]   = useState(false);
-  const [busy, setBusy]   = useState(false);
-  const [error, setError] = useState<string | null>(null);
+type NextItemRes =
+  | { ok: true; item: ItemRow | null; index: number; total: number }
+  | { ok: false; error: string };
 
-  // local answers
-  const [selected, setSelected] = useState<number | null>(null);
-  const [written, setWritten]   = useState('');
+export default function RunnerPage() {
+  const { token } = useParams<{ token: string }>();
+  const router = useRouter();
 
-  async function fetchNext() {
-    setBusy(true); setError(null); setSelected(null); setWritten('');
-    const r = await fetch(`/api/next-item?token=${encodeURIComponent(token)}&t=${Date.now()}`);
-    const j = await r.json();
-    setBusy(false);
-    if (!r.ok) { setError(j?.error || 'Failed to load'); return; }
-    if (j?.done) { setDone(true); setItem(null); return; }
-    setItem(j.item);
+  const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  const [item, setItem] = useState<ItemRow | null>(null);
+  const [index, setIndex] = useState(0);
+  const [total, setTotal] = useState(0);
+
+  // form state (switches UI depending on item type)
+  const isMCQ = useMemo(() => (item?.options ?? []).length > 0, [item]);
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [answerText, setAnswerText] = useState('');
+
+  // load first/next item
+  async function loadNext() {
+    setFetching(true);
+    setErr(null);
+    setSelectedIndex(null);
+    setAnswerText('');
+
+    try {
+      const res = await fetch(`/api/next-item?token=${token}`, { cache: 'no-store' });
+      const json: NextItemRes = await res.json();
+
+      if (!json.ok) {
+        setErr(json.error || 'Failed to fetch item');
+        setItem(null);
+        setIndex(0);
+        setTotal(0);
+      } else {
+        setItem(json.item);
+        setIndex(json.index);
+        setTotal(json.total);
+      }
+    } catch (e: any) {
+      setErr(e?.message || 'Network error');
+    } finally {
+      setFetching(false);
+    }
   }
 
-  async function submit() {
+  useEffect(() => {
+    loadNext();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  // submit current response (MCQ or written)
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
     if (!item) return;
-    setBusy(true); setError(null);
-    const payload:any = { token, itemId: item.id };
-    if (item.type === 'mcq') payload.selectedIndex = selected;
-    else if (item.type === 'written') payload.answerText = written;
 
-    const r = await fetch('/api/submit', {
-      method: 'POST',
-      headers: { 'content-type':'application/json' },
-      body: JSON.stringify(payload),
-    });
-    const j = await r.json().catch(() => ({}));
-    setBusy(false);
-    if (!r.ok) { setError(j?.error || 'Submit failed'); return; }
-    fetchNext();
+    // Validate required field depending on item type
+    if (isMCQ && (selectedIndex === null || selectedIndex < 0)) {
+      setErr('Please select an option.');
+      return;
+    }
+    if (!isMCQ && !answerText.trim()) {
+      setErr('Please enter an answer.');
+      return;
+    }
+
+    setLoading(true);
+    setErr(null);
+
+    try {
+      const body: any = { token, item_id: item.id };
+      if (isMCQ) body.selected_index = selectedIndex;
+      else body.answer_text = answerText.trim();
+
+      const res = await fetch('/api/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json();
+
+      if (!res.ok || !json.ok) {
+        setErr(json?.error || 'Submit failed');
+        setLoading(false);
+        return;
+      }
+
+      // load next item or go to results
+      await loadNext();
+      if (!json.has_more) {
+        router.push(`/t/${token}/results`);
+      }
+    } catch (e: any) {
+      setErr(e?.message || 'Network error');
+    } finally {
+      setLoading(false);
+    }
   }
-
-  useEffect(() => { fetchNext(); /* on mount */ }, []);
-
-  const isMcq = item?.type === 'mcq';
-  const opts = isMcq && Array.isArray(item?.options) ? (item!.options as string[]) : [];
 
   return (
-    <main style={{maxWidth:740, margin:'0 auto', padding:24}}>
-      <h1 style={{fontSize:44, fontWeight:800, marginBottom:16}}>Evalent Test Runner</h1>
-      <p>Token: <code>{token}</code></p>
+    <main className="mx-auto max-w-4xl p-8">
+      <h1 className="text-5xl font-serif font-black mb-6">Evalent Test Runner</h1>
+      <p className="text-xl mb-6"><span className="font-semibold">Token:</span> {token}</p>
 
-      {error && <p style={{color:'#b91c1c', marginTop:12}}>{error}</p>}
-      {done && (
-        <section style={{marginTop:16, padding:16, border:'1px solid #ddd', borderRadius:8}}>
-          <h2 style={{fontSize:24, fontWeight:700}}>All items complete. 🎉</h2>
-          <a href={`/t/${token}/results`} style={{color:'#2563eb', textDecoration:'underline'}}>View results</a>
-        </section>
-      )}
+      {err && <p className="text-red-700 text-xl mb-4">{err}</p>}
 
-      {!done && item && (
-        <section style={{marginTop:16, padding:16, border:'1px solid #ddd', borderRadius:8}}>
-          <div style={{marginBottom:8, opacity:0.7}}>
-            {item.index ?? 0} of {item.total ?? 0}
-            {item.domain ? ` • ${item.domain}` : ''}
+      {fetching ? (
+        <div className="text-lg">Loading…</div>
+      ) : !item ? (
+        <div className="rounded-lg border p-6 text-xl">All items complete. 🎉 <a className="underline" href={`/t/${token}/results`}>View results</a></div>
+      ) : (
+        <form onSubmit={onSubmit} className="rounded-xl border p-6">
+          <div className="text-lg text-gray-700 mb-4">
+            {index + 1} of {total} • {item.domain ?? 'General'}
           </div>
-          <h2 style={{fontSize:22, fontWeight:700, marginBottom:12}}>{item.prompt}</h2>
 
-          {isMcq ? (
-            <div style={{display:'grid', gap:8, marginBottom:12}}>
-              {opts.map((opt, i) => (
-                <label key={i} style={{display:'flex', gap:8, alignItems:'center', cursor:'pointer'}}>
+          <h2 className="text-3xl font-extrabold mb-5">{item.prompt}</h2>
+
+          {/* MCQ */}
+          {isMCQ && (
+            <div className="space-y-3 mb-6">
+              {item.options!.map((opt, i) => (
+                <label key={i} className="flex items-center gap-3 cursor-pointer">
                   <input
                     type="radio"
                     name="mcq"
-                    checked={selected === i}
-                    onChange={() => setSelected(i)}
+                    className="h-5 w-5"
+                    checked={selectedIndex === i}
+                    onChange={() => setSelectedIndex(i)}
                   />
-                  <span>{opt}</span>
+                  <span className="text-lg">{opt}</span>
                 </label>
               ))}
-              {opts.length === 0 && <em>No options provided.</em>}
-            </div>
-          ) : (
-            <div style={{marginBottom:12}}>
-              <textarea
-                value={written}
-                onChange={e => setWritten(e.target.value)}
-                rows={5}
-                style={{width:'100%', padding:10, border:'1px solid #ccc', borderRadius:6}}
-                placeholder="Type your answer…"
-              />
             </div>
           )}
 
+          {/* Written */}
+          {!isMCQ && (
+            <textarea
+              className="w-full min-h-[8rem] rounded-md border p-3 text-lg mb-6"
+              placeholder="Type your answer here…"
+              value={answerText}
+              onChange={(e) => setAnswerText(e.target.value)}
+            />
+          )}
+
           <button
-            onClick={submit}
-            disabled={busy || (isMcq && selected === null)}
-            style={{padding:'10px 16px', borderRadius:6, background:'#2563eb', color:'#fff', opacity:(busy || (isMcq && selected===null))?0.6:1}}
+            type="submit"
+            disabled={loading}
+            className="px-5 py-2 rounded-md bg-blue-600 text-white text-lg disabled:opacity-50"
           >
-            {busy ? 'Submitting…' : 'Submit'}
+            {loading ? 'Submitting…' : 'Submit'}
           </button>
-        </section>
+        </form>
       )}
     </main>
   );
