@@ -1,79 +1,93 @@
 // app/api/next-item/route.ts
 export const runtime = 'nodejs';
-
 import { NextResponse } from 'next/server';
 import { supaAdmin } from '@/lib/supa';
 
-export async function GET(req: Request) {
+type ApiOk =
+  | { ok: true; done: true; index: number; total: number }
+  | { ok: true; done: false; index: number; total: number; item: ItemRow };
+
+type ApiErr = { ok: false; error: string };
+
+type ItemRow = {
+  id: string;
+  domain: string | null;
+  prompt: string;
+  kind: 'mcq' | 'free';
+  options: string[] | null; // null for free-text
+};
+
+export async function GET(req: Request): Promise<Response> {
   try {
     const { searchParams } = new URL(req.url);
     const token = searchParams.get('token');
-    if (!token) {
-      return NextResponse.json({ ok: false, error: 'missing token' }, { status: 400 });
-    }
+    const schoolId = searchParams.get('school_id'); // optional override
 
-    const supa = supaAdmin();
+    if (!token) return NextResponse.json<ApiErr>({ ok: false, error: 'missing_token' }, { status: 400 });
 
-    // 1) Load the session
-    const { data: session, error: sErr } = await supa
+    const admin = supaAdmin();
+
+    // 1) Read session
+    const { data: session, error: sErr } = await admin
       .from('sessions')
       .select('id, school_id, item_index, status')
       .eq('token', token)
       .single();
 
-    if (sErr) {
-      return NextResponse.json({ ok: false, error: sErr.message }, { status: 400 });
-    }
-    if (!session) {
-      return NextResponse.json({ ok: false, error: 'session not found' }, { status: 404 });
-    }
-    if (session.status === 'complete') {
-      return NextResponse.json({ ok: true, done: true });
+    if (sErr || !session) {
+      return NextResponse.json<ApiErr>({ ok: false, error: sErr?.message ?? 'session_not_found' }, { status: 404 });
     }
 
-    const idx = Number(session.item_index ?? 0);
-
-    // 2) Fetch exactly one active item for this school at the current index.
-    //    IMPORTANT: do NOT select a non-existent "kind" column.
-    //    We’ll compute "kind" from options below.
-    const { data: items, error: iErr } = await supa
+    const sid = session.school_id ?? schoolId; // allow override if provided
+    // 2) Count items
+    const { count, error: cErr } = await admin
       .from('items')
-      .select('id, prompt, domain, options, correct_index, active')
+      .select('id', { count: 'estimated', head: true })
       .eq('active', true)
-      .eq('school_id', session.school_id)
-      .order('id', { ascending: true })
-      .range(idx, idx); // one row at the current index
+      .or(sid ? `school_id.eq.${sid},school_id.is.null` : 'school_id.is.null'); // serve demo + null-school items
+    if (cErr) return NextResponse.json<ApiErr>({ ok: false, error: cErr.message }, { status: 400 });
 
-    if (iErr) {
-      return NextResponse.json({ ok: false, error: iErr.message }, { status: 400 });
+    const total = count ?? 0;
+    const index = session.item_index ?? 0;
+
+    if (total === 0) {
+      return NextResponse.json<ApiErr>({ ok: false, error: 'no_items_available' }, { status: 400 });
     }
 
-    const item = items?.[0];
-    if (!item) {
-      // No more items → mark complete
-      await supa.from('sessions').update({ status: 'complete' }).eq('id', session.id);
-      return NextResponse.json({ ok: true, done: true });
+    // 3) Done?
+    if (index >= total) {
+      return NextResponse.json<ApiOk>({ ok: true, done: true, index, total });
     }
 
-    // 3) Compute "kind" from presence of options
-    const kind =
-      Array.isArray(item.options) && item.options.length > 0 ? 'mcq' : 'written';
+    // 4) Fetch the next item (stable order)
+    const { data: rows, error: iErr } = await admin
+      .from('items')
+      .select('id, domain, prompt, kind, options')
+      .eq('active', true)
+      .or(sid ? `school_id.eq.${sid},school_id.is.null` : 'school_id.is.null')
+      .order('created_at', { ascending: true })
+      .range(index, index); // just one
 
-    return NextResponse.json({
+    if (iErr) return NextResponse.json<ApiErr>({ ok: false, error: iErr.message }, { status: 400 });
+    const item = rows?.[0];
+    if (!item) return NextResponse.json<ApiErr>({ ok: false, error: 'item_not_found' }, { status: 404 });
+
+    const shape: ItemRow = {
+      id: item.id,
+      domain: item.domain ?? null,
+      prompt: item.prompt,
+      kind: (item.kind as 'mcq' | 'free') ?? 'mcq',
+      options: item.options ?? null,
+    };
+
+    return NextResponse.json<ApiOk>({
       ok: true,
-      item: {
-        id: item.id,
-        prompt: item.prompt,
-        domain: item.domain ?? 'General',
-        kind,                          // computed
-        options: item.options ?? [],   // MCQ options (if any)
-      },
-      index: idx,
+      done: false,
+      index,
+      total,
+      item: shape,
     });
   } catch (e: any) {
-    return NextResponse.json(
-      { ok: false, error: String(e?.message || e) },
-      { status: 500 }
-    );
+    return NextResponse.json<ApiErr>({ ok: false, error: e?.message ?? 'server_error' }, { status: 500 });
   }
 }
