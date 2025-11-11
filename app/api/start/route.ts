@@ -1,60 +1,69 @@
+// app/api/start/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { supaAdmin } from '@/app/lib/supa';
 import { loadBlueprints } from '@/app/lib/sheets';
+import { supaAdmin } from '@/app/lib/supa';
 
 export const dynamic = 'force-dynamic';
 
-type Counts = Record<string, number>;
-
-function norm(s: unknown): string {
+function norm(s: any): string {
   return String(s ?? '')
-    .replace(/\uFEFF/g, '')      // BOM
-    .replace(/\u00A0/g, ' ')     // nbsp
+    .replace(/\uFEFF/g, '')
+    .replace(/\u00A0/g, ' ')
     .trim()
     .toLowerCase();
 }
-
-function safeNum(v: unknown): number {
+function safeNum(v: any): number {
   const n = Number(String(v ?? '').replace(/[^0-9.\-]/g, ''));
   return Number.isFinite(n) ? n : 0;
 }
 
-async function createSession(passcode: string, programme: string, grade: string, mode: string) {
-  // simple passcode check
-  const required =
-    process.env.NEXT_PUBLIC_START_PASSCODE ||
-    process.env.START_PASSCODE ||
-    '';
-  if (required && passcode !== required) {
+type StartParams = {
+  passcode?: string;
+  programme?: string;
+  grade?: string;
+  mode?: string; // easy|core|hard
+};
+
+async function doStart(params: StartParams) {
+  const PASS = process.env.NEXT_PUBLIC_START_PASSCODE || 'letmein';
+
+  const programme = (params.programme ?? 'UK').trim();
+  const grade = (params.grade ?? '').trim();
+  const mode = (params.mode ?? 'core').trim().toLowerCase();
+
+  if (!programme || !grade) {
+    return NextResponse.json(
+      { ok: false, error: 'missing_programme_or_grade' },
+      { status: 400 }
+    );
+  }
+  if ((params.passcode || '').trim() !== PASS) {
     return NextResponse.json({ ok: false, error: 'bad_passcode' }, { status: 401 });
   }
 
-  // load blueprints CSV
-  const all = await loadBlueprints();
+  // 1) Load blueprints and filter by programme + grade
+  const blueprints = await loadBlueprints(); // rows: Record<string,any>[]
+  const filtered = blueprints.filter(r =>
+    norm(r.programme) === norm(programme) && String(r.grade ?? '').trim() === grade
+  );
 
-  // filter for programme+grade
-  const rows = all.filter((r: Record<string, unknown>) => {
-    const p = norm((r as any)['programme']);
-    const g = String((r as any)['grade'] ?? '').trim();
-    return p === norm(programme) && g === String(grade);
-  });
-
-  // build countsBySubject (supports either schema)
-  const countsBySubject: Counts = {};
-  for (const r of rows as Record<string, unknown>[]) {
-    // subject header can be "subject" or "domains"
+  // 2) Build countsBySubject with BOTH schemas supported
+  const countsBySubject: Record<string, number> = {};
+  for (const r of filtered) {
+    // subject can be "subject" (old) or "domains" (new)
     const subjectKey =
       Object.keys(r).find(k => norm(k) === 'subject') ??
       Object.keys(r).find(k => norm(k) === 'domains');
 
-    const subject = String(subjectKey ? (r as any)[subjectKey] : '').trim();
+    if (!subjectKey) continue;
+    const subject = String(r[subjectKey] ?? '').trim();
     if (!subject) continue;
 
-    // prefer "<mode>_count" else "total"
+    // count can be "<mode>_count" (old) or "total" (new)
     const modeKey = Object.keys(r).find(k => norm(k) === `${mode}_count`);
     const totalKey = Object.keys(r).find(k => norm(k) === 'total');
+    const raw = modeKey ? r[modeKey] : totalKey ? r[totalKey] : undefined;
 
-    const raw = modeKey ? (r as any)[modeKey] : totalKey ? (r as any)[totalKey] : undefined;
     const n = safeNum(raw);
     if (n > 0) countsBySubject[subject] = n;
   }
@@ -66,75 +75,42 @@ async function createSession(passcode: string, programme: string, grade: string,
     );
   }
 
-  // create session in DB
-  const token = crypto.randomUUID();
+  // 3) Create session
+  const token = crypto.randomUUID().replace(/-/g, '');
   const db = supaAdmin();
   const { error } = await db
-    .from('sessions' as any)
-    .insert({
-      token,
-      status: 'active',
-      item_index: 0,
-      plan: { mode, counts: countsBySubject },
-      meta: { programme, grade, mode },
-    } as any);
+    .from('sessions')
+    .insert([
+      {
+        token,
+        item_index: 0,
+        status: 'active',
+        plan: { programme, grade, mode, countsBySubject },
+        meta: { programme, grade, mode },
+      },
+    ]);
 
   if (error) {
-    return NextResponse.json({ ok: false, error: error.message || 'db_insert_failed' }, { status: 500 });
+    return NextResponse.json({ ok: false, error: String(error.message || error) }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true, token });
+  return NextResponse.json({ ok: true, token, plan: { programme, grade, mode, countsBySubject } });
 }
 
-function readParams(req: NextRequest) {
-  const url = req.nextUrl;
-  const passcode = url.searchParams.get('passcode') ?? '';
-  const programme = url.searchParams.get('programme') ?? '';
-  const grade = url.searchParams.get('grade') ?? '';
-  const mode = (url.searchParams.get('mode') ?? 'core').toLowerCase();
-  return { passcode, programme, grade, mode };
-}
-
-// GET support (useful for query-string starts)
+// Accept GET (querystring) …
 export async function GET(req: NextRequest) {
-  const { passcode, programme, grade, mode } = readParams(req);
-  return createSession(passcode, programme, grade, mode);
+  const url = new URL(req.url);
+  const params: StartParams = {
+    passcode: url.searchParams.get('passcode') ?? undefined,
+    programme: url.searchParams.get('programme') ?? undefined,
+    grade: url.searchParams.get('grade') ?? undefined,
+    mode: url.searchParams.get('mode') ?? undefined,
+  };
+  return doStart(params);
 }
 
-// POST support (what the UI uses)
+// …and POST (JSON body) to avoid 405 from the Start page
 export async function POST(req: NextRequest) {
-  // prefer body, but also allow query-string
-  let passcode = '';
-  let programme = '';
-  let grade = '';
-  let mode = 'core';
-
-  try {
-    const ct = req.headers.get('content-type') || '';
-    if (ct.includes('application/json')) {
-      const body = (await req.json()) as any;
-      passcode = body?.passcode ?? '';
-      programme = body?.programme ?? '';
-      grade = body?.grade ?? '';
-      mode = (body?.mode ?? 'core').toLowerCase();
-    } else if (ct.includes('application/x-www-form-urlencoded')) {
-      const fd = await req.formData();
-      passcode = String(fd.get('passcode') ?? '');
-      programme = String(fd.get('programme') ?? '');
-      grade = String(fd.get('grade') ?? '');
-      mode = String(fd.get('mode') ?? 'core').toLowerCase();
-    }
-  } catch {
-    // fall through to query parsing
-  }
-
-  if (!programme || !grade) {
-    const q = readParams(req);
-    passcode ||= q.passcode;
-    programme ||= q.programme;
-    grade ||= q.grade;
-    mode ||= q.mode;
-  }
-
-  return createSession(passcode, programme, grade, mode);
+  const body = (await req.json().catch(() => ({}))) as StartParams;
+  return doStart(body);
 }
