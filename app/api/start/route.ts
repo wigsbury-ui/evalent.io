@@ -1,176 +1,181 @@
 // app/api/start/route.ts
 import { NextResponse } from 'next/server';
-import { loadBlueprints } from '@/lib/sheets';
-import { supaAdmin } from '@/lib/supa';
+import { db } from '@/lib/db'; // <-- keep your existing db helper
 
-type StartPayload = {
-  passcode?: string;
-  programme?: string;
-  grade?: string | number;
-  mode?: 'easy' | 'core' | 'hard';
-};
+// ---------- helpers ----------
+const PASSCODE = process.env.START_PASSCODE || 'letmein';
+const BLUEPRINTS_CSV_URL = process.env.BLUEPRINTS_CSV_URL || '';
 
-const norm = (s: any) =>
+type CountsBySubject = Record<string, number>;
+type StartOk = { ok: true; session_id: string };
+type StartErr = { ok: false; error: string; detail?: any };
+
+const json = (body: StartOk | StartErr, init?: number) =>
+  NextResponse.json(body, { status: init ?? 200 });
+
+const normalize = (s: unknown) =>
   String(s ?? '')
-    .replace(/\uFEFF/g, '')
-    .replace(/\u00A0/g, ' ')
-    .trim()
-    .toLowerCase();
+    .replace(/\uFEFF/g, '')      // strip BOM
+    .replace(/\u00A0/g, ' ')     // strip NBSP
+    .trim();
 
-const numeric = (v: any) => {
-  const n = Number(String(v ?? '').replace(/[^0-9.\-]/g, ''));
-  return Number.isFinite(n) ? n : NaN;
-};
+const lower = (s: unknown) => normalize(s).toLowerCase();
 
-async function readParams(req: Request): Promise<Required<StartPayload>> {
-  // Accept POST JSON or GET querystring (for manual testing)
-  let passcode = '';
-  let programme = '';
-  let grade = '';
-  let mode: 'easy' | 'core' | 'hard' = 'core';
-
-  // Query first (works for GET)
-  const url = new URL(req.url);
-  passcode = url.searchParams.get('passcode') ?? '';
-  programme = url.searchParams.get('programme') ?? '';
-  grade = url.searchParams.get('grade') ?? '';
-  mode = (url.searchParams.get('mode') as any) ?? mode;
-
-  // Body (overrides query if present)
-  try {
-    const body = (await req.json()) as StartPayload;
-    if (body) {
-      passcode = body.passcode ?? passcode;
-      programme = body.programme ?? programme;
-      grade = (body.grade as any) ?? grade;
-      mode = ((body.mode as any) ?? mode) as any;
+function parseCsvToObjects(csv: string): Array<Record<string, string>> {
+  // very small CSV parser that handles quoted commas & quotes
+  const rows: string[] = [];
+  let cur = '';
+  let q = false;
+  for (let i = 0; i < csv.length; i++) {
+    const c = csv[i];
+    if (c === '"') {
+      if (q && csv[i + 1] === '"') {
+        cur += '"';
+        i++;
+      } else {
+        q = !q;
+      }
+    } else if (c === '\n' && !q) {
+      rows.push(cur);
+      cur = '';
+    } else {
+      cur += c;
     }
-  } catch {
-    // not JSON; ignore
   }
+  if (cur) rows.push(cur);
 
-  // normalize
-  programme = String(programme).trim();
-  grade = String(grade).trim();
-  if (!['easy', 'core', 'hard'].includes(mode)) mode = 'core';
-
-  return { passcode, programme, grade, mode };
-}
-
-// support both GET and POST
-export async function GET(req: Request) {
-  return handleStart(req);
-}
-export async function POST(req: Request) {
-  return handleStart(req);
-}
-
-async function handleStart(req: Request) {
-  const { passcode, programme, grade, mode } = await readParams(req);
-
-  if (!programme || !grade) {
-    return NextResponse.json(
-      { ok: false, error: 'missing_programme_or_grade' },
-      { status: 400 }
-    );
-  }
-
-  // TODO: real passcode check if you need one
-  if (!passcode) {
-    return NextResponse.json(
-      { ok: false, error: 'missing_passcode' },
-      { status: 400 }
-    );
-  }
-
-  // --- Load & filter blueprint rows -----------------------------------------
-  const all = (await loadBlueprints()) as any[];
-
-  const rows = all.filter((r) => {
-    const p = String(r?.programme ?? '').trim();
-    const g = String(r?.grade ?? r?.year ?? '').trim(); // some sheets use "year"
-    return p === programme && g === grade;
-  });
-
-  // --- Build countsBySubject robustly (works with both schemas) --------------
-  const countsBySubject: Record<string, number> = {};
-
-  for (const r of rows) {
-    // subject column can be "subject" or "domains"
-    const subjectKey =
-      Object.keys(r).find((k) => norm(k) === 'subject') ??
-      Object.keys(r).find((k) => norm(k) === 'domains');
-
-    const subject = String(subjectKey ? r[subjectKey] : '').trim();
-    if (!subject) continue;
-
-    // preferred key for chosen mode
-    const modeKey = Object.keys(r).find((k) => norm(k) === `${mode}_count`);
-
-    // fallbacks when mode column is missing/blank
-    const fallbacks = ['total', 'count', 'base_count', 'core', 'easy', 'hard', 'base'];
-
-    let val = NaN;
-
-    if (modeKey) val = numeric(r[modeKey]);
-
-    if (!Number.isFinite(val) || val <= 0) {
-      for (const fk of fallbacks) {
-        const k = Object.keys(r).find((h) => norm(h) === fk);
-        if (!k) continue;
-        const n = numeric(r[k]);
-        if (Number.isFinite(n) && n > 0) {
-          val = n;
-          break;
+  const header = rows.shift() ?? '';
+  const keys = header.split(',').map((h) => normalize(h).toLowerCase());
+  return rows
+    .filter((r) => r.trim().length > 0)
+    .map((r) => {
+      const out: Record<string, string> = {};
+      const cols: string[] = [];
+      // split row by commas respecting quotes (second pass is ok)
+      let cell = '';
+      let qq = false;
+      for (let i = 0; i < r.length; i++) {
+        const c = r[i];
+        if (c === '"') {
+          if (qq && r[i + 1] === '"') {
+            cell += '"';
+            i++;
+          } else {
+            qq = !qq;
+          }
+        } else if (c === ',' && !qq) {
+          cols.push(cell);
+          cell = '';
+        } else {
+          cell += c;
         }
       }
+      cols.push(cell);
+      keys.forEach((k, i) => (out[k] = normalize(cols[i] ?? '')));
+      return out;
+    });
+}
+
+async function loadBlueprintCounts(
+  programme: string,
+  grade: string,
+  mode: 'easy' | 'core' | 'hard'
+): Promise<CountsBySubject> {
+  if (!BLUEPRINTS_CSV_URL) throw new Error('missing_BLUEPRINTS_CSV_URL');
+
+  const res = await fetch(BLUEPRINTS_CSV_URL, { cache: 'no-store' });
+  if (!res.ok) throw new Error(`fetch_blueprints_failed_${res.status}`);
+  const csv = await res.text();
+  const rows = parseCsvToObjects(csv);
+
+  // filter by programme+grade
+  const filtered = rows.filter(
+    (r) => lower(r['programme']) === lower(programme) && normalize(r['grade']) === grade
+  );
+
+  const counts: CountsBySubject = {};
+  for (const r of filtered) {
+    // schema A → subject column; schema B → domains column
+    const subjectKey = r['subject'] ? 'subject' : r['domains'] ? 'domains' : '';
+    const subject = normalize(subjectKey ? r[subjectKey] : '');
+    if (!subject) continue;
+
+    // prefer "<mode>_count"; else "total"
+    const modeKey = `${mode}_count`;
+    const raw = r[modeKey] ?? r['total'] ?? '';
+    const n = Number(String(raw).replace(/[^0-9.\-]/g, ''));
+    if (Number.isFinite(n) && n > 0) counts[subject] = n;
+  }
+  return counts;
+}
+
+function safeMode(v: unknown): 'easy' | 'core' | 'hard' {
+  const m = lower(v);
+  if (m === 'easy' || m === 'core' || m === 'hard') return m;
+  return 'core';
+}
+
+function newToken() {
+  // 24 hex chars is fine for a session token
+  const b = crypto.getRandomValues(new Uint8Array(12));
+  return Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+}
+
+// ---------- handler ----------
+export async function GET(req: Request) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const passcode = searchParams.get('passcode') ?? '';
+    const programme = searchParams.get('programme') ?? '';
+    const grade = searchParams.get('grade') ?? '';
+    const mode = safeMode(searchParams.get('mode'));
+
+    if (!programme || !grade) {
+      return json({ ok: false, error: 'missing_programme_or_grade' }, 400);
+    }
+    if (PASSCODE && passcode !== PASSCODE) {
+      return json({ ok: false, error: 'invalid_passcode' }, 401);
     }
 
-    if (Number.isFinite(val) && val > 0) {
-      countsBySubject[subject] = val;
+    // blueprint → counts per subject
+    const countsBySubject = await loadBlueprintCounts(programme, grade, mode);
+    if (!Object.values(countsBySubject).some((v) => v > 0)) {
+      return json(
+        { ok: false, error: `blueprint_has_no_positive_counts_for_mode_${mode}` },
+        400
+      );
     }
+
+    // session payload
+    const token = newToken();
+
+    // keep your existing shapes for plan/meta as needed
+    const plan = { programme, grade, mode, counts: countsBySubject };
+    const meta = { ua: 'runner', started_at: new Date().toISOString() };
+
+    // IMPORTANT: do NOT send 'status' → let DB default ('active') satisfy CHECK
+    const insertRow = {
+      token,
+      programme,
+      grade,
+      mode,
+      item_index: 0,
+      plan,
+      meta
+    };
+
+    const { data: created, error: cErr } = await db
+      .from('sessions')
+      .insert([insertRow])
+      .select('id')
+      .single();
+
+    if (cErr) {
+      return json({ ok: false, error: 'db_insert_failed', detail: cErr.message }, 500);
+    }
+
+    return json({ ok: true, session_id: created.id });
+  } catch (err: any) {
+    return json({ ok: false, error: 'start_failed', detail: String(err?.message ?? err) }, 500);
   }
-
-  if (!Object.values(countsBySubject).some((v) => v > 0)) {
-    return NextResponse.json(
-      { ok: false, error: `blueprint_has_no_positive_counts_for_mode_${mode}` },
-      { status: 400 }
-    );
-  }
-
-  // --- Create session --------------------------------------------------------
-  const token =
-    (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`)
-      .replace(/-/g, '')
-      .slice(0, 24);
-
-  const db = supaAdmin();
-
-  const plan = {
-    programme,
-    grade,
-    mode,
-    countsBySubject,
-  };
-
-  const { error: iErr } = await db
-    .from('sessions')
-    .insert([
-      {
-        token,
-        item_index: 0,
-        status: 'new',
-        plan,
-        meta: {},
-      },
-    ]);
-
-  if (iErr) {
-    return NextResponse.json(
-      { ok: false, error: 'db_insert_failed', detail: iErr.message },
-      { status: 500 }
-    );
-  }
-
-  return NextResponse.json({ ok: true, token, plan });
 }
