@@ -1,93 +1,104 @@
-// app/api/next-item/route.ts
-export const runtime = 'nodejs';
-import { NextResponse } from 'next/server';
-import { supaAdmin } from '@/lib/supa';
+import { NextRequest, NextResponse } from 'next/server';
+import { supaAdmin } from '@/app/lib/supabase';
+import { loadItems, loadBlueprints, loadAssets, toVimeoEmbedFromShare } from '@/app/lib/sheets';
 
-type ApiOk =
-  | { ok: true; done: true; index: number; total: number }
-  | { ok: true; done: false; index: number; total: number; item: ItemRow };
+export async function GET(req: NextRequest) {
+  const token = req.nextUrl.searchParams.get('token') ?? '';
+  if (!token) return NextResponse.json({ ok: false, error: 'missing token' }, { status: 400 });
 
-type ApiErr = { ok: false; error: string };
+  const { data: session, error: sErr } = await supaAdmin
+    .from('sessions')
+    .select('id, item_index, status, plan, meta')
+    .eq('token', token)
+    .single();
 
-type ItemRow = {
-  id: string;
-  domain: string | null;
-  prompt: string;
-  kind: 'mcq' | 'free';
-  options: string[] | null; // null for free-text
-};
+  if (sErr || !session) return NextResponse.json({ ok: false, error: 'session not found' }, { status: 404 });
 
-export async function GET(req: Request): Promise<Response> {
-  try {
-    const { searchParams } = new URL(req.url);
-    const token = searchParams.get('token');
-    const schoolId = searchParams.get('school_id'); // optional override
+  let index = Number(session.item_index ?? 0);
+  let plan: string[] = Array.isArray(session.plan) ? session.plan : [];
 
-    if (!token) return NextResponse.json<ApiErr>({ ok: false, error: 'missing_token' }, { status: 400 });
+  // Build plan once per session
+  if (!plan.length) {
+    const programme = String(session.meta?.programme ?? 'UK');
+    const grade = String(session.meta?.grade ?? '7');
 
-    const admin = supaAdmin();
+    const [items, blue] = await Promise.all([loadItems(), loadBlueprints()]);
 
-    // 1) Read session
-    const { data: session, error: sErr } = await admin
-      .from('sessions')
-      .select('id, school_id, item_index, status')
-      .eq('token', token)
-      .single();
+    // filter blueprint rows for this programme + grade
+    const needs = blue.filter(b => b.programme === programme && b.grade === grade);
 
-    if (sErr || !session) {
-      return NextResponse.json<ApiErr>({ ok: false, error: sErr?.message ?? 'session_not_found' }, { status: 404 });
-    }
+    const bag: string[] = [];
+    const byKey = (s: string, d: string, t?: string) =>
+      items.filter(i =>
+        i.programme === programme &&
+        i.grade_number === grade &&
+        i.subject === s &&
+        i.difficulty === d &&
+        (t ? i.type === t : true) &&
+        i.active
+      );
 
-    const sid = session.school_id ?? schoolId; // allow override if provided
-    // 2) Count items
-    const { count, error: cErr } = await admin
-      .from('items')
-      .select('id', { count: 'estimated', head: true })
-      .eq('active', true)
-      .or(sid ? `school_id.eq.${sid},school_id.is.null` : 'school_id.is.null'); // serve demo + null-school items
-    if (cErr) return NextResponse.json<ApiErr>({ ok: false, error: cErr.message }, { status: 400 });
-
-    const total = count ?? 0;
-    const index = session.item_index ?? 0;
-
-    if (total === 0) {
-      return NextResponse.json<ApiErr>({ ok: false, error: 'no_items_available' }, { status: 400 });
-    }
-
-    // 3) Done?
-    if (index >= total) {
-      return NextResponse.json<ApiOk>({ ok: true, done: true, index, total });
-    }
-
-    // 4) Fetch the next item (stable order)
-    const { data: rows, error: iErr } = await admin
-      .from('items')
-      .select('id, domain, prompt, kind, options')
-      .eq('active', true)
-      .or(sid ? `school_id.eq.${sid},school_id.is.null` : 'school_id.is.null')
-      .order('created_at', { ascending: true })
-      .range(index, index); // just one
-
-    if (iErr) return NextResponse.json<ApiErr>({ ok: false, error: iErr.message }, { status: 400 });
-    const item = rows?.[0];
-    if (!item) return NextResponse.json<ApiErr>({ ok: false, error: 'item_not_found' }, { status: 404 });
-
-    const shape: ItemRow = {
-      id: item.id,
-      domain: item.domain ?? null,
-      prompt: item.prompt,
-      kind: (item.kind as 'mcq' | 'free') ?? 'mcq',
-      options: item.options ?? null,
+    // for each subject/difficulty, sample that many items (prefer MCQ; include Open if pool is small)
+    const take = (arr: string[], count: number) => {
+      // shuffle
+      for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; }
+      return arr.slice(0, count);
     };
 
-    return NextResponse.json<ApiOk>({
-      ok: true,
-      done: false,
-      index,
-      total,
-      item: shape,
-    });
-  } catch (e: any) {
-    return NextResponse.json<ApiErr>({ ok: false, error: e?.message ?? 'server_error' }, { status: 500 });
+    for (const n of needs) {
+      const wants: Array<{ diff: 'easy'|'core'|'hard'; count: number }> = [
+        { diff: 'easy', count: n.easy_count },
+        { diff: 'core', count: n.core_count },
+        { diff: 'hard', count: n.hard_count },
+      ];
+      for (const w of wants) {
+        if (!w.count) continue;
+        const primary = byKey(n.subject, w.diff, 'MCQ').map(i => i.item_id);
+        let picked = take(primary, w.count);
+
+        if (picked.length < w.count) {
+          const remain = w.count - picked.length;
+          const fallback = byKey(n.subject, w.diff, 'Open')
+            .filter(i => !picked.includes(i.item_id))
+            .map(i => i.item_id);
+          picked = picked.concat(take(fallback, remain));
+        }
+        bag.push(...picked);
+      }
+    }
+
+    plan = bag;
+    await supaAdmin.from('sessions').update({ plan }).eq('id', session.id);
+    index = 0;
   }
+
+  if (index >= plan.length) {
+    return NextResponse.json({ ok: true, done: true, index, total: plan.length });
+  }
+
+  // resolve current item by id
+  const [items, assets] = await Promise.all([loadItems(), loadAssets()]);
+  const item = items.find(i => i.item_id === plan[index]);
+  if (!item) {
+    // skip broken entry
+    await supaAdmin.from('sessions').update({ item_index: index + 1 }).eq('id', session.id);
+    return NextResponse.json({ ok: false, error: 'missing item' }, { status: 500 });
+  }
+
+  const asset = item.video_id ? assets.get(item.video_id) : undefined;
+  const video_embed = asset ? toVimeoEmbedFromShare(asset.share_url ?? null) : null;
+
+  return NextResponse.json({
+    ok: true,
+    index,
+    total: plan.length,
+    item: {
+      id: item.item_id,
+      kind: item.type === 'Open' ? 'free' : 'mcq',
+      domain: item.subject,      // keeps your subject label
+      prompt: item.prompt,
+      options: item.options,
+      video_embed,               // ready-to-iframe Vimeo URL (or null)
+    },
+  });
 }
