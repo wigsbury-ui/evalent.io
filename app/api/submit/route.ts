@@ -1,64 +1,72 @@
 // app/api/submit/route.ts
-export const runtime = 'nodejs';
 import { NextResponse } from 'next/server';
-import { supaAdmin } from '@/lib/supa';
+import { createClient } from '@supabase/supabase-js';
 
-type ApiOk = { ok: true; next_index: number };
-type ApiErr = { ok: false; error: string };
+export const dynamic = 'force-dynamic';
 
-export async function POST(req: Request): Promise<Response> {
+export async function POST(req: Request) {
   try {
-    const body = await req.json().catch(() => ({}));
-    const { token, item_id, kind, selected_index, answer_text, is_correct } = body ?? {};
+    const { token, item_id, kind, selected_index, answer_text } = await req.json();
 
-    if (!token || !item_id || !kind) {
-      return NextResponse.json<ApiErr>({ ok: false, error: 'missing_fields' }, { status: 400 });
+    if (!token || !item_id) {
+      return NextResponse.json({ ok: false, error: 'missing token or item_id' }, { status: 400 });
     }
 
-    // Validate payload by type
-    if (kind === 'mcq' && (selected_index === undefined || selected_index === null)) {
-      return NextResponse.json<ApiErr>({ ok: false, error: 'selected_index_required' }, { status: 400 });
-    }
-    if (kind === 'free' && (typeof answer_text !== 'string')) {
-      return NextResponse.json<ApiErr>({ ok: false, error: 'answer_text_required' }, { status: 400 });
-    }
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+    const sb = createClient(supabaseUrl, serviceKey);
 
-    const admin = supaAdmin();
-
-    // 1) Load session
-    const { data: session, error: sErr } = await admin
+    // Find session (optional but nice to have the id)
+    const { data: session } = await sb
       .from('sessions')
-      .select('id, item_index, status')
+      .select('id, item_index')
       .eq('token', token)
-      .single();
+      .maybeSingle();
 
-    if (sErr || !session) {
-      return NextResponse.json<ApiErr>({ ok: false, error: sErr?.message ?? 'session_not_found' }, { status: 404 });
+    // Load item to compute correctness (for MCQ)
+    const { data: item, error: iErr } = await sb
+      .from('items')
+      .select('id, correct_index, options, kind')
+      .eq('id', item_id)
+      .maybeSingle();
+    if (iErr || !item) {
+      return NextResponse.json({ ok: false, error: iErr?.message || 'item not found' }, { status: 400 });
     }
 
-    // 2) Insert attempt (minimal columns you configured)
-    const attemptPayload: any = {
+    const attemptKind: 'mcq' | 'free' =
+      (kind as 'mcq' | 'free') || (item.kind === 'free' ? 'free' : 'mcq');
+
+    let is_correct: boolean | null = null;
+    if (attemptKind === 'mcq' && typeof selected_index === 'number' && item.correct_index != null) {
+      is_correct = selected_index === item.correct_index;
+    }
+
+    // Insert attempt (accept both session_token and session_id)
+    const payload: any = {
       session_token: token,
+      session_id: session?.id ?? null,
       item_id,
-      is_correct: typeof is_correct === 'boolean' ? is_correct : null,
-      selected_index: kind === 'mcq' ? Number(selected_index) : null,
-      kind,
+      kind: attemptKind,
+      selected_index: attemptKind === 'mcq' ? selected_index ?? null : null,
+      answer_text: attemptKind === 'free' ? (answer_text ?? '') : null,
+      is_correct,
     };
-    if (kind === 'free') attemptPayload.answer_text = answer_text;
 
-    const { error: aErr } = await admin.from('attempts').insert(attemptPayload);
-    if (aErr) return NextResponse.json<ApiErr>({ ok: false, error: aErr.message }, { status: 400 });
+    const { error: aErr } = await sb.from('attempts').insert(payload);
+    if (aErr) {
+      return NextResponse.json({ ok: false, error: aErr.message }, { status: 500 });
+    }
 
-    // 3) Advance session index
-    const nextIdx = (session.item_index ?? 0) + 1;
-    const { error: uErr } = await admin
-      .from('sessions')
-      .update({ item_index: nextIdx, status: 'active', updated_at: new Date().toISOString() })
-      .eq('token', token);
-    if (uErr) return NextResponse.json<ApiErr>({ ok: false, error: uErr.message }, { status: 400 });
+    // (Optional) advance session index server-side
+    if (session?.id != null) {
+      await sb
+        .from('sessions')
+        .update({ item_index: (session.item_index ?? 0) + 1 })
+        .eq('id', session.id);
+    }
 
-    return NextResponse.json<ApiOk>({ ok: true, next_index: nextIdx });
+    return NextResponse.json({ ok: true });
   } catch (e: any) {
-    return NextResponse.json<ApiErr>({ ok: false, error: e?.message ?? 'server_error' }, { status: 500 });
+    return NextResponse.json({ ok: false, error: e?.message || 'unexpected error' }, { status: 500 });
   }
 }
