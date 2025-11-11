@@ -1,197 +1,265 @@
+// app/t/[token]/page.tsx
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useEffect, useState } from 'react';
 
-type ItemRow = {
+type Item = {
   id: string;
-  kind: 'mcq' | 'free';
-  domain: string | null;
-  prompt: string;
-  options?: (string | { text: string })[] | null; // for MCQ
+  domain?: string | null;
+  kind?: 'mcq' | 'free' | string | null;
+  prompt?: string;
+  options?: string[] | null;
+  // video fields come from assets join – we keep both to be safe
+  video_embed?: string | null;
+  video_url?: string | null;
 };
 
-type NextRes =
-  | { ok: true; done: true; index: number; total: number }
-  | { ok: true; done?: false; item: ItemRow; index: number; total: number }
-  | { ok: false; error: string };
+type Params = { params: { token: string } };
 
-export default function TestPage({ params }: { params: { token: string } }) {
+export default function TestRunner({ params }: Params) {
   const token = params.token;
-  const router = useRouter();
 
-  const [item, setItem] = useState<ItemRow | null>(null);
-  const [idx, setIdx] = useState(0);
-  const [total, setTotal] = useState(0);
-  const [err, setErr] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  // answers
+  const [item, setItem] = useState<Item | null>(null);
+  const [index, setIndex] = useState<number>(0);
+  const [total, setTotal] = useState<number>(0);
   const [choice, setChoice] = useState<number | null>(null);
-  const [free, setFree] = useState('');
+  const [free, setFree] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
+  const [err, setErr] = useState<string | null>(null);
 
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      setErr(null);
-      setLoading(true);
-      setItem(null); // prevent rendering stale item (fixes the flash)
-      try {
-        const r = await fetch(`/api/next-item?token=${encodeURIComponent(token)}&t=${Date.now()}`);
-        const j: NextRes = await r.json();
-        if (!alive) return;
-        if (!j.ok) {
-          setErr((j as any).error || 'Failed to fetch item');
-          setLoading(false);
-          return;
-        }
-        if ('done' in j && j.done) {
-          router.replace(`/t/${token}/results`);
-          return;
-        }
-        const ok = j as Extract<NextRes, { ok: true; item: ItemRow }>;
-        setIdx(ok.index + 1);
-        setTotal(ok.total);
-        setItem(ok.item);
-        setChoice(null);
-        setFree('');
-        setLoading(false);
-      } catch (e: any) {
-        if (!alive) return;
-        setErr(e?.message || 'Failed to fetch item');
-        setLoading(false);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [token, router]);
+  // Helpers to keep TS happy without over-constraining API shapes
+  function isOk(x: any): x is { ok: true } {
+    return x && x.ok === true;
+  }
 
-  async function submit() {
-    if (!item) return;
+  function hasDone(x: any): x is { done: boolean } {
+    return x && typeof x.done === 'boolean';
+  }
 
-    setErr(null);
+  function nextUrl(extra: string = '') {
+    const t = Date.now();
+    return `/api/next-item?token=${encodeURIComponent(token)}${extra ? `&${extra}` : ''}&t=${t}`;
+  }
+
+  function resultsUrl() {
+    return `/t/${encodeURIComponent(token)}/results`;
+  }
+
+  async function loadFirst() {
     setLoading(true);
-    setItem(null); // clear immediately so the last question can’t flash again
-
+    setErr(null);
     try {
-      const body: any = {
-        token,
-        item_id: item.id,
-        kind: item.kind,
-      };
-      if (item.kind === 'mcq') body.selected_index = choice;
-      else body.answer_text = free ?? '';
-
-      const r = await fetch('/api/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-      const j = await r.json();
-      if (!j.ok) {
-        setErr(j.error || 'Submit failed');
+      const r = await fetch(nextUrl('first=1'), { cache: 'no-store' });
+      const j: any = await r.json();
+      if (!isOk(j)) {
+        setErr(j?.error ?? 'Failed to fetch first item');
+        setItem(null);
         setLoading(false);
         return;
       }
-
-      // fetch next item
-      const r2 = await fetch(`/api/next-item?token=${encodeURIComponent(token)}&t=${Date.now()}`);
-      const n: NextRes = await r2.json();
-      if (!n.ok) {
-        setErr((n as any).error || 'Failed to fetch next item');
-        setLoading(false);
-        return;
-      }
-      if ('done' in n && n.done) {
-        // Go straight to results — no item to render, so no flash.
-        router.replace(`/t/${token}/results`);
-        return;
-      }
-      const ok = n as Extract<NextRes, { ok: true; item: ItemRow }>;
-      setIdx(ok.index + 1);
-      setTotal(ok.total);
-      setItem(ok.item);
+      setIndex((j.index ?? 0) + 1);
+      setTotal(j.total ?? 0);
+      setItem((j.item ?? null) as Item | null);
       setChoice(null);
       setFree('');
-      setLoading(false);
     } catch (e: any) {
-      setErr(e?.message || 'Unexpected error');
+      setErr(String(e?.message ?? e) || 'Network error');
+      setItem(null);
+    } finally {
       setLoading(false);
     }
   }
 
-  const disabled = loading || !item || (item.kind === 'mcq' && choice == null);
+  useEffect(() => {
+    loadFirst();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token]);
+
+  function currentKind(i: Item | null): 'mcq' | 'free' {
+    if (!i) return 'free';
+    if (i.kind === 'mcq') return 'mcq';
+    if (Array.isArray(i.options) && i.options.length > 0) return 'mcq';
+    return 'free';
+  }
+
+  async function handleSubmit(ev: React.FormEvent) {
+    ev.preventDefault();
+    if (!item || loading) return;
+
+    const kind = currentKind(item);
+    if (kind === 'mcq' && (choice === null || choice === undefined)) return;
+    if (kind === 'free' && !free.trim()) return;
+
+    setLoading(true);
+    setErr(null);
+
+    try {
+      const res = await fetch(`/api/submit?t=${Date.now()}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        cache: 'no-store',
+        body: JSON.stringify({
+          token,
+          item_id: item.id,
+          kind,
+          selected_index: kind === 'mcq' ? choice : null,
+          answer_text: kind === 'free' ? free : null,
+        }),
+      });
+
+      const j: any = await res.json();
+      if (!isOk(j)) {
+        setErr(j?.error ?? 'Submit failed');
+        setLoading(false);
+        return;
+      }
+
+      // If done, go straight to results without flashing another question
+      if (hasDone(j) && j.done) {
+        window.location.assign(resultsUrl());
+        return;
+      }
+
+      // Otherwise, load the next item payload the endpoint returned
+      setIndex((j.index ?? 0) + 1);
+      setTotal(j.total ?? total);
+      setItem((j.item ?? null) as Item | null);
+      setChoice(null);
+      setFree('');
+    } catch (e: any) {
+      setErr(String(e?.message ?? e) || 'Network error');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const kind = currentKind(item);
+  const canSubmit =
+    !loading &&
+    item != null &&
+    ((kind === 'mcq' && choice !== null) || (kind === 'free' && free.trim().length > 0));
+
+  // Build a responsive video embed if provided
+  const videoSrc =
+    (item as any)?.video_embed ||
+    (item as any)?.video_url ||
+    null;
 
   return (
-    <div style={{ maxWidth: 900, margin: '2rem auto', padding: '0 1rem' }}>
-      <h1 style={{ fontSize: '3rem', lineHeight: 1.1, fontWeight: 800 }}>Evalent Test Runner</h1>
-      <p><strong>Token:</strong> {token}</p>
+    <div style={{ maxWidth: 920, margin: '48px auto', padding: '0 20px' }}>
+      <h1 style={{ fontSize: 54, lineHeight: 1.05, margin: 0, fontWeight: 800 }}>
+        Evalent Test Runner
+      </h1>
 
-      {err && <p style={{ color: '#8b1d1d' }}>{err}</p>}
+      <p style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 16 }}>
+        Token: <strong>{token}</strong>
+      </p>
 
-      {loading && (
-        <div
-          style={{
-            padding: '1.5rem',
-            border: '1px solid #ddd',
-            borderRadius: 8,
-            marginTop: '1rem',
-            fontStyle: 'italic',
-          }}
-        >
-          Loading…
-        </div>
+      {err && (
+        <p style={{ color: '#a13127', fontSize: 20, marginTop: 6 }}>
+          {err}
+        </p>
       )}
 
-      {!loading && item && (
-        <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: '1.25rem', marginTop: '1rem' }}>
-          <p style={{ marginTop: 0 }}>{idx} of {total} • {item.domain ?? 'General'}</p>
-          <h2 style={{ marginTop: 0 }}>{item.prompt}</h2>
-
-          {item.kind === 'mcq' ? (
-            <div style={{ display: 'flex', gap: '1.25rem', flexWrap: 'wrap', marginTop: '0.75rem' }}>
-              {(item.options ?? []).map((opt, i) => {
-                const label = typeof opt === 'string' ? opt : (opt?.text ?? String(opt));
-                return (
-                  <label key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                    <input
-                      type="radio"
-                      name="mcq"
-                      checked={choice === i}
-                      onChange={() => setChoice(i)}
-                    />
-                    <span>{label}</span>
-                  </label>
-                );
-              })}
-            </div>
-          ) : (
-            <textarea
-              value={free}
-              onChange={(e) => setFree(e.target.value)}
-              rows={5}
-              style={{ width: '100%', marginTop: '0.75rem' }}
-            />
-          )}
-
-          <button
-            onClick={submit}
-            disabled={disabled}
+      {!item ? (
+        <div style={{ marginTop: 24 }}>Loading…</div>
+      ) : (
+        <form onSubmit={handleSubmit}>
+          <div
             style={{
-              marginTop: '1rem',
-              padding: '0.6rem 1rem',
-              borderRadius: 8,
-              border: '1px solid #2b50a2',
-              background: disabled ? '#c7d2fe' : '#3b5ccc',
-              color: '#fff',
-              cursor: disabled ? 'not-allowed' : 'pointer',
-              boxShadow: '0 2px 0 rgba(0,0,0,0.1)'
+              marginTop: 12,
+              padding: 24,
+              border: '1px solid #e5e7eb',
+              borderRadius: 12,
+              background: '#fff',
             }}
           >
-            Submit
-          </button>
-        </div>
+            <div style={{ color: '#374151', marginBottom: 12, fontSize: 18 }}>
+              {index} of {total} • {item.domain ?? 'General'}
+            </div>
+
+            {/* Prompt */}
+            <h2 style={{ fontSize: 36, lineHeight: 1.25, margin: '8px 0 12px', fontWeight: 800 }}>
+              {item.prompt ?? ''}
+            </h2>
+
+            {/* Video (optional) */}
+            {videoSrc && (
+              <div style={{ marginTop: 12 }}>
+                <div
+                  style={{
+                    position: 'relative',
+                    paddingBottom: '56.25%',
+                    height: 0,
+                    overflow: 'hidden',
+                    borderRadius: 12,
+                    border: '1px solid #e5e7eb',
+                  }}
+                >
+                  <iframe
+                    src={videoSrc as string}
+                    allow="autoplay; fullscreen; picture-in-picture"
+                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 0 }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Answer UI */}
+            {kind === 'mcq' ? (
+              <div style={{ marginTop: 18, fontSize: 22 }}>
+                {(item.options ?? []).map((opt, i) => (
+                  <label key={i} style={{ display: 'inline-flex', alignItems: 'center', marginRight: 20, marginBottom: 10 }}>
+                    <input
+                      type="radio"
+                      name="answer"
+                      value={i}
+                      checked={choice === i}
+                      onChange={() => setChoice(i)}
+                      style={{ marginRight: 8, width: 18, height: 18 }}
+                    />
+                    <span>{opt}</span>
+                  </label>
+                ))}
+              </div>
+            ) : (
+              <div style={{ marginTop: 18 }}>
+                <textarea
+                  value={free}
+                  onChange={(e) => setFree(e.target.value)}
+                  rows={6}
+                  style={{
+                    width: '100%',
+                    fontSize: 18,
+                    padding: 12,
+                    borderRadius: 10,
+                    border: '1px solid #d1d5db',
+                    resize: 'vertical',
+                  }}
+                  placeholder="Type your response…"
+                />
+              </div>
+            )}
+
+            <div style={{ marginTop: 18 }}>
+              <button
+                type="submit"
+                disabled={!canSubmit}
+                style={{
+                  padding: '10px 16px',
+                  fontSize: 18,
+                  borderRadius: 10,
+                  background: canSubmit ? '#3b82f6' : '#9ca3af',
+                  color: '#fff',
+                  border: 'none',
+                  cursor: canSubmit ? 'pointer' : 'not-allowed',
+                }}
+              >
+                {loading ? 'Submitting…' : 'Submit'}
+              </button>
+            </div>
+          </div>
+        </form>
       )}
     </div>
   );
