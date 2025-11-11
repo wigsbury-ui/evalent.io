@@ -1,110 +1,130 @@
 // app/api/start/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { supaAdmin } from '@/app/lib/supa';
-import { loadBlueprints } from '@/app/lib/sheets';
-import { randomUUID } from 'crypto';
+import { NextRequest, NextResponse } from 'next/server'
+import { supaAdmin } from '@/app/lib/supa'
+import { loadBlueprints } from '@/app/lib/sheets'
 
-type CountsBySubject = Record<string, number>;
+type Mode = 'easy' | 'core' | 'hard'
 
-const norm = (v: any) =>
-  String(v ?? '')
+function norm(s: unknown) {
+  return String(s ?? '')
     .replace(/\uFEFF/g, '')   // BOM
-    .replace(/\u00A0/g, ' ')   // nbsp
+    .replace(/\u00A0/g, ' ')  // nbsp
     .trim()
-    .toLowerCase();
+}
 
-export async function GET(req: NextRequest) {
-  try {
-    const sp = req.nextUrl.searchParams;
+function normKey(s: unknown) {
+  return norm(s).toLowerCase()
+}
 
-    const passcode = sp.get('passcode') ?? '';
-    const programme = sp.get('programme') ?? '';
-    const grade = sp.get('grade') ?? '';
-    const mode = (sp.get('mode') ?? 'core').toLowerCase();
+function num(val: unknown) {
+  const n = Number(String(val ?? '').replace(/[^0-9.\-]/g, ''))
+  return Number.isFinite(n) ? n : 0
+}
 
-    if (!programme || !grade) {
-      return NextResponse.json(
-        { ok: false, error: 'missing_programme_or_grade' },
-        { status: 400 }
-      );
-    }
+async function handle(req: NextRequest) {
+  // --- 1) Read inputs (support GET and POST) -------------------------------
+  let passcode = ''
+  let programme = ''
+  let grade = ''
+  let mode: Mode = 'core'
 
-    const expected =
-      process.env.NEXT_PUBLIC_START_PASSCODE ?? process.env.START_PASSCODE ?? '';
-    if (!expected || passcode !== expected) {
-      return NextResponse.json(
-        { ok: false, error: 'invalid_passcode' },
-        { status: 401 }
-      );
-    }
+  if (req.method === 'GET') {
+    const sp = req.nextUrl.searchParams
+    passcode = norm(sp.get('passcode'))
+    programme = norm(sp.get('programme'))
+    grade = norm(sp.get('grade'))
+    mode = (norm(sp.get('mode')).toLowerCase() as Mode) || 'core'
+  } else if (req.method === 'POST') {
+    const body = await req.json().catch(() => ({} as any))
+    passcode = norm(body.passcode)
+    programme = norm(body.programme)
+    grade = norm(body.grade)
+    mode = (norm(body.mode).toLowerCase() as Mode) || 'core'
+  } else {
+    return NextResponse.json({ ok: false, error: 'method_not_allowed' }, { status: 405 })
+  }
 
-    // --------- Load & filter blueprint rows ---------
-    const bps = await loadBlueprints();
-    const rows = (bps as any[]).filter(
-      (r) =>
-        norm(r.programme) === norm(programme) &&
-        String(r.grade ?? '').trim() === String(grade).trim()
-    );
+  if (!programme || !grade) {
+    return NextResponse.json({ ok: false, error: 'missing_programme_or_grade' }, { status: 400 })
+  }
 
-    // --------- Build counts map (supports both schemas) ---------
-    const countsBySubject: CountsBySubject = {};
+  const expected = process.env.START_PASSCODE ? norm(process.env.START_PASSCODE) : 'letmein'
+  if (!passcode || norm(passcode) !== expected) {
+    return NextResponse.json({ ok: false, error: 'bad_passcode' }, { status: 401 })
+  }
 
-    for (const row of rows) {
-      // subject: either "subject" (old) or "domains" (new)
-      const subjectKey =
-        Object.keys(row).find((k) => norm(k) === 'subject') ??
-        Object.keys(row).find((k) => norm(k) === 'domains');
+  // --- 2) Load blueprint rows ---------------------------------------------
+  const rows = await loadBlueprints()
 
-      const subject = String(subjectKey ? row[subjectKey] : '').trim();
-      if (!subject) continue;
+  // filter the right programme+grade
+  const filtered = rows.filter((r: any) => {
+    const rProg =
+      r.programme ?? r.Programme ?? r.PROGRAMME ?? r.program ?? r.Program ?? r.PROGRAM
+    const rGrade = r.grade ?? r.Grade ?? r.GRADE
+    return norm(rProg).toLowerCase() === programme.toLowerCase() && norm(rGrade) === grade
+  })
 
-      // count: either "<mode>_count" (old) or "total" (new)
-      const modeKey = Object.keys(row).find((k) => norm(k) === `${mode}_count`);
-      const totalKey = Object.keys(row).find((k) => norm(k) === 'total');
+  // --- 3) Build countsBySubject (two schemas supported) --------------------
+  const countsBySubject: Record<string, number> = {}
 
-      const raw = modeKey ? row[modeKey] : totalKey ? row[totalKey] : undefined;
-      const n = Number(String(raw ?? '').replace(/[^0-9.\-]/g, ''));
+  for (const r of filtered) {
+    // subject column can be "subject" or "domains"
+    const subjectKey =
+      Object.keys(r).find((k) => normKey(k) === 'subject') ??
+      Object.keys(r).find((k) => normKey(k) === 'domains')
 
-      if (Number.isFinite(n) && n > 0) countsBySubject[subject] = n;
-    }
+    if (!subjectKey) continue
+    const subject = norm(r[subjectKey])
+    if (!subject) continue
 
-    if (!Object.values(countsBySubject).some((v) => v > 0)) {
-      return NextResponse.json(
-        { ok: false, error: `blueprint_has_no_positive_counts_for_mode_${mode}` },
-        { status: 400 }
-      );
-    }
+    // primary: <mode>_count; fallback: total
+    const modeKey = Object.keys(r).find((k) => normKey(k) === `${mode}_count`)
+    const totalKey = Object.keys(r).find((k) => normKey(k) === 'total')
+    const raw = modeKey ? r[modeKey] : totalKey ? r[totalKey] : undefined
+    const n = num(raw)
 
-    // --------- Create a session in Supabase ---------
-    const token = randomUUID().replace(/-/g, '').slice(0, 24);
-    const plan = {
-      programme,
-      grade,
-      mode,
-      countsBySubject,
-    };
+    if (n > 0) countsBySubject[subject] = n
+  }
 
-    const db = supaAdmin(); // NOTE: call the function to get the client
-    const { error: insErr } = await db.from('sessions').insert({
+  if (!Object.values(countsBySubject).some((v) => v > 0)) {
+    return NextResponse.json(
+      { ok: false, error: `blueprint_has_no_positive_counts_for_mode_${mode}` },
+      { status: 400 }
+    )
+  }
+
+  // --- 4) Create a session -------------------------------------------------
+  const token = crypto.randomUUID()
+
+  const plan = {
+    programme,
+    grade,
+    mode,
+    countsBySubject, // { English: 4, Mathematics: 4, Reasoning: 4 } etc.
+  }
+
+  const { error: insErr } = await supaAdmin()
+    .from('sessions')
+    .insert({
       token,
       item_index: 0,
       status: 'active',
       plan,
-      meta: { programme, grade, mode },
-    } as any);
+      meta: { programme, grade, mode, t: Date.now() },
+    })
 
-    if (insErr) {
-      return NextResponse.json(
-        { ok: false, error: `db_insert_failed:${insErr.message}` },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json({ ok: true, token, plan });
-  } catch (e: any) {
-    return NextResponse.json(
-      { ok: false, error: `start_route_exception:${e?.message ?? e}` },
-      { status: 500 }
-    );
+  if (insErr) {
+    return NextResponse.json({ ok: false, error: 'db_insert_failed', detail: insErr.message }, { status: 500 })
   }
+
+  const start_url = `/t/${token}`
+  return NextResponse.json({ ok: true, token, start_url })
+}
+
+export async function GET(req: NextRequest) {
+  return handle(req)
+}
+
+export async function POST(req: NextRequest) {
+  return handle(req)
 }
