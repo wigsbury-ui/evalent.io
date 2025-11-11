@@ -1,63 +1,73 @@
-// app/t/[token]/page.tsx
 'use client';
+
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
-import { useEffect, useState } from 'react';
+type Params = { params: { token: string } };
 
-type ItemRow = { id: string; domain: string | null; prompt: string; kind: 'mcq' | 'free'; options: string[] | null };
+type ItemRow = {
+  id: string;
+  kind: 'mcq' | 'free';
+  domain: string | null;
+  prompt: string;
+  options?: string[] | null; // present for MCQ
+};
 
-type NextOkDone = { ok: true; done: true; index: number; total: number };
-type NextOkItem = { ok: true; done: false; index: number; total: number; item: ItemRow };
-type NextOk = NextOkDone | NextOkItem;
-type NextErr = { ok: false; error: string };
+type NextRes =
+  | {
+      ok: true;
+      done?: boolean; // when true, no more items
+      index: number;  // 0-based index of current/last
+      total: number;  // total items in session
+      item?: ItemRow; // present when not done
+    }
+  | { ok: false; error: string };
 
-function hasItem(x: NextOk): x is NextOkItem {
-  return (x as NextOkItem).done === false && 'item' in (x as any);
-}
-
-export default function Runner({ params }: { params: { token: string } }) {
+export default function TestRunnerPage({ params }: Params) {
+  const router = useRouter();
   const token = params.token;
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState<string | null>(null);
+
   const [idx, setIdx] = useState(0);
   const [total, setTotal] = useState(0);
   const [item, setItem] = useState<ItemRow | null>(null);
   const [choice, setChoice] = useState<number | null>(null);
-  const [free, setFree] = useState('');
+  const [free, setFree] = useState<string>('');
+  const [err, setErr] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   async function loadNext() {
     setLoading(true);
     setErr(null);
     try {
-      const res = await fetch(`/api/next-item?token=${encodeURIComponent(token)}`);
-      const json: NextOk | NextErr = await res.json();
+      const res = await fetch(
+        `/api/next-item?token=${encodeURIComponent(token)}&t=${Date.now()}`,
+        { cache: 'no-store' }
+      );
+      const j: NextRes = await res.json();
 
-      if (!('ok' in json) || (json as any).ok !== true) {
-        setErr((json as NextErr).error ?? 'Failed to load');
+      if (!j.ok) {
+        setErr(j.error || 'Failed to fetch next item');
         setItem(null);
+        setLoading(false);
         return;
       }
 
-      const ok = json as NextOk;
-
-      if (ok.done) {
-        window.location.href = `/results?token=${encodeURIComponent(token)}`;
+      // finished?
+      if (j.done) {
+        router.replace(`/t/${token}/results`);
         return;
       }
 
-      if (hasItem(ok)) {
-        setIdx(ok.index + 1);
-        setTotal(ok.total);
-        setItem(ok.item);
-        setChoice(null);
-        setFree('');
-      } else {
-        setErr('unexpected_response');
-        setItem(null);
-      }
+      setIdx(j.index + 1); // display as 1-based
+      setTotal(j.total);
+      setItem(j.item!);
+      setChoice(null);
+      setFree('');
     } catch (e: any) {
-      setErr(e?.message ?? 'network_error');
+      setErr(e?.message || 'Network error');
       setItem(null);
     } finally {
       setLoading(false);
@@ -67,60 +77,98 @@ export default function Runner({ params }: { params: { token: string } }) {
   useEffect(() => {
     loadNext();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [token]);
 
-  async function onSubmit() {
-    if (!item) return;
-    const payload: any = { token, item_id: item.id, kind: item.kind };
-    if (item.kind === 'mcq') {
-      if (choice === null) return setErr('choose_an_option');
-      payload.selected_index = choice;
-    } else {
-      payload.answer_text = free;
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!item || submitting) return;
+
+    // guard: require an answer
+    if (item.kind === 'mcq' && (choice === null || choice === undefined)) {
+      setErr('Please select an option.');
+      return;
     }
-    setLoading(true);
+    if (item.kind === 'free' && !free.trim()) {
+      setErr('Please enter an answer.');
+      return;
+    }
+
+    setSubmitting(true);
     setErr(null);
     try {
+      const payload =
+        item.kind === 'mcq'
+          ? {
+              token,
+              item_id: item.id,
+              kind: 'mcq' as const,
+              selected_index: choice,
+            }
+          : {
+              token,
+              item_id: item.id,
+              kind: 'free' as const,
+              answer_text: free,
+            };
+
       const res = await fetch('/api/submit', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify(payload),
+        cache: 'no-store',
       });
-      const json = await res.json();
-      if (!json?.ok) {
-        setErr(json?.error ?? 'submit_failed');
-        setLoading(false);
+      const j = await res.json();
+
+      if (j?.ok && j?.done) {
+        router.replace(`/t/${token}/results`);
         return;
       }
+      if (!j?.ok && j?.error) {
+        setErr(j.error);
+        return;
+      }
+
+      // load the next item
       await loadNext();
     } catch (e: any) {
-      setErr(e?.message ?? 'submit_failed');
+      setErr(e?.message || 'Submit failed');
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   }
 
-  if (loading && !item) return <div style={{ padding: 24 }}>Loading…</div>;
-
   return (
-    <div style={{ padding: '32px 24px', maxWidth: 900 }}>
-      <h1 style={{ fontSize: 48, lineHeight: 1.05, marginBottom: 8 }}>Evalent Test Runner</h1>
-      <div style={{ marginBottom: 16, fontFamily: 'monospace' }}>Token: {token}</div>
-      {err && <div style={{ color: '#b91c1c', marginBottom: 12 }}>{err}</div>}
-      {item && (
-        <div style={{ border: '1px solid #ddd', borderRadius: 8, padding: 16 }}>
-          <div style={{ marginBottom: 8 }}>
-            {idx} of {total} • {item.domain ?? 'General'}
+    <main style={{ maxWidth: 900, margin: '40px auto', padding: '0 20px' }}>
+      <h1 style={{ fontSize: 56, lineHeight: 1.05, marginBottom: 8 }}>
+        Evalent Test Runner
+      </h1>
+      <p style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace' }}>
+        Token: <strong>{token}</strong>
+      </p>
+
+      {err && (
+        <div style={{ color: '#a11', fontSize: 18, margin: '12px 0' }}>{err}</div>
+      )}
+
+      {loading && <div style={{ fontSize: 18 }}>Loading…</div>}
+
+      {!loading && item && (
+        <form onSubmit={handleSubmit} style={{ marginTop: 16 }}>
+          <div style={{ fontSize: 20, color: '#444', marginBottom: 12 }}>
+            {idx} of {total} • {item.domain || 'General'}
           </div>
-          <h2 style={{ fontSize: 36, lineHeight: 1.2 }}>{item.prompt}</h2>
+
+          <h2 style={{ fontSize: 40, lineHeight: 1.2, margin: '8px 0 18px' }}>
+            {item.prompt}
+          </h2>
 
           {item.kind === 'mcq' ? (
-            <div style={{ marginTop: 16 }}>
-              {(item.options ?? []).map((opt, i) => (
-                <label key={i} style={{ marginRight: 16, fontSize: 24 }}>
+            <div style={{ margin: '8px 0 18px' }}>
+              {(item.options || []).map((opt, i) => (
+                <label key={i} style={{ marginRight: 16, fontSize: 22 }}>
                   <input
                     type="radio"
-                    name="opt"
+                    name="mcq"
                     checked={choice === i}
                     onChange={() => setChoice(i)}
                     style={{ marginRight: 8 }}
@@ -130,21 +178,42 @@ export default function Runner({ params }: { params: { token: string } }) {
               ))}
             </div>
           ) : (
-            <textarea
-              value={free}
-              onChange={(e) => setFree(e.target.value)}
-              rows={5}
-              style={{ width: '100%', marginTop: 12 }}
-            />
+            <div style={{ marginBottom: 18 }}>
+              <textarea
+                value={free}
+                onChange={(e) => setFree(e.target.value)}
+                rows={6}
+                style={{ width: '100%', fontSize: 18, padding: 12 }}
+                placeholder="Type your answer…"
+              />
+            </div>
           )}
 
-          <div style={{ marginTop: 16 }}>
-            <button onClick={onSubmit} disabled={loading} style={{ fontSize: 20, padding: '8px 16px' }}>
-              Submit
-            </button>
-          </div>
-        </div>
+          <button
+            type="submit"
+            disabled={
+              submitting ||
+              (item.kind === 'mcq' ? choice === null : !free.trim())
+            }
+            style={{
+              padding: '10px 18px',
+              fontSize: 18,
+              borderRadius: 6,
+              border: '1px solid #2b50d9',
+              background: '#3b5bfd',
+              color: 'white',
+              cursor: 'pointer',
+              opacity:
+                submitting ||
+                (item.kind === 'mcq' ? choice === null : !free.trim())
+                  ? 0.6
+                  : 1,
+            }}
+          >
+            {submitting ? 'Submitting…' : 'Submit'}
+          </button>
+        </form>
       )}
-    </div>
+    </main>
   );
 }
