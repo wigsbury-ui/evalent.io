@@ -1,52 +1,78 @@
 // app/api/start/route.ts
-export const runtime = 'nodejs';
+import { NextRequest, NextResponse } from 'next/server';
+import { supaAdmin } from '@/app/lib/supa';
+import { loadBlueprints } from '@/app/lib/sheets';
+import crypto from 'crypto';
 
-import { NextResponse } from 'next/server';
-import { supaAdmin } from '@/lib/supa';
+/**
+ * Build a per-session plan from the Blueprints CSV.
+ * We don’t change any column names. We only read:
+ * programme, grade, subject, base_count, easy_count, core_count, hard_count
+ */
+async function buildPlan(programme: string, grade: string, mode: string) {
+  const blue = await loadBlueprints();
+  const gradeNum = String(grade).trim();
 
-// One place to read the passcode (keep it server-only if you can)
-// You currently store NEXT_PUBLIC_START_PASSCODE, so read that:
-const PASSCODE = process.env.NEXT_PUBLIC_START_PASSCODE || 'letmein';
-const DEFAULT_SCHOOL_ID = process.env.DEFAULT_SCHOOL_ID;
+  // rows matching programme + grade (exact string match, case-insensitive on programme)
+  const rows = blue.filter(
+    r =>
+      String(r.programme || '').toLowerCase() === programme.toLowerCase() &&
+      String(r.grade || '') === gradeNum
+  );
 
-function makeToken(): string {
-  return Math.random().toString(16).slice(2) + Math.random().toString(16).slice(2);
+  const key = `${mode}_count`; // e.g. 'core_count'
+  const countsBySubject: Record<string, number> = {};
+  let total = 0;
+
+  for (const r of rows) {
+    const subject = String(r.subject || '').trim();
+    const n = Number(r[key] ?? 0);
+    if (!subject || !Number.isFinite(n) || n <= 0) continue;
+    countsBySubject[subject] = n;
+    total += n;
+  }
+
+  return {
+    programme,
+    grade: gradeNum,
+    mode,
+    total,
+    countsBySubject, // { English: 4, Mathematics: 4, Reasoning: 4 } for UK/3/core
+  };
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const { passcode } = (await req.json().catch(() => ({}))) as { passcode?: string };
+    const url = new URL(req.url);
+    const programme = url.searchParams.get('programme') ?? 'UK';
+    const grade = url.searchParams.get('grade') ?? '';
+    const mode = (url.searchParams.get('mode') ?? 'core').toLowerCase();
 
-    if (!passcode) {
-      return NextResponse.json({ ok: false, error: 'missing_passcode' }, { status: 400 });
-    }
-    if (passcode !== PASSCODE) {
-      return NextResponse.json({ ok: false, error: 'bad_passcode' }, { status: 401 });
-    }
-    if (!DEFAULT_SCHOOL_ID) {
-      return NextResponse.json({ ok: false, error: 'missing_DEFAULT_SCHOOL_ID' }, { status: 500 });
-    }
+    // Optional passcode in body (we don't validate here)
+    const _ = await req.json().catch(() => ({}));
 
-    const token = makeToken();
+    const plan = await buildPlan(programme, grade, mode);
 
-    // create session with safe defaults
-    const { data, error } = await supaAdmin()
+    // Create session
+    const token = crypto.randomBytes(16).toString('hex');
+    const db = supaAdmin();
+
+    const { error: sErr } = await db
       .from('sessions')
       .insert({
         token,
-        school_id: DEFAULT_SCHOOL_ID,
-        item_index: 0,
         status: 'active',
-      })
-      .select('id')
-      .single();
+        item_index: 0,
+        plan,                 // <— save the blueprint-driven plan here
+        meta: { programme, grade, mode },
+      });
 
-    if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    if (sErr) {
+      return NextResponse.json({ ok: false, error: sErr.message }, { status: 400 });
     }
 
-    return NextResponse.json({ ok: true, token, session_id: data?.id ?? null });
+    return NextResponse.json({ ok: true, token });
   } catch (e: any) {
-    return NextResponse.json({ ok: false, error: String(e?.message || e) }, { status: 500 });
+    return NextResponse.json({ ok: false, error: e?.message || 'start_failed' }, { status: 500 });
   }
 }
