@@ -5,25 +5,29 @@ import { useRouter } from 'next/navigation';
 
 export const dynamic = 'force-dynamic';
 
-type Params = { params: { token: string } };
-
 type ItemRow = {
   id: string;
   kind: 'mcq' | 'free';
   domain: string | null;
   prompt: string;
-  options?: string[] | null; // present for MCQ
+  options?: string[] | null;
 };
 
-type NextRes =
-  | {
-      ok: true;
-      done?: boolean; // when true, no more items
-      index: number;  // 0-based index of current/last
-      total: number;  // total items in session
-      item?: ItemRow; // present when not done
-    }
-  | { ok: false; error: string };
+type NextOk = {
+  ok: true;
+  done?: boolean;
+  index: number;
+  total: number;
+  item?: ItemRow;
+};
+type NextErr = { ok: false; error: string };
+type NextRes = NextOk | NextErr;
+
+function isErr(res: NextRes): res is NextErr {
+  return res.ok === false;
+}
+
+type Params = { params: { token: string } };
 
 export default function TestRunnerPage({ params }: Params) {
   const router = useRouter();
@@ -48,20 +52,19 @@ export default function TestRunnerPage({ params }: Params) {
       );
       const j: NextRes = await res.json();
 
-      if (!j.ok) {
+      if (isErr(j)) {
         setErr(j.error || 'Failed to fetch next item');
         setItem(null);
         setLoading(false);
         return;
       }
 
-      // finished?
       if (j.done) {
         router.replace(`/t/${token}/results`);
         return;
       }
 
-      setIdx(j.index + 1); // display as 1-based
+      setIdx(j.index + 1);
       setTotal(j.total);
       setItem(j.item!);
       setChoice(null);
@@ -83,7 +86,6 @@ export default function TestRunnerPage({ params }: Params) {
     e.preventDefault();
     if (!item || submitting) return;
 
-    // guard: require an answer
     if (item.kind === 'mcq' && (choice === null || choice === undefined)) {
       setErr('Please select an option.');
       return;
@@ -117,18 +119,17 @@ export default function TestRunnerPage({ params }: Params) {
         body: JSON.stringify(payload),
         cache: 'no-store',
       });
-      const j = await res.json();
+      const j: { ok: boolean; done?: boolean; error?: string } = await res.json();
 
-      if (j?.ok && j?.done) {
+      if (!j.ok) {
+        setErr(j.error || 'Submit failed');
+        return;
+      }
+      if (j.done) {
         router.replace(`/t/${token}/results`);
         return;
       }
-      if (!j?.ok && j?.error) {
-        setErr(j.error);
-        return;
-      }
 
-      // load the next item
       await loadNext();
     } catch (e: any) {
       setErr(e?.message || 'Submit failed');
