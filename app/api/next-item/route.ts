@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
     const gstr = (v: unknown) => String(v ?? '').trim(); // grade: compare as string
 
     // Filter by programme, grade, and allowed subjects
-    const candidates = allItems.filter((row: any) =>
+    const candidates = (allItems as any[]).filter((row: any) =>
       norm(row?.programme) === norm(programme) &&
       gstr(row?.grade) === gstr(grade) &&
       allowedSubjects.has(norm(row?.subject))
@@ -136,8 +136,15 @@ export async function GET(req: NextRequest) {
     // 6) Optional: attach video (from Assets; vimeo share → embed)
     let video_embed: string | undefined;
     try {
-      const assets = await loadAssets();
-      const a = assets.find((x: any) => String(x.item_id ?? '') === String(chosen.id ?? ''));
+      const assetsMaybe = await loadAssets();
+      // Normalize to an array in case typings say it's a single object
+      const assetsArr = Array.isArray(assetsMaybe)
+        ? (assetsMaybe as any[])
+        : (assetsMaybe ? [assetsMaybe as any] : []);
+
+      const a = assetsArr.find(
+        (x: any) => String(x?.item_id ?? '') === String(chosen?.id ?? '')
+      );
       const vimeo = toVimeoEmbedFromShare(a?.share_url || a?.video_url || '');
       if (vimeo) video_embed = vimeo;
     } catch {
