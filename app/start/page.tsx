@@ -1,3 +1,31 @@
+// app/start/page.tsx
+import { Suspense } from "react";
+
+export const dynamic = "force-dynamic"; // avoid static prerender of a page that uses useSearchParams
+export const revalidate = 0;
+
+function Loading() {
+  return (
+    <main style={{ maxWidth: 920, margin: "72px auto", padding: "0 24px" }}>
+      <h1 style={{ fontSize: 56, lineHeight: 1.1, marginBottom: 28 }}>Start a Test</h1>
+      <div>Loading…</div>
+    </main>
+  );
+}
+
+function PageShell() {
+  return (
+    <Suspense fallback={<Loading />}>
+      <StartForm />
+    </Suspense>
+  );
+}
+
+export default function Page() {
+  return <PageShell />;
+}
+
+/* -------------------- Client component -------------------- */
 "use client";
 
 import * as React from "react";
@@ -13,7 +41,7 @@ const MODES: { value: Mode; label: string }[] = [
   { value: "hard", label: "Hard" },
 ];
 
-export default function StartPage() {
+export function StartForm() {
   const router = useRouter();
   const sp = useSearchParams();
 
@@ -24,22 +52,20 @@ export default function StartPage() {
   const [err, setErr] = React.useState<string>("");
   const [loading, setLoading] = React.useState(false);
 
-  // allow prefill: /start?programme=UK&grade=3&mode=core
+  // Allow prefill by URL: /start?programme=UK&grade=3&mode=core
   React.useEffect(() => {
-    const p = (sp.get("programme") || "").toUpperCase();
+    const p = (sp.get("programme") || "").trim().toUpperCase();
     const g = (sp.get("grade") || "").trim();
     const m = (sp.get("mode") || "").trim().toLowerCase() as Mode;
-
-    if (p && PROGRAMMES.includes(p as any)) setProgramme(p);
-    if (g && GRADES.includes(g as any)) setGrade(g);
-    if (["core", "easy", "hard"].includes(m)) setMode(m);
+    if (p && (PROGRAMMES as readonly string[]).includes(p)) setProgramme(p);
+    if (g && (GRADES as readonly string[]).includes(g)) setGrade(g);
+    if (m && (["core", "easy", "hard"] as const).includes(m)) setMode(m);
   }, [sp]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr("");
     setLoading(true);
-
     try {
       const qs = new URLSearchParams({
         passcode,
@@ -51,13 +77,14 @@ export default function StartPage() {
       const res = await fetch(`/api/start?${qs}`, { cache: "no-store" });
       const data = await res.json();
 
-      if (!res.ok || !data?.ok || !data?.session?.token) {
+      if (!res.ok || !data?.ok || !data?.token) {
         setErr(data?.error || "start_failed");
         return;
       }
 
-      router.push(`/run?t=${encodeURIComponent(data.session.token)}`);
-    } catch {
+      // Navigate to runner with token
+      router.push(`/run?t=${encodeURIComponent(data.token)}`);
+    } catch (e: any) {
       setErr("start_failed");
     } finally {
       setLoading(false);
@@ -66,9 +93,7 @@ export default function StartPage() {
 
   return (
     <main style={{ maxWidth: 920, margin: "72px auto", padding: "0 24px" }}>
-      <h1 style={{ fontSize: 56, lineHeight: 1.1, marginBottom: 28 }}>
-        Start a Test
-      </h1>
+      <h1 style={{ fontSize: 56, lineHeight: 1.1, marginBottom: 28 }}>Start a Test</h1>
 
       <form onSubmit={onSubmit}>
         <input
@@ -80,28 +105,20 @@ export default function StartPage() {
           style={{
             width: "100%",
             height: 64,
-            fontSize: 24,
+            fontSize: 28,
             padding: "0 16px",
-            borderRadius: 10,
-            border: "1px solid #d0d0d0",
-            outline: "none",
+            borderRadius: 8,
+            border: "1px solid #ccc",
             marginBottom: 16,
           }}
         />
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr 1fr",
-            gap: 12,
-            marginBottom: 16,
-          }}
-        >
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
           <select
             value={programme}
             onChange={(e) => setProgramme(e.target.value)}
             aria-label="Programme"
-            style={{ height: 52, fontSize: 18, padding: "0 12px" }}
+            style={{ height: 52, fontSize: 18, borderRadius: 8, border: "1px solid #ccc", padding: "0 12px" }}
           >
             {PROGRAMMES.map((p) => (
               <option key={p} value={p}>
@@ -114,7 +131,7 @@ export default function StartPage() {
             value={grade}
             onChange={(e) => setGrade(e.target.value)}
             aria-label="Grade"
-            style={{ height: 52, fontSize: 18, padding: "0 12px" }}
+            style={{ height: 52, fontSize: 18, borderRadius: 8, border: "1px solid #ccc", padding: "0 12px" }}
           >
             {GRADES.map((g) => (
               <option key={g} value={g}>
@@ -127,7 +144,7 @@ export default function StartPage() {
             value={mode}
             onChange={(e) => setMode(e.target.value as Mode)}
             aria-label="Mode"
-            style={{ height: 52, fontSize: 18, padding: "0 12px" }}
+            style={{ height: 52, fontSize: 18, borderRadius: 8, border: "1px solid #ccc", padding: "0 12px" }}
           >
             {MODES.map((m) => (
               <option key={m.value} value={m.value}>
@@ -141,13 +158,13 @@ export default function StartPage() {
           type="submit"
           disabled={loading}
           style={{
-            background: "#3d50ff",
-            color: "#fff",
+            background: "#3b5bfd",
+            color: "white",
             border: "none",
             height: 56,
-            padding: "0 22px",
+            padding: "0 24px",
             borderRadius: 10,
-            fontSize: 22,
+            fontSize: 24,
             cursor: "pointer",
             opacity: loading ? 0.7 : 1,
           }}
@@ -156,8 +173,8 @@ export default function StartPage() {
         </button>
       </form>
 
-      {!!err && (
-        <div style={{ marginTop: 16, color: "#8b1d1d", fontSize: 18 }}>
+      {err && (
+        <div style={{ color: "#8b1c1c", marginTop: 18, fontSize: 18 }}>
           {err}
         </div>
       )}
