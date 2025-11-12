@@ -5,220 +5,180 @@ import { supabaseAdmin } from '../../../lib/supabaseClient';
 import { parse as parseCsv } from 'csv-parse/sync';
 
 type Row = Record<string, string | null | undefined>;
+type AnyRec = Record<string, any>;
 
-const NUMERIC_COLS = new Set([
-  'script_version',
-  'duration_seconds',
-  'target_count',
-]);
+const NUMERIC_COLS = new Set(['script_version', 'duration_seconds', 'target_count']);
+const BOOL_LIKE = new Set(['_has_vid', '_has_share']);
 
-const BOOL_LIKE = new Set([
-  '_has_vid',
-  '_has_share',
-]);
-
-// helper-only columns we never want to send even if they exist in sheets
-const DROP_KEYS = new Set<string>([
-  '__sheet',
-  'anchor',
-  'error',
-  // multi-variant intro/end/script helpers we saw in earlier runs
-  'intro', 'a_intro', 'b_intro', 'c_intro', 'd_intro', 'end',
-  'script_audio_original',
-]);
-
-async function fetchCsv(url: string): Promise<Row[]> {
+/** ---------- CSV helpers ---------- */
+const fetchCsv = async (url: string): Promise<Row[]> => {
   const r = await fetch(url, { cache: 'no-store' });
   if (!r.ok) throw new Error(`CSV fetch failed: ${r.status} ${url}`);
   const text = await r.text();
   return parseCsv(text, { columns: true, skip_empty_lines: true }) as Row[];
-}
+};
 
-function coerceScalars(obj: Record<string, any>) {
-  for (const [k, raw] of Object.entries(obj)) {
-    if (raw === undefined || raw === null) continue;
-    const v = String(raw).trim();
+const normalizeRow = (row: Row): AnyRec => {
+  const out: AnyRec = {};
+  for (const [rawKey, rawVal] of Object.entries(row)) {
+    const key = (rawKey ?? '').toString().trim();
+    const v = (rawVal ?? '').toString().trim();
 
-    if (v === '') { obj[k] = null; continue; }
+    if (!key) continue;
 
-    if (NUMERIC_COLS.has(k)) {
+    if (v === '') {
+      out[key] = null;
+      continue;
+    }
+
+    if (NUMERIC_COLS.has(key)) {
       const n = Number(v);
-      obj[k] = Number.isFinite(n) ? n : null;
+      out[key] = Number.isFinite(n) ? n : null;
       continue;
     }
 
-    if (BOOL_LIKE.has(k)) {
+    if (BOOL_LIKE.has(key)) {
       const t = v.toLowerCase();
-      obj[k] = t === 'true' || t === '1' || t === 'yes';
+      out[key] = t === 'true' || t === '1' || t === 'yes';
       continue;
     }
 
-    obj[k] = v;
+    out[key] = v;
   }
-}
-
-function stripHelperCols(obj: Record<string, any>) {
-  for (const k of Object.keys(obj)) {
-    if (DROP_KEYS.has(k)) delete obj[k];
-  }
-}
-
-/**
- * Read live column names from a table by selecting 1 row.
- * If the table is empty, fall back to a minimal allow-list.
- */
-async function getTableColumns(table: 'items' | 'assets' | 'blueprints'): Promise<Set<string>> {
-  const { data, error } = await supabaseAdmin.from(table).select('*').limit(1);
-  if (!error && data && data.length > 0) {
-    return new Set(Object.keys(data[0] as Record<string, any>));
-  }
-  // minimal safe fallback if table is empty (adjust if needed later)
-  if (table === 'items') return new Set(['id']);
-  if (table === 'assets') return new Set(['item_id']);
-  return new Set(['id']);
-}
-
-/**
- * Prepare a row for a specific table; return null to skip.
- * Then filter keys to only those that exist in the live schema.
- */
-function prepareForTable(
-  table: 'items' | 'assets' | 'blueprints',
-  row: Row,
-  columnSet: Set<string>,
-) {
-  // clone → trim all keys
-  const tmp: Record<string, any> = {};
-  for (const [k, v] of Object.entries(row)) {
-    const key = (k || '').trim();
-    tmp[key] = v;
-  }
-
-  // hard drop helper sheet-only keys
-  stripHelperCols(tmp);
-
-  // coerce scalars (numbers/bools)
-  coerceScalars(tmp);
-
-  if (table === 'items') {
-    // items.id is required: map item_id → id if present
-    const candidate = (tmp['id'] ?? tmp['item_id'] ?? '').toString().trim();
-    if (!candidate) return null;
-    tmp['id'] = candidate;
-    delete tmp['item_id'];
-  }
-
-  if (table === 'assets') {
-    const fk = (tmp['item_id'] ?? '').toString().trim();
-    if (!fk) return null;
-    tmp['item_id'] = fk;
-  }
-
-  // remove empty strings after coercion
-  for (const [k, v] of Object.entries(tmp)) {
-    if (v === '') tmp[k] = null;
-  }
-
-  // **schema filter**: only keep keys that are real columns
-  const out: Record<string, any> = {};
-  for (const k of Object.keys(tmp)) {
-    if (columnSet.has(k)) out[k] = tmp[k];
-  }
-
-  // if after filtering we lost required keys, skip
-  if (table === 'items' && !out['id']) return null;
-  if (table === 'assets' && !out['item_id']) return null;
-
   return out;
-}
+};
 
-/** Deduplicate by a single key (keep the *last* seen row for that key). */
-function dedupeByKey(rows: Record<string, any>[], key: string) {
-  const map = new Map<string, Record<string, any>>();
-  for (const r of rows) {
-    const k = String(r[key] ?? '');
-    if (!k) continue;
-    map.set(k, r); // last wins
+/** ---------- Prepare rows for specific tables ---------- */
+const prepareItems = (rows: Row[]) => {
+  const prepared: AnyRec[] = [];
+  const skipped: { reason: string; sample: AnyRec }[] = [];
+
+  for (const r of rows.map(normalizeRow)) {
+    const id = (r.id ?? '').toString().trim();
+    if (!id) {
+      skipped.push({ reason: 'missing id', sample: r });
+      continue;
+    }
+    prepared.push({ ...r, id });
   }
-  return Array.from(map.values());
-}
+  return { prepared, skipped };
+};
 
+const prepareAssets = (rows: Row[]) => {
+  const prepared: AnyRec[] = [];
+  const skipped: { reason: string; sample: AnyRec }[] = [];
+
+  for (const r of rows.map(normalizeRow)) {
+    const item_id = (r.item_id ?? '').toString().trim();
+    if (!item_id) {
+      skipped.push({ reason: 'missing item_id', sample: r });
+      continue;
+    }
+    prepared.push({ ...r, item_id });
+  }
+
+  // Deduplicate to align with onConflict: 'item_id'
+  const seen = new Set<string>();
+  const deduped: AnyRec[] = [];
+  const dedupedOut: AnyRec[] = [];
+  for (const a of prepared) {
+    if (seen.has(a.item_id)) {
+      dedupedOut.push(a);
+      continue;
+    }
+    seen.add(a.item_id);
+    deduped.push(a);
+  }
+
+  return { prepared: deduped, skipped, dedupedCount: dedupedOut.length, dedupedSamples: dedupedOut.slice(0, 5) };
+};
+
+const prepareBlueprints = (rows: Row[]) => {
+  // Blueprints are simple pass-through with id mandatory
+  const prepared: AnyRec[] = [];
+  const skipped: { reason: string; sample: AnyRec }[] = [];
+  for (const r of rows.map(normalizeRow)) {
+    const id = (r.id ?? '').toString().trim();
+    if (!id) {
+      skipped.push({ reason: 'missing id', sample: r });
+      continue;
+    }
+    prepared.push({ ...r, id });
+  }
+  return { prepared, skipped };
+};
+
+/** ---------- Route ---------- */
 export async function GET() {
   try {
-    const itemsCsv = env.SHEETS_ITEMS_CSV || '';
-    const assetsCsv = env.SHEETS_ASSETS_CSV || '';
-    const blueprintsCsv = env.SHEETS_BLUEPRINTS_CSV || '';
+    const itemsUrl = env.SHEETS_ITEMS_CSV;
+    const assetsUrl = env.SHEETS_ASSETS_CSV;
+    const blueprintsUrl = env.SHEETS_BLUEPRINTS_CSV;
 
-    const [itemsCols, assetsCols, bpsCols] = await Promise.all([
-      getTableColumns('items'),
-      getTableColumns('assets'),
-      getTableColumns('blueprints'),
+    const [itemsCsv, assetsCsv, blueprintsCsv] = await Promise.all([
+      itemsUrl ? fetchCsv(itemsUrl) : Promise.resolve([]),
+      assetsUrl ? fetchCsv(assetsUrl) : Promise.resolve([]),
+      blueprintsUrl ? fetchCsv(blueprintsUrl) : Promise.resolve([]),
     ]);
 
-    const [itemsRaw, assetsRaw, bpsRaw] = await Promise.all([
-      itemsCsv ? fetchCsv(itemsCsv) : Promise.resolve([]),
-      assetsCsv ? fetchCsv(assetsCsv) : Promise.resolve([]),
-      blueprintsCsv ? fetchCsv(blueprintsCsv) : Promise.resolve([]),
-    ]);
+    // Prepare
+    const itemsPrep = prepareItems(itemsCsv);
+    const assetsPrep = prepareAssets(assetsCsv);
+    const blueprintsPrep = prepareBlueprints(blueprintsCsv);
 
-    const itemsPrepared0 = itemsRaw
-      .map(r => prepareForTable('items', r, itemsCols))
-      .filter((r): r is Record<string, any> => !!r);
-
-    const assetsPrepared0 = assetsRaw
-      .map(r => prepareForTable('assets', r, assetsCols))
-      .filter((r): r is Record<string, any> => !!r);
-
-    const bpsPrepared = bpsRaw
-      .map(r => prepareForTable('blueprints', r, bpsCols))
-      .filter((r): r is Record<string, any> => !!r);
-
-    // **DEDUPLICATE BY CONFLICT KEY BEFORE UPSERT**
-    const itemsPrepared = dedupeByKey(itemsPrepared0, 'id');
-    const assetsPrepared = dedupeByKey(assetsPrepared0, 'item_id');
-
-    if (itemsPrepared.length) {
-      const { error } = await supabaseAdmin
-        .from('items')
-        .upsert(itemsPrepared, { onConflict: 'id' });
+    // Upserts
+    if (itemsPrep.prepared.length) {
+      const { error } = await supabaseAdmin.from('items').upsert(itemsPrep.prepared, { onConflict: 'id' });
       if (error) throw new Error(`items upsert error: ${error.message}`);
     }
 
-    if (assetsPrepared.length) {
-      const { error } = await supabaseAdmin
-        .from('assets')
-        .upsert(assetsPrepared, { onConflict: 'item_id' });
+    if (assetsPrep.prepared.length) {
+      const { error } = await supabaseAdmin.from('assets').upsert(assetsPrep.prepared, { onConflict: 'item_id' });
       if (error) throw new Error(`assets upsert error: ${error.message}`);
     }
 
-    if (bpsPrepared.length) {
-      const { error } = await supabaseAdmin
-        .from('blueprints')
-        .upsert(bpsPrepared, { onConflict: 'id' });
+    if (blueprintsPrep.prepared.length) {
+      const { error } = await supabaseAdmin.from('blueprints').upsert(blueprintsPrep.prepared, { onConflict: 'id' });
       if (error) throw new Error(`blueprints upsert error: ${error.message}`);
     }
+
+    // Small log block: show a concise sample of skipped/filtered assets
+    const assets_skipped_samples = assetsPrep.skipped.slice(0, 10).map(s => {
+      const { reason, sample } = s;
+      // Return only lightweight fields for readability
+      return {
+        reason,
+        item_id: (sample.item_id ?? '').toString().trim() || null,
+        programme: sample.programme ?? null,
+        answer_key: sample.answer_key ?? null,
+        // keep a tiny echo of the row id/label if present
+        id: sample.id ?? null,
+        label: sample.label ?? null,
+      };
+    });
 
     return NextResponse.json({
       ok: true,
       counts: {
-        items_csv_rows: itemsRaw.length,
-        items_prepared: itemsPrepared0.length,
-        items_upserting: itemsPrepared.length,
-        items_skipped_after_prepare: itemsRaw.length - itemsPrepared0.length,
-        items_deduped: itemsPrepared0.length - itemsPrepared.length,
+        items_csv_rows: itemsCsv.length,
+        items_prepared: itemsPrep.prepared.length,
+        items_skipped_after_prepare: itemsPrep.skipped.length,
 
-        assets_csv_rows: assetsRaw.length,
-        assets_prepared: assetsPrepared0.length,
-        assets_upserting: assetsPrepared.length,
-        assets_skipped_after_prepare: assetsRaw.length - assetsPrepared0.length,
-        assets_deduped: assetsPrepared0.length - assetsPrepared.length,
+        assets_csv_rows: assetsCsv.length,
+        assets_prepared: assetsPrep.prepared.length,
+        assets_skipped_after_prepare: assetsPrep.skipped.length,
+        assets_deduped: assetsPrep.dedupedCount,
 
-        blueprints_csv_rows: bpsRaw.length,
-        blueprints_upserting: bpsPrepared.length,
-        blueprints_skipped: bpsRaw.length - bpsPrepared.length,
+        blueprints_csv_rows: blueprintsCsv.length,
+        blueprints_prepared: blueprintsPrep.prepared.length,
+        blueprints_skipped: blueprintsPrep.skipped.length,
+      },
+      logs: {
+        assets_skipped_samples,                 // <= requested small log block
+        assets_deduped_samples: assetsPrep.dedupedSamples, // tiny extra for visibility
       },
     });
   } catch (e: any) {
-    return new NextResponse(`Seed failed: ${e.message ?? e}`, { status: 500 });
+    return new NextResponse(`Seed failed: ${e?.message ?? e}`, { status: 500 });
   }
 }
