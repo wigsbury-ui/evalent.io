@@ -132,6 +132,17 @@ function prepareForTable(
   return out;
 }
 
+/** Deduplicate by a single key (keep the *last* seen row for that key). */
+function dedupeByKey(rows: Record<string, any>[], key: string) {
+  const map = new Map<string, Record<string, any>>();
+  for (const r of rows) {
+    const k = String(r[key] ?? '');
+    if (!k) continue;
+    map.set(k, r); // last wins
+  }
+  return Array.from(map.values());
+}
+
 export async function GET() {
   try {
     const itemsCsv = env.SHEETS_ITEMS_CSV || '';
@@ -150,17 +161,21 @@ export async function GET() {
       blueprintsCsv ? fetchCsv(blueprintsCsv) : Promise.resolve([]),
     ]);
 
-    const itemsPrepared = itemsRaw
+    const itemsPrepared0 = itemsRaw
       .map(r => prepareForTable('items', r, itemsCols))
       .filter((r): r is Record<string, any> => !!r);
 
-    const assetsPrepared = assetsRaw
+    const assetsPrepared0 = assetsRaw
       .map(r => prepareForTable('assets', r, assetsCols))
       .filter((r): r is Record<string, any> => !!r);
 
     const bpsPrepared = bpsRaw
       .map(r => prepareForTable('blueprints', r, bpsCols))
       .filter((r): r is Record<string, any> => !!r);
+
+    // **DEDUPLICATE BY CONFLICT KEY BEFORE UPSERT**
+    const itemsPrepared = dedupeByKey(itemsPrepared0, 'id');
+    const assetsPrepared = dedupeByKey(assetsPrepared0, 'item_id');
 
     if (itemsPrepared.length) {
       const { error } = await supabaseAdmin
@@ -187,13 +202,19 @@ export async function GET() {
       ok: true,
       counts: {
         items_csv_rows: itemsRaw.length,
-        items_upserted: itemsPrepared.length,
-        items_skipped: itemsRaw.length - itemsPrepared.length,
+        items_prepared: itemsPrepared0.length,
+        items_upserting: itemsPrepared.length,
+        items_skipped_after_prepare: itemsRaw.length - itemsPrepared0.length,
+        items_deduped: itemsPrepared0.length - itemsPrepared.length,
+
         assets_csv_rows: assetsRaw.length,
-        assets_upserted: assetsPrepared.length,
-        assets_skipped: assetsRaw.length - assetsPrepared.length,
+        assets_prepared: assetsPrepared0.length,
+        assets_upserting: assetsPrepared.length,
+        assets_skipped_after_prepare: assetsRaw.length - assetsPrepared0.length,
+        assets_deduped: assetsPrepared0.length - assetsPrepared.length,
+
         blueprints_csv_rows: bpsRaw.length,
-        blueprints_upserted: bpsPrepared.length,
+        blueprints_upserting: bpsPrepared.length,
         blueprints_skipped: bpsRaw.length - bpsPrepared.length,
       },
     });
