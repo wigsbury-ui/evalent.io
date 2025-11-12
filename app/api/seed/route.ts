@@ -1,7 +1,7 @@
 // app/api/seed/route.ts
 import { NextResponse } from 'next/server';
 import { env } from '../../../lib/env';
-import { supabaseService } from '../../../lib/supabaseClient';
+import { supabaseAdmin } from '../../../lib/supabaseClient'; // ⬅️ use the admin client
 import { parse as parseCsv } from 'csv-parse/sync';
 
 type Row = Record<string, string | null | undefined>;
@@ -65,21 +65,21 @@ export async function GET() {
     // upserts
     // items.id is text; keep id exactly as in sheet
     if (items.length) {
-      const { error } = await supabaseService
+      const { error } = await supabaseAdmin
         .from('items')
         .upsert(items, { onConflict: 'id' });
       if (error) throw new Error(`items upsert error: ${error.message}`);
     }
 
     if (assets.length) {
-      const { error } = await supabaseService
+      const { error } = await supabaseAdmin
         .from('assets')
         .upsert(assets, { onConflict: 'item_id' });
       if (error) throw new Error(`assets upsert error: ${error.message}`);
     }
 
     if (blueprints.length) {
-      const { error } = await supabaseService
+      const { error } = await supabaseAdmin
         .from('blueprints')
         .upsert(blueprints, { onConflict: 'id' });
       if (error) throw new Error(`blueprints upsert error: ${error.message}`);
