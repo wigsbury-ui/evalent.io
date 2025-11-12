@@ -1,0 +1,9 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; }
+a { color: inherit; }
+button { padding: 8px 14px; cursor: pointer; }
+input, select, textarea { padding: 8px; width: 100%; }
+.card { border: 1px solid #ddd; border-radius: 12px; padding: 16px; margin: 12px 0; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #eee; font-size: 12px; }
+.row { display: flex; gap: 12px; }
+.row > * { flex: 1; }
