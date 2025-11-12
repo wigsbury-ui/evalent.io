@@ -1,6 +1,6 @@
 {
   "name": "evalent-pro-pack",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "private": true,
   "engines": { "node": ">=18.18 <21" },
   "scripts": {
@@ -25,7 +25,6 @@
     "@types/node": "^20.11.30",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
-    "@types/pdfkit": "^0.14.7",
     "eslint": "^8.57.0",
     "eslint-config-next": "14.2.4",
     "tsx": "^4.19.2",
