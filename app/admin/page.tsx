@@ -1,31 +1,65 @@
 'use client';
+
 import { useState } from 'react';
 
-export default function Admin() {
-  const [diag, setDiag] = useState<any>(null);
-  const [msg, setMsg] = useState<string>('');
+type Jsonish = unknown;
 
-  async function runDiag() {
-    const res = await fetch('/api/diag');
-    setDiag(await res.json());
-  }
-  async function seed() {
-    const res = await fetch('/api/seed', { method: 'POST' });
-    setMsg(await res.text());
+export default function AdminPage() {
+  const [out, setOut] = useState<Jsonish>(null);
+  const [loading, setLoading] = useState<string | null>(null);
+
+  async function hit(path: string) {
+    try {
+      setLoading(path);
+      setOut(null);
+      const r = await fetch(path, { method: 'GET', cache: 'no-store' });
+      const text = await r.text();
+      // try parse JSON, else show raw text
+      try {
+        setOut(JSON.parse(text));
+      } catch {
+        setOut(text);
+      }
+    } catch (e: any) {
+      setOut({ ok: false, error: e?.message ?? String(e) });
+    } finally {
+      setLoading(null);
+    }
   }
 
   return (
-    <main>
-      <div className="card">
-        <h2>Admin</h2>
-        <div className="row">
-          <button onClick={runDiag}>Run Diagnostics</button>
-          <button onClick={seed}>Seed from CSV</button>
-          <a className="badge" href="/api/ping">Ping</a>
-        </div>
-        {msg && <p>{msg}</p>}
-        {diag && <pre style={{whiteSpace:'pre-wrap'}}>{JSON.stringify(diag,null,2)}</pre>}
+    <div className="mx-auto max-w-4xl p-6">
+      <h1 className="text-3xl font-semibold mb-6">Admin</h1>
+
+      <div className="flex flex-wrap gap-4 mb-6">
+        <button
+          onClick={() => hit('/api/diag')}
+          disabled={loading !== null}
+          className="rounded border px-4 py-2 bg-gray-100 hover:bg-gray-200 disabled:opacity-50"
+        >
+          {loading === '/api/diag' ? 'Running…' : 'Run Diagnostics'}
+        </button>
+
+        <button
+          onClick={() => hit('/api/seed')}
+          disabled={loading !== null}
+          className="rounded border px-4 py-2 bg-gray-100 hover:bg-gray-200 disabled:opacity-50"
+        >
+          {loading === '/api/seed' ? 'Seeding…' : 'Seed from CSV'}
+        </button>
+
+        <button
+          onClick={() => hit('/api/ping')}
+          disabled={loading !== null}
+          className="rounded border px-4 py-2 bg-gray-100 hover:bg-gray-200 disabled:opacity-50"
+        >
+          {loading === '/api/ping' ? 'Pinging…' : 'Ping'}
+        </button>
       </div>
-    </main>
-  )
+
+      <pre className="whitespace-pre-wrap rounded bg-black/90 text-green-200 p-4 text-sm overflow-auto min-h-[180px]">
+        {out === null ? '— no output yet —' : typeof out === 'string' ? out : JSON.stringify(out, null, 2)}
+      </pre>
+    </div>
+  );
 }
