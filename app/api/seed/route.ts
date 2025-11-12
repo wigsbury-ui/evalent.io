@@ -8,9 +8,33 @@ type Row = Record<string, string | null | undefined>;
 type AnyRec = Record<string, any>;
 
 const NUMERIC_COLS = new Set(['script_version', 'duration_seconds', 'target_count']);
-const BOOL_LIKE = new Set(['_has_vid', '_has_share']);
+const BOOL_LIKE   = new Set(['_has_vid', '_has_share']);
 
-/** ---------- CSV helpers ---------- */
+/** Known asset columns in Postgres (drop anything else) */
+const ASSET_ALLOWED = new Set([
+  'item_id',
+  'programme',
+  'video_title',
+  'script_audio',
+  'video_id',
+  'share_url',
+  'download_url',
+  'duration_seconds',
+  'avatar_voice_id',
+  'avatar_style',
+  'background',
+  'resolution',
+  'video_thumbnail',
+  'current_script_hash',
+  'last_rendered_script_hash',
+  'status',
+  'notes',
+  '_has_vid',
+  '_has_share',
+  '__sheet', // if you keep provenance
+]);
+
+/** ---------- helpers ---------- */
 const fetchCsv = async (url: string): Promise<Row[]> => {
   const r = await fetch(url, { cache: 'no-store' });
   if (!r.ok) throw new Error(`CSV fetch failed: ${r.status} ${url}`);
@@ -18,12 +42,19 @@ const fetchCsv = async (url: string): Promise<Row[]> => {
   return parseCsv(text, { columns: true, skip_empty_lines: true }) as Row[];
 };
 
+const toSnake = (k: string) =>
+  k
+    .trim()
+    .replace(/[\s\-\/]+/g, '_')
+    .replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`) // camel/Pascal → snake
+    .replace(/^_+/, '')
+    .toLowerCase();
+
 const normalizeRow = (row: Row): AnyRec => {
   const out: AnyRec = {};
   for (const [rawKey, rawVal] of Object.entries(row)) {
     const key = (rawKey ?? '').toString().trim();
     const v = (rawVal ?? '').toString().trim();
-
     if (!key) continue;
 
     if (v === '') {
@@ -48,7 +79,7 @@ const normalizeRow = (row: Row): AnyRec => {
   return out;
 };
 
-/** ---------- Prepare rows for specific tables ---------- */
+/** ---------- per-table preparation ---------- */
 const prepareItems = (rows: Row[]) => {
   const prepared: AnyRec[] = [];
   const skipped: { reason: string; sample: AnyRec }[] = [];
@@ -65,36 +96,66 @@ const prepareItems = (rows: Row[]) => {
 };
 
 const prepareAssets = (rows: Row[]) => {
-  const prepared: AnyRec[] = [];
+  const preparedRaw: AnyRec[] = [];
   const skipped: { reason: string; sample: AnyRec }[] = [];
+  const droppedKeySamples: AnyRec[] = [];
 
-  for (const r of rows.map(normalizeRow)) {
-    const item_id = (r.item_id ?? '').toString().trim();
+  for (const _r of rows.map(normalizeRow)) {
+    // 1) map headers like "Download_URL", "Share URL" → snake case that matches DB
+    const mapped: AnyRec = {};
+    for (const [k, v] of Object.entries(_r)) {
+      const snake = toSnake(k);
+      mapped[snake] = v;
+    }
+
+    // 2) require item_id
+    const item_id = (mapped.item_id ?? '').toString().trim();
     if (!item_id) {
-      skipped.push({ reason: 'missing item_id', sample: r });
+      skipped.push({ reason: 'missing item_id', sample: mapped });
       continue;
     }
-    prepared.push({ ...r, item_id });
+
+    // 3) filter to allowed DB columns only (unknown columns cause Supabase error)
+    const filtered: AnyRec = { item_id };
+    const dropped: string[] = [];
+    for (const [k, v] of Object.entries(mapped)) {
+      if (k === 'item_id') continue;
+      if (ASSET_ALLOWED.has(k)) {
+        filtered[k] = v;
+      } else {
+        dropped.push(k);
+      }
+    }
+    if (dropped.length) {
+      droppedKeySamples.push({ item_id, dropped });
+    }
+
+    preparedRaw.push(filtered);
   }
 
-  // Deduplicate to align with onConflict: 'item_id'
+  // 4) de-dup by item_id (onConflict: 'item_id')
   const seen = new Set<string>();
-  const deduped: AnyRec[] = [];
-  const dedupedOut: AnyRec[] = [];
-  for (const a of prepared) {
+  const prepared: AnyRec[] = [];
+  const dedupedSamples: AnyRec[] = [];
+  for (const a of preparedRaw) {
     if (seen.has(a.item_id)) {
-      dedupedOut.push(a);
+      if (dedupedSamples.length < 5) dedupedSamples.push(a);
       continue;
     }
     seen.add(a.item_id);
-    deduped.push(a);
+    prepared.push(a);
   }
 
-  return { prepared: deduped, skipped, dedupedCount: dedupedOut.length, dedupedSamples: dedupedOut.slice(0, 5) };
+  return {
+    prepared,
+    skipped,
+    dedupedCount: preparedRaw.length - prepared.length,
+    dedupedSamples,
+    droppedKeySamples: droppedKeySamples.slice(0, 10),
+  };
 };
 
 const prepareBlueprints = (rows: Row[]) => {
-  // Blueprints are simple pass-through with id mandatory
   const prepared: AnyRec[] = [];
   const skipped: { reason: string; sample: AnyRec }[] = [];
   for (const r of rows.map(normalizeRow)) {
@@ -108,7 +169,7 @@ const prepareBlueprints = (rows: Row[]) => {
   return { prepared, skipped };
 };
 
-/** ---------- Route ---------- */
+/** ---------- route ---------- */
 export async function GET() {
   try {
     const itemsUrl = env.SHEETS_ITEMS_CSV;
@@ -121,12 +182,10 @@ export async function GET() {
       blueprintsUrl ? fetchCsv(blueprintsUrl) : Promise.resolve([]),
     ]);
 
-    // Prepare
     const itemsPrep = prepareItems(itemsCsv);
     const assetsPrep = prepareAssets(assetsCsv);
     const blueprintsPrep = prepareBlueprints(blueprintsCsv);
 
-    // Upserts
     if (itemsPrep.prepared.length) {
       const { error } = await supabaseAdmin.from('items').upsert(itemsPrep.prepared, { onConflict: 'id' });
       if (error) throw new Error(`items upsert error: ${error.message}`);
@@ -142,21 +201,8 @@ export async function GET() {
       if (error) throw new Error(`blueprints upsert error: ${error.message}`);
     }
 
-    // Small log block: show a concise sample of skipped/filtered assets
-    const assets_skipped_samples = assetsPrep.skipped.slice(0, 10).map(s => {
-      const { reason, sample } = s;
-      // Return only lightweight fields for readability
-      return {
-        reason,
-        item_id: (sample.item_id ?? '').toString().trim() || null,
-        programme: sample.programme ?? null,
-        answer_key: sample.answer_key ?? null,
-        // keep a tiny echo of the row id/label if present
-        id: sample.id ?? null,
-        label: sample.label ?? null,
-      };
-    });
-
+    // concise visibility logs
+    const assets_skipped_samples = assetsPrep.skipped.slice(0, 10);
     return NextResponse.json({
       ok: true,
       counts: {
@@ -174,8 +220,9 @@ export async function GET() {
         blueprints_skipped: blueprintsPrep.skipped.length,
       },
       logs: {
-        assets_skipped_samples,                 // <= requested small log block
-        assets_deduped_samples: assetsPrep.dedupedSamples, // tiny extra for visibility
+        assets_skipped_samples,
+        assets_deduped_samples: assetsPrep.dedupedSamples,
+        assets_dropped_key_samples: assetsPrep.droppedKeySamples, // shows columns we stripped (e.g., "Download_URL")
       },
     });
   } catch (e: any) {
