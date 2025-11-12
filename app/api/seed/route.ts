@@ -1,7 +1,7 @@
 // app/api/seed/route.ts
 import { NextResponse } from 'next/server';
 import { env } from '../../../lib/env';
-import { supabaseAdmin } from '../../../lib/supabaseClient'; // ⬅️ use the admin client
+import { supabaseAdmin } from '../../../lib/supabaseClient';
 import { parse as parseCsv } from 'csv-parse/sync';
 
 type Row = Record<string, string | null | undefined>;
@@ -63,7 +63,6 @@ export async function GET() {
     ]);
 
     // upserts
-    // items.id is text; keep id exactly as in sheet
     if (items.length) {
       const { error } = await supabaseAdmin
         .from('items')
