@@ -1,6 +1,6 @@
 // lib/env.ts
-// Centralised, typed env accessor (build-safe). Only *critical* keys are required.
-// Others default to '' so code can read them without type errors.
+// Centralised, typed env accessor (build-safe). Critical keys are required,
+// everything else defaults to '' so code can import without type errors.
 
 type NonEmptyString = string & { __brand: 'nonempty' };
 function req(name: string): NonEmptyString {
@@ -17,7 +17,7 @@ export const env = {
   SUPABASE_ANON_KEY: req('SUPABASE_ANON_KEY'),
   SUPABASE_SERVICE_ROLE_KEY: req('SUPABASE_SERVICE_ROLE_KEY'),
 
-  // ---- Public copies (optional, default '') ----
+  // ---- Public copies (optional) ----
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || '',
   NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
 
@@ -27,8 +27,9 @@ export const env = {
   SHEETS_BLUEPRINTS_CSV: process.env.SHEETS_BLUEPRINTS_CSV || '',
 
   // ---- App config (optional) ----
-  DEFAULT_SCHOOL_ID: process.env.DEFAULT_SCHOOL_ID || '',     // <- added to satisfy diag route
+  DEFAULT_SCHOOL_ID: process.env.DEFAULT_SCHOOL_ID || '',
   NEXT_PUBLIC_START_PASSCODE: process.env.NEXT_PUBLIC_START_PASSCODE || '',
+  USE_BLUEPRINTS: process.env.USE_BLUEPRINTS || '',
 
   // ---- Integrations (optional) ----
   RESEND_API_KEY: process.env.RESEND_API_KEY || '',
