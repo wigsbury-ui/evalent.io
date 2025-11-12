@@ -1,140 +1,173 @@
 // app/api/seed/route.ts
 import { NextResponse } from 'next/server';
-import { parse as parseCsv } from 'csv-parse/sync';
 import { env } from '../../../lib/env';
 import { supabaseAdmin } from '../../../lib/supabaseClient';
+import { parse as parseCsv } from 'csv-parse/sync';
 
 type Row = Record<string, string | null | undefined>;
 
-// ---------- CSV helpers ------------------------------------------------------
+const NUMERIC_COLS = new Set([
+  'script_version',
+  'duration_seconds',
+  'target_count',
+]);
 
-const NUMERIC_COLS = new Set(['script_version', 'duration_seconds', 'target_count']);
-const BOOL_LIKE     = new Set(['_has_vid', '_has_share']);
+const BOOL_LIKE = new Set([
+  '_has_vid',
+  '_has_share',
+]);
 
-const parseCsvUrl = async (url: string): Promise<Row[]> => {
+// columns that must NEVER be sent to the DB
+const DROP_KEYS = new Set([
+  '__sheet',
+  'anchor',
+  'error',
+  'intro',
+  'a_intro',
+  'b_intro',
+  'c_intro',
+  'd_intro',
+  'end',
+  'script_audio_original',
+]);
+
+async function fetchCsv(url: string): Promise<Row[]> {
   const r = await fetch(url, { cache: 'no-store' });
   if (!r.ok) throw new Error(`CSV fetch failed: ${r.status} ${url}`);
   const text = await r.text();
-  const rows = parseCsv(text, { columns: true, skip_empty_lines: true }) as Row[];
-  return rows.map(normalizeRow);
-};
+  return parseCsv(text, { columns: true, skip_empty_lines: true }) as Row[];
+}
 
-function normalizeRow(row: Row) {
-  const out: Record<string, any> = {};
-  for (const [rawKey, rawVal] of Object.entries(row)) {
-    const key = (rawKey || '').trim();
-    const v = (rawVal ?? '').toString().trim();
+function coerceScalars(obj: Record<string, any>) {
+  for (const [k, raw] of Object.entries(obj)) {
+    if (raw === undefined || raw === null) continue;
+    const v = String(raw).trim();
 
-    if (!key) continue;                  // skip empty headers
-    if (v === '') { out[key] = null; continue; }     // empty -> null
+    if (v === '') { obj[k] = null; continue; }
 
-    if (NUMERIC_COLS.has(key)) {         // numbers
+    if (NUMERIC_COLS.has(k)) {
       const n = Number(v);
-      out[key] = Number.isFinite(n) ? n : null;
+      obj[k] = Number.isFinite(n) ? n : null;
       continue;
     }
 
-    if (BOOL_LIKE.has(key)) {            // booleans
+    if (BOOL_LIKE.has(k)) {
       const t = v.toLowerCase();
-      out[key] = t === 'true' || t === '1' || t === 'yes';
+      obj[k] = t === 'true' || t === '1' || t === 'yes';
       continue;
     }
 
-    out[key] = v;                        // text
+    obj[k] = v;
   }
-  return out;
 }
 
-// Remove meta/temporary columns commonly present in sheets/exports
-const stripMeta = (o: Record<string, any>) => {
-  const out: Record<string, any> = {};
-  for (const [k, v] of Object.entries(o)) {
-    if (k.startsWith('_')) continue;     // drop __sheet, _row, etc.
-    out[k] = v;
+function stripHelperCols(obj: Record<string, any>) {
+  for (const k of Object.keys(obj)) {
+    if (DROP_KEYS.has(k)) delete obj[k];
   }
-  return out;
-};
-
-// Fetch the actual column list of a table (by reading one row)
-async function getTableColumns(table: string): Promise<Set<string>> {
-  const { data, error } = await supabaseAdmin.from(table).select('*').limit(1);
-  if (error) throw new Error(`schema probe failed for ${table}: ${error.message}`);
-  const sample = (data && data[0]) || {};
-  return new Set(Object.keys(sample));
 }
 
-// Keep only keys that exist in the table
-const keepOnly = (allowed: Set<string>) => (row: Record<string, any>) => {
+/**
+ * Prepare a row for a specific table; return null to skip.
+ */
+function prepareForTable(table: 'items' | 'assets' | 'blueprints', row: Row) {
+  // clone → trim all keys
   const out: Record<string, any> = {};
-  for (const [k, v] of Object.entries(row)) if (allowed.has(k)) out[k] = v;
-  return out;
-};
+  for (const [k, v] of Object.entries(row)) {
+    const key = (k || '').trim();
+    out[key] = v;
+  }
 
-// ---------- Route ------------------------------------------------------------
+  // drop helpers
+  stripHelperCols(out);
+
+  // coerce obvious scalars
+  coerceScalars(out);
+
+  if (table === 'items') {
+    // rename item_id -> id (DB expects 'id')
+    const candidate = (out['id'] ?? out['item_id'] ?? '').toString().trim();
+    if (!candidate) return null; // skip rows with no id
+    out['id'] = candidate;
+    delete out['item_id'];
+  }
+
+  if (table === 'assets') {
+    // assets must have a valid item_id FK
+    const fk = (out['item_id'] ?? '').toString().trim();
+    if (!fk) return null; // skip orphan assets
+    out['item_id'] = fk;
+  }
+
+  // remove empty-string keys after coercion
+  for (const [k, v] of Object.entries(out)) {
+    if (v === '') out[k] = null;
+  }
+
+  return out;
+}
 
 export async function GET() {
   try {
-    const itemsUrl = env.SHEETS_ITEMS_CSV;
-    const assetsUrl = env.SHEETS_ASSETS_CSV;
-    const blueprintsUrl = env.SHEETS_BLUEPRINTS_CSV;
+    const itemsCsv = env.SHEETS_ITEMS_CSV || '';
+    const assetsCsv = env.SHEETS_ASSETS_CSV || '';
+    const blueprintsCsv = env.SHEETS_BLUEPRINTS_CSV || '';
 
-    // Parse CSVs that are configured
-    const [itemsCsv, assetsCsv, blueprintsCsv] = await Promise.all([
-      itemsUrl ? parseCsvUrl(itemsUrl) : Promise.resolve([]),
-      assetsUrl ? parseCsvUrl(assetsUrl) : Promise.resolve([]),
-      blueprintsUrl ? parseCsvUrl(blueprintsUrl) : Promise.resolve([]),
+    const [itemsRaw, assetsRaw, bpsRaw] = await Promise.all([
+      itemsCsv ? fetchCsv(itemsCsv) : Promise.resolve([]),
+      assetsCsv ? fetchCsv(assetsCsv) : Promise.resolve([]),
+      blueprintsCsv ? fetchCsv(blueprintsCsv) : Promise.resolve([]),
     ]);
 
-    // Strip meta keys first
-    const itemsRaw = itemsCsv.map(stripMeta);
-    const assetsRaw = assetsCsv.map(stripMeta);
-    const blueprintsRaw = blueprintsCsv.map(stripMeta);
+    const itemsPrepared = itemsRaw
+      .map(r => prepareForTable('items', r))
+      .filter((r): r is Record<string, any> => !!r);
 
-    // Probe live schema & filter to real columns to avoid “column not found”
-    const [itemCols, assetCols, blueprintCols] = await Promise.all([
-      itemsRaw.length ? getTableColumns('items') : Promise.resolve(new Set<string>()),
-      assetsRaw.length ? getTableColumns('assets') : Promise.resolve(new Set<string>()),
-      blueprintsRaw.length ? getTableColumns('blueprints') : Promise.resolve(new Set<string>()),
-    ]);
+    const assetsPrepared = assetsRaw
+      .map(r => prepareForTable('assets', r))
+      .filter((r): r is Record<string, any> => !!r);
 
-    const items = itemCols.size ? itemsRaw.map(keepOnly(itemCols)) : [];
-    const assets = assetCols.size ? assetsRaw.map(keepOnly(assetCols)) : [];
-    const blueprints = blueprintCols.size ? blueprintsRaw.map(keepOnly(blueprintCols)) : [];
+    const bpsPrepared = bpsRaw
+      .map(r => prepareForTable('blueprints', r))
+      .filter((r): r is Record<string, any> => !!r);
 
-    // Upserts
-    let upItems = 0, upAssets = 0, upBps = 0;
-
-    if (items.length) {
-      const { error, count } = await supabaseAdmin
+    // upserts
+    if (itemsPrepared.length) {
+      const { error } = await supabaseAdmin
         .from('items')
-        .upsert(items, { onConflict: 'id', ignoreDuplicates: false, count: 'exact' });
+        .upsert(itemsPrepared, { onConflict: 'id' });
       if (error) throw new Error(`items upsert error: ${error.message}`);
-      upItems = count ?? items.length;
     }
 
-    if (assets.length) {
-      const { error, count } = await supabaseAdmin
+    if (assetsPrepared.length) {
+      const { error } = await supabaseAdmin
         .from('assets')
-        .upsert(assets, { onConflict: 'item_id', ignoreDuplicates: false, count: 'exact' });
+        .upsert(assetsPrepared, { onConflict: 'item_id' });
       if (error) throw new Error(`assets upsert error: ${error.message}`);
-      upAssets = count ?? assets.length;
     }
 
-    if (blueprints.length) {
-      const { error, count } = await supabaseAdmin
+    if (bpsPrepared.length) {
+      const { error } = await supabaseAdmin
         .from('blueprints')
-        .upsert(blueprints, { onConflict: 'id', ignoreDuplicates: false, count: 'exact' });
+        .upsert(bpsPrepared, { onConflict: 'id' });
       if (error) throw new Error(`blueprints upsert error: ${error.message}`);
-      upBps = count ?? blueprints.length;
     }
 
     return NextResponse.json({
       ok: true,
-      upserted: { items: upItems, assets: upAssets, blueprints: upBps },
-      received: { items: itemsRaw.length, assets: assetsRaw.length, blueprints: blueprintsRaw.length },
-      note: 'Rows were filtered to match live table schemas; unknown columns (e.g., "anchor", "__sheet") were dropped.',
+      counts: {
+        items_csv_rows: itemsRaw.length,
+        items_upserted: itemsPrepared.length,
+        items_skipped: itemsRaw.length - itemsPrepared.length,
+        assets_csv_rows: assetsRaw.length,
+        assets_upserted: assetsPrepared.length,
+        assets_skipped: assetsRaw.length - assetsPrepared.length,
+        blueprints_csv_rows: bpsRaw.length,
+        blueprints_upserted: bpsPrepared.length,
+        blueprints_skipped: bpsRaw.length - bpsPrepared.length,
+      },
     });
   } catch (e: any) {
-    return new NextResponse(`Seed failed: ${e?.message ?? e}`, { status: 500 });
+    return new NextResponse(`Seed failed: ${e.message ?? e}`, { status: 500 });
   }
 }
