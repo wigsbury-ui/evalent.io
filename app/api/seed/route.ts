@@ -17,17 +17,13 @@ const BOOL_LIKE = new Set([
   '_has_share',
 ]);
 
-// columns that must NEVER be sent to the DB
-const DROP_KEYS = new Set([
+// helper-only columns we never want to send even if they exist in sheets
+const DROP_KEYS = new Set<string>([
   '__sheet',
   'anchor',
   'error',
-  'intro',
-  'a_intro',
-  'b_intro',
-  'c_intro',
-  'd_intro',
-  'end',
+  // multi-variant intro/end/script helpers we saw in earlier runs
+  'intro', 'a_intro', 'b_intro', 'c_intro', 'd_intro', 'end',
   'script_audio_original',
 ]);
 
@@ -68,41 +64,70 @@ function stripHelperCols(obj: Record<string, any>) {
 }
 
 /**
- * Prepare a row for a specific table; return null to skip.
+ * Read live column names from a table by selecting 1 row.
+ * If the table is empty, fall back to a minimal allow-list.
  */
-function prepareForTable(table: 'items' | 'assets' | 'blueprints', row: Row) {
+async function getTableColumns(table: 'items' | 'assets' | 'blueprints'): Promise<Set<string>> {
+  const { data, error } = await supabaseAdmin.from(table).select('*').limit(1);
+  if (!error && data && data.length > 0) {
+    return new Set(Object.keys(data[0] as Record<string, any>));
+  }
+  // minimal safe fallback if table is empty (adjust if needed later)
+  if (table === 'items') return new Set(['id']);
+  if (table === 'assets') return new Set(['item_id']);
+  return new Set(['id']);
+}
+
+/**
+ * Prepare a row for a specific table; return null to skip.
+ * Then filter keys to only those that exist in the live schema.
+ */
+function prepareForTable(
+  table: 'items' | 'assets' | 'blueprints',
+  row: Row,
+  columnSet: Set<string>,
+) {
   // clone → trim all keys
-  const out: Record<string, any> = {};
+  const tmp: Record<string, any> = {};
   for (const [k, v] of Object.entries(row)) {
     const key = (k || '').trim();
-    out[key] = v;
+    tmp[key] = v;
   }
 
-  // drop helpers
-  stripHelperCols(out);
+  // hard drop helper sheet-only keys
+  stripHelperCols(tmp);
 
-  // coerce obvious scalars
-  coerceScalars(out);
+  // coerce scalars (numbers/bools)
+  coerceScalars(tmp);
 
   if (table === 'items') {
-    // rename item_id -> id (DB expects 'id')
-    const candidate = (out['id'] ?? out['item_id'] ?? '').toString().trim();
-    if (!candidate) return null; // skip rows with no id
-    out['id'] = candidate;
-    delete out['item_id'];
+    // items.id is required: map item_id → id if present
+    const candidate = (tmp['id'] ?? tmp['item_id'] ?? '').toString().trim();
+    if (!candidate) return null;
+    tmp['id'] = candidate;
+    delete tmp['item_id'];
   }
 
   if (table === 'assets') {
-    // assets must have a valid item_id FK
-    const fk = (out['item_id'] ?? '').toString().trim();
-    if (!fk) return null; // skip orphan assets
-    out['item_id'] = fk;
+    const fk = (tmp['item_id'] ?? '').toString().trim();
+    if (!fk) return null;
+    tmp['item_id'] = fk;
   }
 
-  // remove empty-string keys after coercion
-  for (const [k, v] of Object.entries(out)) {
-    if (v === '') out[k] = null;
+  // remove empty strings after coercion
+  for (const [k, v] of Object.entries(tmp)) {
+    if (v === '') tmp[k] = null;
   }
+
+  // **schema filter**: only keep keys that are real columns
+  const out: Record<string, any> = {};
+  for (const k of Object.keys(tmp)) {
+    if (columnSet.has(k)) out[k] = tmp[k];
+  }
+
+  // if after filtering we lost required keys, skip
+  if (table === 'items' && !out['id']) return null;
+  if (table === 'assets' && !out['item_id']) return null;
 
   return out;
 }
@@ -113,6 +138,12 @@ export async function GET() {
     const assetsCsv = env.SHEETS_ASSETS_CSV || '';
     const blueprintsCsv = env.SHEETS_BLUEPRINTS_CSV || '';
 
+    const [itemsCols, assetsCols, bpsCols] = await Promise.all([
+      getTableColumns('items'),
+      getTableColumns('assets'),
+      getTableColumns('blueprints'),
+    ]);
+
     const [itemsRaw, assetsRaw, bpsRaw] = await Promise.all([
       itemsCsv ? fetchCsv(itemsCsv) : Promise.resolve([]),
       assetsCsv ? fetchCsv(assetsCsv) : Promise.resolve([]),
@@ -120,18 +151,17 @@ export async function GET() {
     ]);
 
     const itemsPrepared = itemsRaw
-      .map(r => prepareForTable('items', r))
+      .map(r => prepareForTable('items', r, itemsCols))
       .filter((r): r is Record<string, any> => !!r);
 
     const assetsPrepared = assetsRaw
-      .map(r => prepareForTable('assets', r))
+      .map(r => prepareForTable('assets', r, assetsCols))
       .filter((r): r is Record<string, any> => !!r);
 
     const bpsPrepared = bpsRaw
-      .map(r => prepareForTable('blueprints', r))
+      .map(r => prepareForTable('blueprints', r, bpsCols))
       .filter((r): r is Record<string, any> => !!r);
 
-    // upserts
     if (itemsPrepared.length) {
       const { error } = await supabaseAdmin
         .from('items')
