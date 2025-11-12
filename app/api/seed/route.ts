@@ -9,9 +9,9 @@ type Row = Record<string, string | null | undefined>;
 // ---- parsing helpers --------------------------------------------------------
 
 const NUMERIC_COLS = new Set(['script_version', 'duration_seconds', 'target_count']);
-const BOOL_LIKE     = new Set(['_has_vid', '_has_share']);
+const BOOL_LIKE = new Set(['_has_vid', '_has_share']);
 
-function parseCsvUrl = async (url: string): Promise<Row[]> => {
+const parseCsvUrl = async (url: string): Promise<Row[]> => {
   const r = await fetch(url, { cache: 'no-store' });
   if (!r.ok) throw new Error(`CSV fetch failed: ${r.status} ${url}`);
   const text = await r.text();
@@ -25,39 +25,33 @@ function normalizeRow(row: Row) {
     const key = (rawKey || '').trim();
     const v = (rawVal ?? '').toString().trim();
 
-    // empty cell -> null
-    if (v === '') { out[key] = null; continue; }
-
-    if (NUMERIC_COLS.has(key)) {
+    if (v === '') { out[key] = null; continue; }             // empty -> null
+    if (NUMERIC_COLS.has(key)) {                             // numbers
       const n = Number(v);
       out[key] = Number.isFinite(n) ? n : null;
       continue;
     }
-
-    if (BOOL_LIKE.has(key)) {
+    if (BOOL_LIKE.has(key)) {                                // booleans
       const t = v.toLowerCase();
       out[key] = t === 'true' || t === '1' || t === 'yes';
       continue;
     }
-
-    out[key] = v;
+    out[key] = v;                                            // text
   }
   return out;
 }
 
 // ---- column filtering to avoid schema mismatches ----------------------------
 
-// Drop spreadsheet meta columns like "__sheet", "_row", etc.
 const dropMetaKeys = (obj: Record<string, any>) => {
   const out: Record<string, any> = {};
   for (const [k, v] of Object.entries(obj)) {
-    if (!k || k.startsWith('_')) continue;     // strip all underscore-prefixed cols (e.g., "__sheet")
+    if (!k || k.startsWith('_')) continue; // strip "__sheet", "_row", etc.
     out[k] = v;
   }
   return out;
 };
 
-// Whitelists for tables that are noisy in the sheet
 const ASSET_COLS = new Set([
   'item_id',
   'programme',
@@ -79,21 +73,21 @@ const BLUEPRINT_COLS = new Set([
   'target_count',
 ]);
 
-const pick = (allowed: Set<string>) => (row: Record<string, any>) => {
-  const out: Record<string, any> = {};
-  for (const [k, v] of Object.entries(row)) {
-    if (allowed.has(k)) out[k] = v;
-  }
-  return out;
-};
+const pick =
+  (allowed: Set<string>) =>
+  (row: Record<string, any>): Record<string, any> => {
+    const out: Record<string, any> = {};
+    for (const [k, v] of Object.entries(row)) if (allowed.has(k)) out[k] = v;
+    return out;
+  };
 
 // ---- route ------------------------------------------------------------------
 
 export async function GET() {
   try {
-    const itemsUrl       = env.SHEETS_ITEMS_CSV;
-    const assetsUrl      = env.SHEETS_ASSETS_CSV;
-    const blueprintsUrl  = env.SHEETS_BLUEPRINTS_CSV;
+    const itemsUrl = env.SHEETS_ITEMS_CSV;
+    const assetsUrl = env.SHEETS_ASSETS_CSV;
+    const blueprintsUrl = env.SHEETS_BLUEPRINTS_CSV;
 
     // 1) Pull CSVs (only those configured)
     const [itemsRaw, assetsRaw, blueprintsRaw] = await Promise.all([
@@ -103,7 +97,7 @@ export async function GET() {
     ]);
 
     // 2) Filter rows to avoid schema errors
-    const items = itemsRaw.map(dropMetaKeys); // items table already matches names; just drop meta cols
+    const items = itemsRaw.map(dropMetaKeys); // items table matches; just drop meta cols
     const assets = assetsRaw.map(dropMetaKeys).map(pick(ASSET_COLS));
     const blueprints = blueprintsRaw.map(dropMetaKeys).map(pick(BLUEPRINT_COLS));
 
@@ -122,9 +116,8 @@ export async function GET() {
       const { error, count } = await supabaseAdmin
         .from('assets')
         .upsert(assets, { onConflict: 'item_id', ignoreDuplicates: false, count: 'exact' });
-      // If the schema does not have these columns yet, fail softly but report:
       if (error?.message?.includes('column') || error?.message?.includes('schema')) {
-        // swallow and continue; report in payload
+        // soft-fail if your DB doesn’t have these columns yet
       } else if (error) {
         throw new Error(`assets upsert error: ${error.message}`);
       } else {
@@ -136,9 +129,8 @@ export async function GET() {
       const { error, count } = await supabaseAdmin
         .from('blueprints')
         .upsert(blueprints, { onConflict: 'id', ignoreDuplicates: false, count: 'exact' });
-      // same soft handling
       if (error?.message?.includes('column') || error?.message?.includes('schema')) {
-        // skip silently
+        // soft-fail likewise
       } else if (error) {
         throw new Error(`blueprints upsert error: ${error.message}`);
       } else {
@@ -150,7 +142,7 @@ export async function GET() {
       ok: true,
       upserted: { items: upItems, assets: upAssets, blueprints: upBps },
       received: { items: items.length, assets: assets.length, blueprints: blueprints.length },
-      note: 'Unknown/underscore-prefixed columns were stripped to avoid schema mismatches.',
+      note: 'Underscore-prefixed columns were stripped to avoid schema mismatches.',
     });
   } catch (e: any) {
     return new NextResponse(`Seed failed: ${e?.message ?? e}`, { status: 500 });
