@@ -1,7 +1,7 @@
 // app/api/seed/route.ts
 import { NextResponse } from 'next/server';
-import { env } from '@/lib/env';
-import { supabaseService } from '@/lib/supabaseClient';
+import { env } from '../../../lib/env';
+import { supabaseService } from '../../../lib/supabaseClient';
 import { parse as parseCsv } from 'csv-parse/sync';
 
 type Row = Record<string, string | null | undefined>;
