@@ -1,13 +1,33 @@
-export const env = {
-  SUPABASE_URL: process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-  DEFAULT_SCHOOL_ID: process.env.DEFAULT_SCHOOL_ID || 'f347d17d-6faa-47a1-809d-62cd69e945f2',
-  NEXT_PUBLIC_START_PASSCODE: process.env.NEXT_PUBLIC_START_PASSCODE || '',
-  SHEETS_ITEMS_CSV: process.env.SHEETS_ITEMS_CSV || process.env.SHEET_ITEMS_CSV_URL || '',
-  SHEETS_ASSETS_CSV: process.env.SHEETS_ASSETS_CSV || process.env.SHEET_ASSETS_CSV_URL || '',
-  SHEETS_BLUEPRINTS_CSV: process.env.SHEETS_BLUEPRINTS_CSV || '',
-  USE_BLUEPRINTS: (process.env.USE_BLUEPRINTS || 'false').toLowerCase() === 'true',
-  RESEND_API_KEY: process.env.RESEND_API_KEY || '',
-  OPENAI_API_KEY: process.env.OPENAI_API_KEY || ''
+// lib/env.ts
+// Centralized, typed access to environment variables used across the app.
+type NonEmptyString = string & { __brand: 'nonempty' };
+
+function req(name: string): NonEmptyString {
+  const v = process.env[name];
+  if (!v || v.trim() === '') {
+    throw new Error(`Missing required env var: ${name}`);
+  }
+  return v as NonEmptyString;
 }
+
+export const env = {
+  // Supabase
+  SUPABASE_URL: req('SUPABASE_URL'),
+  SUPABASE_ANON_KEY: req('SUPABASE_ANON_KEY'),
+  SUPABASE_SERVICE_ROLE_KEY: req('SUPABASE_SERVICE_ROLE_KEY'),
+
+  // Public (client) copies if you use them elsewhere
+  NEXT_PUBLIC_SUPABASE_URL: req('NEXT_PUBLIC_SUPABASE_URL'),
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: req('NEXT_PUBLIC_SUPABASE_ANON_KEY'),
+
+  // Sheets (published-to-web CSVs)
+  SHEETS_ITEMS_CSV: process.env.SHEETS_ITEMS_CSV || '',
+  SHEETS_ASSETS_CSV: process.env.SHEETS_ASSETS_CSV || '',
+  SHEETS_BLUEPRINTS_CSV: process.env.SHEETS_BLUEPRINTS_CSV || '',
+
+  // Optional integrations
+  RESEND_API_KEY: process.env.RESEND_API_KEY || '',
+  ASSESSOR_EMAIL: process.env.ASSESSOR_EMAIL || '',
+  USE_BLUEPRINTS: process.env.USE_BLUEPRINTS || '',
+  NEXT_PUBLIC_START_PASSCODE: process.env.NEXT_PUBLIC_START_PASSCODE || '',
+} as const;
