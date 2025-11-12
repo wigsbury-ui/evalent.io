@@ -6,10 +6,10 @@ import { supabaseAdmin } from '../../../lib/supabaseClient';
 
 type Row = Record<string, string | null | undefined>;
 
-// ---- parsing helpers --------------------------------------------------------
+// ---------- CSV helpers ------------------------------------------------------
 
 const NUMERIC_COLS = new Set(['script_version', 'duration_seconds', 'target_count']);
-const BOOL_LIKE = new Set(['_has_vid', '_has_share']);
+const BOOL_LIKE     = new Set(['_has_vid', '_has_share']);
 
 const parseCsvUrl = async (url: string): Promise<Row[]> => {
   const r = await fetch(url, { cache: 'no-store' });
@@ -25,63 +25,52 @@ function normalizeRow(row: Row) {
     const key = (rawKey || '').trim();
     const v = (rawVal ?? '').toString().trim();
 
-    if (v === '') { out[key] = null; continue; }             // empty -> null
-    if (NUMERIC_COLS.has(key)) {                             // numbers
+    if (!key) continue;                  // skip empty headers
+    if (v === '') { out[key] = null; continue; }     // empty -> null
+
+    if (NUMERIC_COLS.has(key)) {         // numbers
       const n = Number(v);
       out[key] = Number.isFinite(n) ? n : null;
       continue;
     }
-    if (BOOL_LIKE.has(key)) {                                // booleans
+
+    if (BOOL_LIKE.has(key)) {            // booleans
       const t = v.toLowerCase();
       out[key] = t === 'true' || t === '1' || t === 'yes';
       continue;
     }
-    out[key] = v;                                            // text
+
+    out[key] = v;                        // text
   }
   return out;
 }
 
-// ---- column filtering to avoid schema mismatches ----------------------------
-
-const dropMetaKeys = (obj: Record<string, any>) => {
+// Remove meta/temporary columns commonly present in sheets/exports
+const stripMeta = (o: Record<string, any>) => {
   const out: Record<string, any> = {};
-  for (const [k, v] of Object.entries(obj)) {
-    if (!k || k.startsWith('_')) continue; // strip "__sheet", "_row", etc.
+  for (const [k, v] of Object.entries(o)) {
+    if (k.startsWith('_')) continue;     // drop __sheet, _row, etc.
     out[k] = v;
   }
   return out;
 };
 
-const ASSET_COLS = new Set([
-  'item_id',
-  'programme',
-  'video_id',
-  'share_url',
-  'download_url',
-  'duration_seconds',
-  'script_version',
-  'video_thumbnail',
-  'status',
-  'notes',
-]);
+// Fetch the actual column list of a table (by reading one row)
+async function getTableColumns(table: string): Promise<Set<string>> {
+  const { data, error } = await supabaseAdmin.from(table).select('*').limit(1);
+  if (error) throw new Error(`schema probe failed for ${table}: ${error.message}`);
+  const sample = (data && data[0]) || {};
+  return new Set(Object.keys(sample));
+}
 
-const BLUEPRINT_COLS = new Set([
-  'id',
-  'programme',
-  'year',
-  'domain',
-  'target_count',
-]);
+// Keep only keys that exist in the table
+const keepOnly = (allowed: Set<string>) => (row: Record<string, any>) => {
+  const out: Record<string, any> = {};
+  for (const [k, v] of Object.entries(row)) if (allowed.has(k)) out[k] = v;
+  return out;
+};
 
-const pick =
-  (allowed: Set<string>) =>
-  (row: Record<string, any>): Record<string, any> => {
-    const out: Record<string, any> = {};
-    for (const [k, v] of Object.entries(row)) if (allowed.has(k)) out[k] = v;
-    return out;
-  };
-
-// ---- route ------------------------------------------------------------------
+// ---------- Route ------------------------------------------------------------
 
 export async function GET() {
   try {
@@ -89,19 +78,30 @@ export async function GET() {
     const assetsUrl = env.SHEETS_ASSETS_CSV;
     const blueprintsUrl = env.SHEETS_BLUEPRINTS_CSV;
 
-    // 1) Pull CSVs (only those configured)
-    const [itemsRaw, assetsRaw, blueprintsRaw] = await Promise.all([
+    // Parse CSVs that are configured
+    const [itemsCsv, assetsCsv, blueprintsCsv] = await Promise.all([
       itemsUrl ? parseCsvUrl(itemsUrl) : Promise.resolve([]),
       assetsUrl ? parseCsvUrl(assetsUrl) : Promise.resolve([]),
       blueprintsUrl ? parseCsvUrl(blueprintsUrl) : Promise.resolve([]),
     ]);
 
-    // 2) Filter rows to avoid schema errors
-    const items = itemsRaw.map(dropMetaKeys); // items table matches; just drop meta cols
-    const assets = assetsRaw.map(dropMetaKeys).map(pick(ASSET_COLS));
-    const blueprints = blueprintsRaw.map(dropMetaKeys).map(pick(BLUEPRINT_COLS));
+    // Strip meta keys first
+    const itemsRaw = itemsCsv.map(stripMeta);
+    const assetsRaw = assetsCsv.map(stripMeta);
+    const blueprintsRaw = blueprintsCsv.map(stripMeta);
 
-    // 3) Upserts
+    // Probe live schema & filter to real columns to avoid “column not found”
+    const [itemCols, assetCols, blueprintCols] = await Promise.all([
+      itemsRaw.length ? getTableColumns('items') : Promise.resolve(new Set<string>()),
+      assetsRaw.length ? getTableColumns('assets') : Promise.resolve(new Set<string>()),
+      blueprintsRaw.length ? getTableColumns('blueprints') : Promise.resolve(new Set<string>()),
+    ]);
+
+    const items = itemCols.size ? itemsRaw.map(keepOnly(itemCols)) : [];
+    const assets = assetCols.size ? assetsRaw.map(keepOnly(assetCols)) : [];
+    const blueprints = blueprintCols.size ? blueprintsRaw.map(keepOnly(blueprintCols)) : [];
+
+    // Upserts
     let upItems = 0, upAssets = 0, upBps = 0;
 
     if (items.length) {
@@ -116,33 +116,23 @@ export async function GET() {
       const { error, count } = await supabaseAdmin
         .from('assets')
         .upsert(assets, { onConflict: 'item_id', ignoreDuplicates: false, count: 'exact' });
-      if (error?.message?.includes('column') || error?.message?.includes('schema')) {
-        // soft-fail if your DB doesn’t have these columns yet
-      } else if (error) {
-        throw new Error(`assets upsert error: ${error.message}`);
-      } else {
-        upAssets = count ?? assets.length;
-      }
+      if (error) throw new Error(`assets upsert error: ${error.message}`);
+      upAssets = count ?? assets.length;
     }
 
     if (blueprints.length) {
       const { error, count } = await supabaseAdmin
         .from('blueprints')
         .upsert(blueprints, { onConflict: 'id', ignoreDuplicates: false, count: 'exact' });
-      if (error?.message?.includes('column') || error?.message?.includes('schema')) {
-        // soft-fail likewise
-      } else if (error) {
-        throw new Error(`blueprints upsert error: ${error.message}`);
-      } else {
-        upBps = count ?? blueprints.length;
-      }
+      if (error) throw new Error(`blueprints upsert error: ${error.message}`);
+      upBps = count ?? blueprints.length;
     }
 
     return NextResponse.json({
       ok: true,
       upserted: { items: upItems, assets: upAssets, blueprints: upBps },
-      received: { items: items.length, assets: assets.length, blueprints: blueprints.length },
-      note: 'Underscore-prefixed columns were stripped to avoid schema mismatches.',
+      received: { items: itemsRaw.length, assets: assetsRaw.length, blueprints: blueprintsRaw.length },
+      note: 'Rows were filtered to match live table schemas; unknown columns (e.g., "anchor", "__sheet") were dropped.',
     });
   } catch (e: any) {
     return new NextResponse(`Seed failed: ${e?.message ?? e}`, { status: 500 });
