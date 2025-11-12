@@ -1,6 +1,6 @@
 {
   "name": "evalent-pro-pack",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "private": true,
   "engines": { "node": ">=18.18 <21" },
   "scripts": {
@@ -33,7 +33,6 @@
   },
   "overrides": {
     "fontkit": "2.0.2",
-    "restructure": "3.0.1",
-    "iconv-lite": "0.6.3"
+    "restructure": "3.0.1"
   }
 }
