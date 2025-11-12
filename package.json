@@ -1,0 +1,42 @@
+{
+  "name": "evalent-pro-pack",
+  "version": "1.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "seed": "tsx scripts/seed.ts",
+    "test:smoke": "bash scripts/smoke.sh http://localhost:3000"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "csv-parse": "^5.5.6",
+    "next": "14.2.4",
+    "pdfkit": "^0.14.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "resend": "^4.0.0",
+    "zod": "^3.23.8",
+    "iconv-lite": "^0.6.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.30",
+    "@types/react": "^18.2.66",
+    "@types/react-dom": "^18.2.22",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "14.2.4",
+    "tsx": "^4.19.2",
+    "typescript": "^5.4.5",
+    "@types/pdfkit": "^0.14.7"
+  },
+  "engines": {
+    "node": ">=18.18 <21"
+  },
+  "overrides": {
+    "pdfkit": "0.14.0",
+    "fontkit": "2.0.2",
+    "restructure": "3.0.1",
+    "iconv-lite": "0.6.3"
+  }
+}
