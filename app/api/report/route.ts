@@ -1,4 +1,5 @@
-export const runtime = 'nodejs'
+export const runtime = 'nodejs';
+
 import PDFDocument from 'pdfkit'
 import { supabaseAnon } from '../../../lib/supabaseClient'
 import { Resend } from 'resend'
@@ -8,6 +9,7 @@ export async function POST(req: Request) {
   const { session_id, email } = await req.json();
   if (!session_id) return new Response('session_id required', { status: 400 });
 
+  // Load session + attempts
   const { data: session } = await supabaseAnon.from('sessions').select('*').eq('id', session_id).single();
   if (!session) return new Response('Session not found', { status: 404 });
 
@@ -15,6 +17,7 @@ export async function POST(req: Request) {
   const pass = (attempts || []).filter(a => a.correct === true).length;
   const total = (attempts || []).length;
 
+  // Create PDF in memory
   const doc = new PDFDocument();
   const chunks: Buffer[] = [];
   doc.on('data', (c: Buffer) => chunks.push(c));
@@ -27,8 +30,10 @@ export async function POST(req: Request) {
   doc.text(`Score: ${pass}/${total}`);
   doc.moveDown().text('Thank you for completing the assessment.');
   doc.end();
+
   const pdf = await done;
 
+  // Optional email via Resend
   if (email && env.RESEND_API_KEY) {
     const resend = new Resend(env.RESEND_API_KEY);
     await resend.emails.send({
@@ -40,5 +45,12 @@ export async function POST(req: Request) {
     });
   }
 
-  return new Response(pdf, { headers: { 'Content-Type': 'application/pdf' } });
+  // ✅ Return as Uint8Array (not Node Buffer) to satisfy Web Response typings
+  const body = new Uint8Array(pdf);
+  return new Response(body, {
+    headers: {
+      'Content-Type': 'application/pdf',
+      'Cache-Control': 'no-store'
+    }
+  });
 }
