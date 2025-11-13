@@ -1,6 +1,10 @@
+// lib/supabaseClient.ts
+// Shared Supabase client for anonymous (non-admin) access, used by the
+// student test flow and diagnostics/reporting API routes.
+
 import { createClient } from '@supabase/supabase-js';
+import { env } from './env';
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-export const supabase = createClient(url, anon, { auth: { persistSession: false } });
+export const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_ANON_KEY, {
+  auth: { persistSession: false },
+});
