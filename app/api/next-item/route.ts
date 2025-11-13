@@ -9,10 +9,10 @@ export async function GET(req: NextRequest) {
     return new NextResponse('session_id required', { status: 400 });
   }
 
-  // 1) Load session
+  // 1) Load the session
   const { data: session, error: sessionError } = await supabase
     .from('sessions')
-    .select('id, year, status, item_index, selected_ids')
+    .select('id, year, status, item_index')
     .eq('id', sessionId)
     .single();
 
@@ -21,62 +21,63 @@ export async function GET(req: NextRequest) {
   }
 
   if (session.status === 'finished') {
-    // No more questions once finished
-    return NextResponse.json({ item: null });
+    return NextResponse.json({ ok: true, item: null });
   }
 
-  const currentIndex = session.item_index ?? 0;
+  const index = session.item_index ?? 0;
 
-  // 2) Pick next item for the session's year (simple version: ordered by id)
+  // 2) Pick the next item for this year
   const { data: items, error: itemError } = await supabase
     .from('items')
-    .select('id, stem, type, options')
+    .select('id, stem, kind, year, option_a, option_b, option_c, option_d')
+    .not('stem', 'is', null)
     .eq('year', session.year)
     .order('id', { ascending: true })
-    .range(currentIndex, currentIndex); // single row at this index
+    .range(index, index); // get a single row at this index
 
   if (itemError) {
     return new NextResponse(itemError.message, { status: 500 });
   }
 
-  const item = items && items[0];
+  const row = items?.[0];
 
-  if (!item) {
-    // No item at this index → test is done
-    return NextResponse.json({ item: null });
+  // No more items → mark finished
+  if (!row) {
+    await supabaseAdmin
+      .from('sessions')
+      .update({ status: 'finished' })
+      .eq('id', sessionId);
+
+    return NextResponse.json({ ok: true, item: null });
   }
 
-  // 3) Optional: load associated video asset
-  const { data: asset } = await supabase
-    .from('assets_vw')
-    .select(
-      'item_id, video_title, video_id, share_url, download_url, video_thumbnail, player_url',
-    )
-    .eq('item_id', item.id)
-    .maybeSingle();
+  // 3) Build options array
+  const options = [row.option_a, row.option_b, row.option_c, row.option_d]
+    .filter(Boolean)
+    .map(String);
 
-  // 4) Update session progress (item_index and selected_ids)
-  const prevSelected = Array.isArray(session.selected_ids)
-    ? session.selected_ids
-    : [];
-  const nextSelected = [...prevSelected, item.id];
+  const isMcq = options.length >= 2;
 
+  // DB "kind" (for logging, analytics) and UI "type" (for rendering)
+  const kind = (row.kind as string | null) || (isMcq ? 'mcq' : 'text');
+  const type: 'mcq' | 'short' = isMcq ? 'mcq' : 'short';
+
+  // 4) Advance the session index
   await supabaseAdmin
     .from('sessions')
-    .update({
-      item_index: currentIndex + 1,
-      selected_ids: nextSelected,
-    })
+    .update({ item_index: index + 1 })
     .eq('id', sessionId);
 
-  // 5) Return payload in the shape the client expects
+  // 5) Return exactly what the client expects
   return NextResponse.json({
+    ok: true,
     item: {
-      id: item.id,
-      stem: item.stem,
-      type: item.type,
-      options: item.options ?? undefined,
+      id: row.id,
+      stem: row.stem,
+      type,
+      options: isMcq ? options : undefined,
     },
-    asset: asset || null,
+    // meta is optional; client ignores it, but it’s useful if you inspect the API response
+    meta: { kind },
   });
 }
