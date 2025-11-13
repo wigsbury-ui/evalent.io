@@ -15,10 +15,10 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // 1) Fetch item so we can infer kind + correctness
+  // 1) Fetch item to infer kind + correctness
   const { data: item, error: itemError } = await supabase
     .from('items')
-    .select('kind, mcq_options_json, answer_key')
+    .select('type, options, correct')
     .eq('id', itemId)
     .maybeSingle();
 
@@ -26,41 +26,35 @@ export async function GET(req: NextRequest) {
     return new NextResponse(itemError.message, { status: 500 });
   }
 
-  // Infer kind (mcq vs text) based on sheet structure
-  let options: string[] = [];
-  if (item?.mcq_options_json) {
-    try {
-      const parsed = JSON.parse(item.mcq_options_json as unknown as string);
-      if (Array.isArray(parsed)) {
-        options = parsed.map((v) => String(v));
-      }
-    } catch {
-      options = [];
-    }
-  }
+  const rawOptions = item ? (item as any).options : null;
+  const options: string[] = Array.isArray(rawOptions)
+    ? rawOptions.map((v: any) => String(v))
+    : [];
 
-  const inferredKind =
-    (item && (item.kind as string | null)) ||
-    (options.length >= 2 ? 'mcq' : 'text');
+  const baseType =
+    (item?.type as string | null) || (options.length >= 2 ? 'mcq' : 'short');
+  const inferredKind = baseType === 'mcq' ? 'mcq' : 'short';
 
-  // 2) Compute "correct" flag where we can
+  // 2) Compute correctness using `items.correct`
   let correct: boolean | null = null;
-  if (item && item.answer_key != null) {
-    const key = String(item.answer_key).trim();
+  if (item && item.correct != null) {
+    const key = String(item.correct).trim();
     const given = String(response).trim();
     if (key !== '') {
       correct = given === key;
     }
   }
 
-  // 3) Insert attempt row – MUST include kind (NOT NULL in DB)
+  // 3) Insert attempt row
+  // NOTE: your Supabase `attempts` table currently has a NOT NULL `kind` column,
+  // so we *always* send it here.
   const { error: insertError } = await supabaseAdmin.from('attempts').insert([
     {
       session_id: sessionId,
       item_id: itemId,
-      kind: inferredKind,        // aligns with NOT NULL constraint
-      answer: response,          // student's answer text / option value
-      correct,                   // true / false / null
+      kind: inferredKind,
+      response,     // student's answer (works with schema.sql)
+      correct,      // true / false / null
     },
   ]);
 
