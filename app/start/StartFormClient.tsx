@@ -7,54 +7,51 @@ type Item = {
   id: string;
   stem?: string | null;
   prompt?: string | null;
-  // if your table uses different fields, add them here
 };
 
-const UUID_RX =
+const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
-function safeGetSid(): string {
+const getSid = () => {
   if (typeof window === 'undefined') return '';
   const s = sessionStorage.getItem('evalent_sid') || '';
-  return UUID_RX.test(s) ? s : '';
-}
-
-function safeSetSid(id: string) {
+  return UUID.test(s) ? s : '';
+};
+const setSid = (s: string) => {
   if (typeof window === 'undefined') return;
-  sessionStorage.setItem('evalent_sid', id);
-}
+  sessionStorage.setItem('evalent_sid', s);
+};
 
 export default function StartFormClient() {
-  const [sid, setSid] = useState('');
+  const [sid, setSidState] = useState('');
   const [item, setItem] = useState<Item | null>(null);
   const [answer, setAnswer] = useState('');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const booted = useRef(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const mounted = useRef(false);
 
   async function loadNext(forceNew = false) {
     setLoading(true);
-    setError(null);
+    setMsg(null);
     try {
-      const currentSid = forceNew ? '' : safeGetSid();
+      const current = forceNew ? '' : getSid();
       const qs = new URLSearchParams();
-      if (currentSid) qs.set('sid', currentSid);
-      qs.set('cb', String(Date.now())); // cache buster
-
+      if (current) qs.set('sid', current);
+      qs.set('cb', String(Date.now()));
       const r = await fetch(`/api/next-item?${qs.toString()}`, {
         method: 'GET',
         cache: 'no-store',
       });
       if (!r.ok) throw new Error(await r.text());
-
       const data = await r.json();
-      if (data?.sid && UUID_RX.test(data.sid)) {
+      if (data?.sid && UUID.test(data.sid)) {
+        setSidState(data.sid);
         setSid(data.sid);
-        safeSetSid(data.sid);
       }
       setItem(data?.item ?? null);
+      if (!data?.item) setMsg('No item returned. Click “New session” to try again.');
     } catch (e: any) {
-      setError(e?.message ?? 'Failed to load next item');
+      setMsg(e?.message ?? 'Failed to load item');
       setItem(null);
     } finally {
       setLoading(false);
@@ -62,102 +59,66 @@ export default function StartFormClient() {
   }
 
   useEffect(() => {
-    if (booted.current) return;
-    booted.current = true;
-    loadNext();
+    if (mounted.current) return;
+    mounted.current = true;
+    loadNext(false);
   }, []);
 
   async function submit() {
     if (!sid || !item?.id) return;
     try {
-      setError(null);
       const r = await fetch('/api/submit', {
         method: 'POST',
         cache: 'no-store',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sid,
-          item_id: item.id,
-          answer_text: answer,
-        }),
+        body: JSON.stringify({ sid, item_id: item.id, answer_text: answer }),
       });
       if (!r.ok) throw new Error(await r.text());
       setAnswer('');
-      await loadNext();
+      await loadNext(false);
     } catch (e: any) {
-      setError(e?.message ?? 'Submit failed');
+      setMsg(e?.message ?? 'Submit failed');
     }
   }
 
   return (
-    <div className="rounded-2xl border p-6 space-y-4 text-black">
-      <div className="text-sm opacity-70">
-        <span className="font-semibold">Session:</span>{' '}
-        <code>{sid || '(none yet)'}</code>
+    <div className="max-w-5xl mx-auto p-6 border rounded-2xl">
+      <div className="text-sm opacity-70 mb-3">
+        <b>Session:</b> <code>{sid || '(initializing)'}</code>
       </div>
 
-      {loading && <div className="text-xl">Loading…</div>}
+      {/* ALWAYS SHOW INPUT UI (even if item is temporarily null) */}
+      <div className="text-2xl font-medium mb-2">
+        {item?.stem || item?.prompt || 'Loading question…'}
+      </div>
 
-      {!loading && error && (
-        <div className="rounded-md border border-red-300 bg-red-50 p-3 text-red-700">
-          <div className="font-semibold mb-1">Error</div>
-          <pre className="whitespace-pre-wrap break-words text-sm">{error}</pre>
-          <div className="mt-3 flex gap-2">
-            <button
-              onClick={() => loadNext(false)}
-              className="rounded-md border px-3 py-1"
-            >
-              Retry
-            </button>
-            <button
-              onClick={() => loadNext(true)}
-              className="rounded-md border px-3 py-1"
-            >
-              New session
-            </button>
-          </div>
-        </div>
-      )}
+      <textarea
+        value={answer}
+        onChange={(e) => setAnswer(e.target.value)}
+        placeholder="Type your answer here…"
+        className="w-full h-28 border rounded-md p-3 mb-3"
+      />
 
-      {!loading && !error && (
-        <>
-          <div className="text-2xl font-medium">
-            {item
-              ? item.stem ?? item.prompt ?? 'Question'
-              : 'No more items. 🎉'}
-          </div>
+      <div className="flex gap-2">
+        <button
+          onClick={submit}
+          disabled={!item || !sid || !answer.trim()}
+          className="border rounded-md px-4 py-2 disabled:opacity-50"
+        >
+          Submit answer
+        </button>
+        <button onClick={() => loadNext(false)} className="border rounded-md px-4 py-2">
+          Reload item
+        </button>
+        <button onClick={() => loadNext(true)} className="border rounded-md px-4 py-2">
+          New session
+        </button>
+      </div>
 
-          {/* Always render the input area so the UI never appears blank */}
-          <textarea
-            value={answer}
-            onChange={(e) => setAnswer(e.target.value)}
-            placeholder={item ? 'Type your answer…' : 'No item loaded'}
-            className="w-full h-28 rounded-md border p-3 text-black"
-          />
-
-          <div className="flex gap-2">
-            <button
-              onClick={submit}
-              disabled={!item || !answer.trim()}
-              className="rounded-md border px-4 py-2 disabled:opacity-50"
-            >
-              Submit answer
-            </button>
-            <button
-              onClick={() => loadNext(false)}
-              className="rounded-md border px-4 py-2"
-            >
-              Reload item
-            </button>
-            <button
-              onClick={() => loadNext(true)}
-              className="rounded-md border px-4 py-2"
-            >
-              New session
-            </button>
-          </div>
-        </>
-      )}
+      <div className="mt-3 text-sm">
+        {loading ? 'Loading…' : null}
+        {msg ? <div className="mt-2 text-red-600">{msg}</div> : null}
+      </div>
     </div>
   );
 }
