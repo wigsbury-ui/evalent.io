@@ -4,81 +4,94 @@ import { supabase } from '@/lib/supabaseClient';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
 export async function GET(req: NextRequest) {
-  const sessionId = req.nextUrl.searchParams.get('session_id');
+  const url = new URL(req.url);
+
+  // Accept both new and legacy query names
+  const sessionId =
+    url.searchParams.get('session_id') || url.searchParams.get('sid');
+
   if (!sessionId) {
-    return new NextResponse('session_id required', { status: 400 });
+    return new NextResponse('session_id (or sid) query param is required', {
+      status: 400,
+    });
   }
 
-  // 1) Load session (year + current index)
+  // 1) Load session to get year + current index
   const { data: session, error: sessionError } = await supabase
     .from('sessions')
-    .select('id, year, status, item_index')
+    .select('id, year, item_index')
     .eq('id', sessionId)
-    .single();
+    .maybeSingle();
 
-  if (sessionError || !session) {
-    return new NextResponse('Session not found', { status: 404 });
+  if (sessionError) {
+    return new NextResponse(sessionError.message, { status: 500 });
   }
-
-  if (session.status === 'finished') {
-    return NextResponse.json({ ok: true, item: null });
+  if (!session) {
+    return new NextResponse('Session not found', { status: 404 });
   }
 
   const index = session.item_index ?? 0;
 
-  // 2) Pick the next item for this year
+  // 2) Pick ONE item for this year at the current index
   const { data: items, error: itemError } = await supabase
     .from('items')
     .select('id, stem, type, options, correct')
     .eq('year', session.year)
     .not('stem', 'is', null)
     .order('id', { ascending: true })
-    .range(index, index); // exactly one row
+    .range(index, index); // a single row
 
   if (itemError) {
     return new NextResponse(itemError.message, { status: 500 });
   }
 
-  const row = items?.[0];
-
-  // No more items → mark finished
-  if (!row) {
-    await supabaseAdmin
-      .from('sessions')
-      .update({ status: 'finished' })
-      .eq('id', sessionId);
-
-    return NextResponse.json({ ok: true, item: null });
+  // No more items -> we're done
+  if (!items || !items.length) {
+    return NextResponse.json({
+      ok: true,
+      item: null,
+      asset: null,
+      done: true,
+    });
   }
 
-  // 3) Build options array from jsonb `options`
+  const row = items[0];
+
+  // 3) Normalise options + type
   const rawOptions = (row as any).options;
   const options: string[] = Array.isArray(rawOptions)
-    ? rawOptions.map((v) => String(v))
+    ? rawOptions.map((o) => String(o))
     : [];
 
-  // Decide UI type: mcq vs short
   const baseType = (row.type as string | null) || (options.length >= 2 ? 'mcq' : 'short');
-  const type: 'mcq' | 'short' = baseType === 'mcq' ? 'mcq' : 'short';
+  const type: 'mcq' | 'short' =
+    baseType.toLowerCase() === 'mcq' || options.length >= 2 ? 'mcq' : 'short';
 
-  // 4) Advance session index
+  // 4) Optional asset (video) for this item
+  const { data: asset } = await supabase
+    .from('assets')
+    .select(
+      'item_id, video_title, video_id, share_url, download_url, player_url'
+    )
+    .eq('item_id', row.id)
+    .maybeSingle();
+
+  // 5) Bump item_index so next call moves on
   await supabaseAdmin
     .from('sessions')
     .update({ item_index: index + 1 })
-    .eq('id', sessionId);
+    .eq('id', session.id);
 
-  // 5) Return payload for the client
+  // 6) Return item + asset to the client
   return NextResponse.json({
     ok: true,
+    done: false,
     item: {
       id: row.id,
       stem: row.stem,
       type,
-      options: type === 'mcq' ? options : undefined,
+      options,
     },
-    // meta for debugging if you inspect the API directly
-    meta: {
-      correct: row.correct,
-    },
+    asset: asset || null,
   });
 }
