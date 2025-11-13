@@ -1,7 +1,17 @@
 import { NextResponse } from 'next/server'
-import parse from 'csv-parse/sync'
+import { parse } from 'csv-parse/sync'
+import { createClient } from '@supabase/supabase-js'
 import { env } from '../../../lib/env'
-import { supabaseAdmin } from '../../../lib/supabaseClient'
+
+// If you have a Database type you can import it and use createClient<Database>,
+// but it's optional. We'll keep it generic to avoid type errors.
+const supabaseAdmin = createClient(
+  env.SUPABASE_URL,
+  env.SUPABASE_SERVICE_ROLE_KEY,
+  {
+    auth: { persistSession: false }
+  }
+)
 
 type Row = Record<string, string>
 
@@ -11,9 +21,6 @@ const NUMERIC_COLS = new Set(['script_version', 'duration_seconds'])
 
 /**
  * Convert arbitrary spreadsheet header into snake_case Postgres column name.
- * - Inserts underscores between lower/upper boundaries: "VideoURL" -> "video_url"
- * - Replaces non-alphanumeric characters with '_'
- * - Ensures the name does not start with a digit.
  */
 function toSnake(rawKey: string): string {
   const key = rawKey.trim()
@@ -24,7 +31,7 @@ function toSnake(rawKey: string): string {
     const ch = key[i]
     const prev = i > 0 ? key[i - 1] : ''
 
-    // break on lower->upper like "VideoURL" -> "video_url"
+    // lower->upper boundary => insert underscore
     if (prev && /[a-z]/.test(prev) && /[A-Z]/.test(ch)) {
       out += '_'
     }
@@ -100,8 +107,7 @@ function normaliseAsset(row: Row): Record<string, any> {
     out[key] = value
   }
 
-  // Bridge Google Sheet column names to DB fields:
-  // - Many of the sheets use "Video_URL" or "video_url" – we want that as share_url.
+  // Map Google Sheet URL columns into share_url if needed
   if (!out.share_url && typeof row['Video_URL'] === 'string' && row['Video_URL'].trim() !== '') {
     out.share_url = row['Video_URL'].trim()
   }
@@ -121,10 +127,12 @@ async function fetchCsvRows(url: string): Promise<Row[]> {
     throw new Error(`CSV fetch failed (${res.status}) for ${url}`)
   }
   const text = await res.text()
+
   const rows = parse(text, {
     columns: true,
     skip_empty_lines: true,
   }) as Row[]
+
   return rows
 }
 
@@ -171,7 +179,7 @@ export async function POST() {
       }
     }
 
-    // 4. Return some diagnostics so the Admin screen can show counts
+    // 4. Diagnostics for Admin screen
     const [itemsCount, assetsCount, blueprintsCount] = await Promise.all([
       countRows('items').catch(() => 0),
       countRows('assets').catch(() => 0),
