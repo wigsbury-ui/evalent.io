@@ -11,7 +11,6 @@ type Item = Record<string, any> & {
 
 function extractOptions(it: Item | null): string[] {
   if (!it) return [];
-
   for (const k of ['options', 'choices', 'answers', 'answer_options']) {
     const v = it[k];
     if (Array.isArray(v) && v.length) return v.map(String);
@@ -47,7 +46,7 @@ function getPrompt(it: Item | null): string {
 }
 
 type NextItemResponse =
-  | { ok: true; item: Item | null }
+  | { ok: true; sid: string; item: Item | null }
   | { ok: false; error: string };
 
 function getUrlSid(): string | null {
@@ -71,6 +70,7 @@ export default function StartFormClient() {
   const responseValue = isMCQ ? mcqResponse : textResponse;
   const hasResponse = responseValue.trim() !== '';
 
+  // bootstrap a session id (URL → storage → create)
   React.useEffect(() => {
     const fromUrl = getUrlSid();
     if (fromUrl) {
@@ -83,37 +83,35 @@ export default function StartFormClient() {
       setSessionId(existing);
       return;
     }
-    const sid = `local-${crypto.randomUUID()}`;
-    sessionStorage.setItem('evalent_sid', sid);
-    setSessionId(sid);
+    // leave null for now; next-item will give us a sid we can store
+    setSessionId(null);
   }, []);
 
   React.useEffect(() => {
-    if (!sessionId) return;
     void loadNext();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
   async function loadNext() {
-    if (!sessionId) return;
     setLoadingItem(true);
     setServerError(null);
     setTextResponse('');
     setMcqResponse('');
     try {
-      const r = await fetch(`/api/next-item?sid=${encodeURIComponent(sessionId)}`, {
-        method: 'GET',
-        cache: 'no-store',
-      });
-      let data: NextItemResponse | null = null;
-      try { data = await r.json(); } catch (_) {}
+      const qs = sessionId ? `?sid=${encodeURIComponent(sessionId)}` : '';
+      const r = await fetch(`/api/next-item${qs}`, { method: 'GET', cache: 'no-store' });
+      const data = (await r.json().catch(() => null)) as NextItemResponse | null;
       if (!r.ok || !data || !('ok' in data) || !data.ok) {
         const msg = (!r.ok ? `HTTP ${r.status}` : (data as any)?.error) ?? 'Unknown error';
         setServerError(`Next item error: ${msg}`);
         setItem(null);
         return;
       }
-      console.log('[Evalent] Loaded item', data.item);
+      // if API bootstrapped a sid for us, store it
+      if (data.sid) {
+        sessionStorage.setItem('evalent_sid', data.sid);
+        setSessionId(data.sid);
+      }
       setItem(data.item ?? null);
     } catch (e: any) {
       setServerError(`Next item fetch failed: ${e?.message ?? e}`);
@@ -142,14 +140,11 @@ export default function StartFormClient() {
           meta: { client_ts: Date.now(), is_mcq: isMCQ },
         }),
       });
-
-      const text = await r.text(); // prefer text for clearer errors
+      const text = await r.text();
       if (!r.ok) {
         setServerError(text || `Submit failed (HTTP ${r.status})`);
         return;
       }
-
-      // success → load next
       await loadNext();
     } catch (e: any) {
       setServerError(`Submit failed: ${e?.message ?? e}`);
