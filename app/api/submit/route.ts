@@ -15,10 +15,10 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // 1) Fetch item metadata so we can infer kind
+  // 1) Fetch item so we can infer kind + correctness
   const { data: item, error: itemError } = await supabase
     .from('items')
-    .select('kind, option_a, option_b, option_c, option_d')
+    .select('kind, mcq_options_json, answer_key')
     .eq('id', itemId)
     .maybeSingle();
 
@@ -26,24 +26,41 @@ export async function GET(req: NextRequest) {
     return new NextResponse(itemError.message, { status: 500 });
   }
 
-  const options = item
-    ? [item.option_a, item.option_b, item.option_c, item.option_d]
-        .filter(Boolean)
-        .map(String)
-    : [];
+  // Infer kind (mcq vs text) based on sheet structure
+  let options: string[] = [];
+  if (item?.mcq_options_json) {
+    try {
+      const parsed = JSON.parse(item.mcq_options_json as unknown as string);
+      if (Array.isArray(parsed)) {
+        options = parsed.map((v) => String(v));
+      }
+    } catch {
+      options = [];
+    }
+  }
 
   const inferredKind =
     (item && (item.kind as string | null)) ||
     (options.length >= 2 ? 'mcq' : 'text');
 
-  // 2) Record the attempt
+  // 2) Compute "correct" flag where we can
+  let correct: boolean | null = null;
+  if (item && item.answer_key != null) {
+    const key = String(item.answer_key).trim();
+    const given = String(response).trim();
+    if (key !== '') {
+      correct = given === key;
+    }
+  }
+
+  // 3) Insert attempt row – MUST include kind (NOT NULL in DB)
   const { error: insertError } = await supabaseAdmin.from('attempts').insert([
     {
       session_id: sessionId,
       item_id: itemId,
-      kind: inferredKind,
-      answer: response, // keep using the original "answer" column
-      // we can add "correct" later; leaving it null is fine for now
+      kind: inferredKind,        // aligns with NOT NULL constraint
+      answer: response,          // student's answer text / option value
+      correct,                   // true / false / null
     },
   ]);
 
