@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
     return new NextResponse('session_id required', { status: 400 });
   }
 
-  // 1) Load the session (to get year + current index)
+  // 1) Load session (year + current index)
   const { data: session, error: sessionError } = await supabase
     .from('sessions')
     .select('id, year, status, item_index')
@@ -29,10 +29,11 @@ export async function GET(req: NextRequest) {
   // 2) Pick the next item for this year
   const { data: items, error: itemError } = await supabase
     .from('items')
-    .select('id, stem, kind, year, mcq_options_json, answer_key')
+    .select('id, stem, type, options, correct')
     .eq('year', session.year)
+    .not('stem', 'is', null)
     .order('id', { ascending: true })
-    .range(index, index); // single row
+    .range(index, index); // exactly one row
 
   if (itemError) {
     return new NextResponse(itemError.message, { status: 500 });
@@ -40,7 +41,7 @@ export async function GET(req: NextRequest) {
 
   const row = items?.[0];
 
-  // No more items → mark session finished
+  // No more items → mark finished
   if (!row) {
     await supabaseAdmin
       .from('sessions')
@@ -50,44 +51,34 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, item: null });
   }
 
-  // 3) Build MCQ options from mcq_options_json
-  let options: string[] = [];
-  if (row.mcq_options_json) {
-    try {
-      const parsed = JSON.parse(row.mcq_options_json as unknown as string);
-      if (Array.isArray(parsed)) {
-        options = parsed.map((v) => String(v));
-      }
-    } catch {
-      // if parsing fails, we just leave options as []
-    }
-  }
+  // 3) Build options array from jsonb `options`
+  const rawOptions = (row as any).options;
+  const options: string[] = Array.isArray(rawOptions)
+    ? rawOptions.map((v) => String(v))
+    : [];
 
-  const hasMcqOptions = options.length >= 2;
+  // Decide UI type: mcq vs short
+  const baseType = (row.type as string | null) || (options.length >= 2 ? 'mcq' : 'short');
+  const type: 'mcq' | 'short' = baseType === 'mcq' ? 'mcq' : 'short';
 
-  // DB "kind" vs UI "type"
-  const kind =
-    (row.kind as string | null) || (hasMcqOptions ? 'mcq' : 'text');
-  const type: 'mcq' | 'short' = hasMcqOptions ? 'mcq' : 'short';
-
-  // 4) Advance the session index
+  // 4) Advance session index
   await supabaseAdmin
     .from('sessions')
     .update({ item_index: index + 1 })
     .eq('id', sessionId);
 
-  // 5) Return payload the client expects
+  // 5) Return payload for the client
   return NextResponse.json({
     ok: true,
     item: {
       id: row.id,
       stem: row.stem,
-      type,              // 'mcq' or 'short' for the React UI
-      options: hasMcqOptions ? options : undefined,
+      type,
+      options: type === 'mcq' ? options : undefined,
     },
+    // meta for debugging if you inspect the API directly
     meta: {
-      kind,
-      answer_key: row.answer_key, // not used by UI, but handy if you inspect
+      correct: row.correct,
     },
   });
 }
