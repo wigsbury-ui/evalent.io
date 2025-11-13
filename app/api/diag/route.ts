@@ -1,8 +1,12 @@
-import { env } from '../../../lib/env'
-import { supabaseAnon } from '../../../lib/supabaseClient'
+// app/api/diag/route.ts
+import { env } from '@/lib/env';
+import { supabase } from '@/lib/supabaseClient';
 
 async function count(name: string) {
-  const { count, error } = await supabaseAnon.from(name).select('id', { count: 'exact', head: true });
+  const { count, error } = await supabase
+    .from(name)
+    .select('id', { count: 'exact', head: true });
+
   if (error) return null;
   return count;
 }
@@ -18,28 +22,35 @@ export async function GET() {
     SHEETS_ASSETS_CSV: !!env.SHEETS_ASSETS_CSV,
     SHEETS_BLUEPRINTS_CSV: !!env.SHEETS_BLUEPRINTS_CSV,
     USE_BLUEPRINTS: env.USE_BLUEPRINTS,
-    RESEND_API_KEY: !!env.RESEND_API_KEY
+    RESEND_API_KEY: !!env.RESEND_API_KEY,
   };
 
-  // Use views first, then tables as backup
+  // Prefer the views, fall back to base tables if needed
   const [itemsV, assetsV, blueprintsV] = await Promise.all([
     count('items_vw'),
     count('assets_vw'),
-    count('blueprints_vw')
+    count('blueprints_vw'),
   ]);
 
   const [itemsT, assetsT, blueprintsT] = await Promise.all([
     count('items'),
     count('assets'),
-    count('blueprints')
+    count('blueprints'),
   ]);
 
-  return new Response(JSON.stringify({
-    env: vars,
-    counts: {
-      items: itemsV ?? itemsT,
-      assets: assetsV ?? assetsT,
-      blueprints: blueprintsV ?? blueprintsT
-    }
-  }), { headers: { 'Content-Type': 'application/json' } })
+  return new Response(
+    JSON.stringify(
+      {
+        env: vars,
+        counts: {
+          items: itemsV ?? itemsT,
+          assets: assetsV ?? assetsT,
+          blueprints: blueprintsV ?? blueprintsT,
+        },
+      },
+      null,
+      2,
+    ),
+    { headers: { 'Content-Type': 'application/json' } },
+  );
 }
