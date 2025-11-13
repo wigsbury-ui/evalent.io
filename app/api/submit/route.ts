@@ -15,26 +15,35 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // Optional correctness check based on items.correct
-  let correct: boolean | null = null;
-
+  // 1) Fetch item metadata so we can infer kind
   const { data: item, error: itemError } = await supabase
     .from('items')
-    .select('correct')
+    .select('kind, option_a, option_b, option_c, option_d')
     .eq('id', itemId)
     .maybeSingle();
 
-  if (!itemError && item && item.correct != null) {
-    const expected = String(item.correct).trim();
-    correct = expected !== '' ? expected === String(response).trim() : null;
+  if (itemError) {
+    return new NextResponse(itemError.message, { status: 500 });
   }
 
+  const options = item
+    ? [item.option_a, item.option_b, item.option_c, item.option_d]
+        .filter(Boolean)
+        .map(String)
+    : [];
+
+  const inferredKind =
+    (item && (item.kind as string | null)) ||
+    (options.length >= 2 ? 'mcq' : 'text');
+
+  // 2) Record the attempt
   const { error: insertError } = await supabaseAdmin.from('attempts').insert([
     {
       session_id: sessionId,
       item_id: itemId,
-      response,
-      correct,
+      kind: inferredKind,
+      answer: response, // keep using the original "answer" column
+      // we can add "correct" later; leaving it null is fine for now
     },
   ]);
 
