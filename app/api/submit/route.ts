@@ -1,66 +1,113 @@
 // app/api/submit/route.ts
 import { NextRequest, NextResponse } from 'next/server';
+import { supabase } from '@/lib/supabaseClient';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
-async function handleSubmit(req: NextRequest) {
+export async function GET(req: NextRequest) {
   const url = new URL(req.url);
 
-  // We accept both current and legacy shapes, but we don't
-  // actually *use* them yet – this is just for future-proofing.
-  const sessionId =
-    url.searchParams.get('session_id') ||
-    url.searchParams.get('sid') ||
-    null;
-
-  const itemId = url.searchParams.get('item_id') || null;
-  const responseParam = url.searchParams.get('response') ?? null;
-
-  // If it's a POST, there *might* be a JSON body instead.
-  let body: any = null;
-  if (req.method === 'POST') {
-    try {
-      body = await req.json();
-    } catch {
-      body = null;
-    }
-  }
-
-  const response =
-    responseParam ??
-    (body && (body.response ?? body.answer ?? body.value)) ??
-    '';
+  const sessionId = url.searchParams.get('session_id');
+  const itemId = url.searchParams.get('item_id');
+  const response = url.searchParams.get('response') ?? '';
 
   if (!sessionId || !itemId) {
-    // Keep this strict so we notice wiring mistakes
     return new NextResponse('session_id and item_id required', {
       status: 400,
     });
   }
 
-  // 🔒 IMPORTANT:
-  // We are *not* writing to Supabase here yet, because your live
-  // `attempts` table has a custom NOT NULL + CHECK constraint on
-  // "kind" that we can't see from the repo.
-  //
-  // This endpoint now acts as a "no-op" logger so the front-end
-  // flow can proceed without any database errors.
-  //
-  // Once we're happy with the end-to-end flow, we can reintroduce
-  // proper logging to `attempts` with whatever "kind" values your
-  // Supabase schema actually allows.
+  // 1) Look up the item so we can mark correct/incorrect
+  const { data: item, error: itemError } = await supabase
+    .from('items')
+    .select('correct')
+    .eq('id', itemId)
+    .maybeSingle();
 
-  console.log('SUBMIT (stub)', {
-    sessionId,
-    itemId,
-    response,
-  });
+  if (itemError) {
+    return new NextResponse(itemError.message, { status: 500 });
+  }
+
+  // 2) Work out correctness
+  let correct: boolean | null = null;
+  if (item && item.correct != null) {
+    const key = String(item.correct).trim();
+    const given = String(response).trim();
+    if (key !== '') {
+      correct = given === key;
+    }
+  }
+
+  // 3) Insert attempt row into the real attempts table
+  const { error: insertError } = await supabaseAdmin.from('attempts').insert([
+    {
+      session_id: sessionId,
+      item_id: itemId,
+      response,
+      correct,
+    },
+  ]);
+
+  if (insertError) {
+    return new NextResponse(insertError.message, { status: 500 });
+  }
 
   return NextResponse.json({ ok: true });
 }
 
-export async function GET(req: NextRequest) {
-  return handleSubmit(req);
-}
-
+// Optional: keep POST behaving the same, in case we ever call it
 export async function POST(req: NextRequest) {
-  return handleSubmit(req);
+  const url = new URL(req.url);
+
+  const body = await req.json().catch(() => null);
+  const sessionId =
+    (body && body.session_id) ||
+    url.searchParams.get('session_id') ||
+    null;
+  const itemId =
+    (body && body.item_id) || url.searchParams.get('item_id') || null;
+  const response =
+    (body && (body.response ?? body.answer ?? '')) ||
+    url.searchParams.get('response') ||
+    '';
+
+  if (!sessionId || !itemId) {
+    return new NextResponse('session_id and item_id required', {
+      status: 400,
+    });
+  }
+
+  // Look up item
+  const { data: item, error: itemError } = await supabase
+    .from('items')
+    .select('correct')
+    .eq('id', itemId)
+    .maybeSingle();
+
+  if (itemError) {
+    return new NextResponse(itemError.message, { status: 500 });
+  }
+
+  let correct: boolean | null = null;
+  if (item && item.correct != null) {
+    const key = String(item.correct).trim();
+    const given = String(response).trim();
+    if (key !== '') {
+      correct = given === key;
+    }
+  }
+
+  const { error: insertError } = await supabaseAdmin.from('attempts').insert([
+    {
+      session_id: sessionId,
+      item_id: itemId,
+      response,
+      correct,
+    },
+  ]);
+
+  if (insertError) {
+    return new NextResponse(insertError.message, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true });
 }
