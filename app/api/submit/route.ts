@@ -15,10 +15,10 @@ export async function GET(req: NextRequest) {
     });
   }
 
-  // 1) Fetch item to infer kind + correctness
+  // 1) Fetch item so we can compute correctness
   const { data: item, error: itemError } = await supabase
     .from('items')
-    .select('type, options, correct')
+    .select('correct')
     .eq('id', itemId)
     .maybeSingle();
 
@@ -26,16 +26,7 @@ export async function GET(req: NextRequest) {
     return new NextResponse(itemError.message, { status: 500 });
   }
 
-  const rawOptions = item ? (item as any).options : null;
-  const options: string[] = Array.isArray(rawOptions)
-    ? rawOptions.map((v: any) => String(v))
-    : [];
-
-  const baseType =
-    (item?.type as string | null) || (options.length >= 2 ? 'mcq' : 'short');
-  const inferredKind = baseType === 'mcq' ? 'mcq' : 'short';
-
-  // 2) Compute correctness using `items.correct`
+  // 2) Compute correctness using items.correct (seeded from answer_key)
   let correct: boolean | null = null;
   if (item && item.correct != null) {
     const key = String(item.correct).trim();
@@ -46,15 +37,15 @@ export async function GET(req: NextRequest) {
   }
 
   // 3) Insert attempt row
-  // NOTE: your Supabase `attempts` table currently has a NOT NULL `kind` column,
-  // so we *always* send it here.
+  //    NOTE: the Supabase DB has a NOT NULL + CHECK on attempts.kind,
+  //    so we always use the generic value 'item' here.
   const { error: insertError } = await supabaseAdmin.from('attempts').insert([
     {
       session_id: sessionId,
       item_id: itemId,
-      kind: inferredKind,
-      response,     // student's answer (works with schema.sql)
-      correct,      // true / false / null
+      kind: 'item',
+      response,   // student’s answer
+      correct,    // true / false / null
     },
   ]);
 
