@@ -1,25 +1,20 @@
 // lib/supabaseClient.ts
 import { createClient } from '@supabase/supabase-js';
-import { env } from './env';
 
-// If you have generated Database types, you can do:
-// import type { Database } from './types';
-// const make = (key: string) => createClient<Database>(env.SUPABASE_URL, key, { ... });
+// Use service role for server-side admin calls, fall back to anon if needed
+const SUPABASE_URL = process.env.SUPABASE_URL!;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY!;
+const SUPABASE_SERVICE_ROLE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY;
 
-const make = (key: string) =>
-  createClient(env.SUPABASE_URL, key, {
-    auth: { persistSession: false },
-    global: { headers: { 'x-application': 'evalent' } },
-  });
+// Public client if you need one later
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: { persistSession: false },
+});
 
-/** Public client (anon key) — safe for browser use */
-export const supabaseAnon = make(env.SUPABASE_ANON_KEY);
-
-/** Admin client (service-role key) — server-only usage (API routes, server actions) */
-export const supabaseAdmin = make(env.SUPABASE_SERVICE_ROLE_KEY);
-
-/** Back-compat alias to satisfy older imports */
-export { supabaseAdmin as supabaseService };
-
-/** Optional default export: public client */
-export default supabaseAnon;
+// Admin client for server routes (CFI/SCT etc.)
+export const supabaseAdmin = createClient(
+  SUPABASE_URL,
+  SUPABASE_SERVICE_ROLE_KEY,
+  { auth: { persistSession: false } }
+);
