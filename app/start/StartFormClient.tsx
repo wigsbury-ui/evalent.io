@@ -9,12 +9,10 @@ type Item = {
   stem?: string;              // item prompt
   prompt?: string;            // alt name
   question?: string;          // alt name
-  // possible options keys we’ve seen in different sheets
   options?: string[];
   choices?: string[];
   answers?: string[];
   answer_options?: string[];
-  // some banks provide correct + distractors instead of options
   correct_answer?: string | null;
   distractors?: string[] | null;
 };
@@ -26,28 +24,17 @@ type NextItemResponse = {
 };
 
 function pickPrompt(i: Item): string {
-  return (
-    i.stem ??
-    i.prompt ??
-    i.question ??
-    '' // empty -> we’ll show a fallback safely but still submit-able
-  );
+  return i.stem ?? i.prompt ?? i.question ?? '';
 }
 
 function extractOptions(i: Item): string[] {
-  // prefer explicit options arrays
   const fromArrays =
-    i.options ??
-    i.choices ??
-    i.answers ??
-    i.answer_options ??
-    null;
+    i.options ?? i.choices ?? i.answers ?? i.answer_options ?? null;
 
   if (Array.isArray(fromArrays) && fromArrays.length > 0) {
     return fromArrays.filter(Boolean).map(String);
   }
 
-  // fallback: build from correct_answer + distractors
   const pool: string[] = [];
   if (i.correct_answer) pool.push(String(i.correct_answer));
   if (Array.isArray(i.distractors)) {
@@ -75,7 +62,7 @@ export default function StartFormClient() {
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
 
-  // 1) Ensure we have a session
+  // Ensure we have a session
   useEffect(() => {
     let mounted = true;
 
@@ -104,7 +91,7 @@ export default function StartFormClient() {
     return () => { mounted = false; };
   }, []);
 
-  // 2) With a session, fetch the next item
+  // With a session, fetch the next item
   useEffect(() => {
     if (!sessionId) return;
     let mounted = true;
@@ -116,7 +103,8 @@ export default function StartFormClient() {
       setText('');
 
       try {
-        const r = await fetch(`/api/next-item?sid=${encodeURIComponent(sessionId)}`, {
+        // non-null assertion: we already guard if (!sessionId) return above
+        const r = await fetch(`/api/next-item?sid=${encodeURIComponent(sessionId!)}`, {
           method: 'GET',
           cache: 'no-store',
         });
@@ -126,7 +114,6 @@ export default function StartFormClient() {
         }
         const j: NextItemResponse = await r.json();
         if (!j.ok || !j.item) {
-          // no more items (or API said not OK)
           if (mounted) {
             setItem(null);
             setOptions([]);
@@ -139,7 +126,6 @@ export default function StartFormClient() {
         const opts = extractOptions(j.item);
 
         if (mounted) {
-          // Store item with a guaranteed prompt field so rendering is simple
           setItem({ ...j.item, stem: prompt });
           setOptions(opts.length > 0 ? shuffle(opts) : []);
         }
@@ -176,7 +162,7 @@ export default function StartFormClient() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          session_id: sessionId,
+          session_id: sessionId!, // non-null assertion
           item_id: item.id,
           response: responsePayload,
         }),
@@ -187,8 +173,7 @@ export default function StartFormClient() {
         throw new Error(t || 'Submit failed');
       }
 
-      // After successful submit, fetch the next item
-      const next = await fetch(`/api/next-item?sid=${encodeURIComponent(sessionId)}`, {
+      const next = await fetch(`/api/next-item?sid=${encodeURIComponent(sessionId!)}`, {
         cache: 'no-store',
       });
       if (!next.ok) {
