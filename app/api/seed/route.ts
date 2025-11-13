@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import parse from 'csv-parse/sync'
-import { env } from '../../../env.mjs'
-import { supabaseAdmin } from '../../../lib/supabaseAdmin'
+import { env } from '../../../lib/env'
+import { supabaseAdmin } from '../../../lib/supabaseClient'
 
 type Row = Record<string, string>
 
@@ -46,7 +46,6 @@ function toSnake(rawKey: string): string {
 }
 
 // Columns we actually persist into the `assets` table.
-// This is deliberately conservative – anything not in this list is ignored.
 const ASSET_ALLOWED = new Set<string>([
   'item_id',
   'programme',
@@ -103,7 +102,6 @@ function normaliseAsset(row: Row): Record<string, any> {
 
   // Bridge Google Sheet column names to DB fields:
   // - Many of the sheets use "Video_URL" or "video_url" – we want that as share_url.
-  // - Some flows also have a direct player_url that we can treat as share_url fallback.
   if (!out.share_url && typeof row['Video_URL'] === 'string' && row['Video_URL'].trim() !== '') {
     out.share_url = row['Video_URL'].trim()
   }
