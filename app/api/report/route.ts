@@ -1,27 +1,44 @@
+// app/api/report/route.ts
 export const runtime = 'nodejs';
 
-import PDFDocument from 'pdfkit'
-import { supabaseAnon } from '../../../lib/supabaseClient'
-import { Resend } from 'resend'
-import { env } from '../../../lib/env'
+import PDFDocument from 'pdfkit';
+import { supabase } from '@/lib/supabaseClient';
+import { Resend } from 'resend';
+import { env } from '@/lib/env';
 
 export async function POST(req: Request) {
   const { session_id, email } = await req.json();
-  if (!session_id) return new Response('session_id required', { status: 400 });
+  if (!session_id) {
+    return new Response('session_id required', { status: 400 });
+  }
 
   // Load session + attempts
-  const { data: session } = await supabaseAnon.from('sessions').select('*').eq('id', session_id).single();
-  if (!session) return new Response('Session not found', { status: 404 });
+  const { data: session } = await supabase
+    .from('sessions')
+    .select('*')
+    .eq('id', session_id)
+    .single();
 
-  const { data: attempts } = await supabaseAnon.from('attempts').select('*').eq('session_id', session_id);
-  const pass = (attempts || []).filter(a => a.correct === true).length;
+  if (!session) {
+    return new Response('Session not found', { status: 404 });
+  }
+
+  const { data: attempts } = await supabase
+    .from('attempts')
+    .select('*')
+    .eq('session_id', session_id);
+
+  const pass = (attempts || []).filter((a: any) => a.correct === true).length;
   const total = (attempts || []).length;
 
   // Create PDF in memory
   const doc = new PDFDocument();
   const chunks: Buffer[] = [];
   doc.on('data', (c: Buffer) => chunks.push(c));
-  const done = new Promise<Buffer>((resolve) => doc.on('end', () => resolve(Buffer.concat(chunks))));
+
+  const done = new Promise<Buffer>((resolve) =>
+    doc.on('end', () => resolve(Buffer.concat(chunks))),
+  );
 
   doc.fontSize(18).text('Evalent: Admissions Report', { underline: true });
   doc.moveDown();
@@ -41,7 +58,9 @@ export async function POST(req: Request) {
       to: email,
       subject: 'Evalent Admissions Report',
       text: `Attached is the report for ${session.candidate_name}`,
-      attachments: [{ filename: 'report.pdf', content: pdf.toString('base64') }]
+      attachments: [
+        { filename: 'report.pdf', content: pdf.toString('base64') },
+      ],
     });
   }
 
@@ -50,7 +69,7 @@ export async function POST(req: Request) {
   return new Response(body, {
     headers: {
       'Content-Type': 'application/pdf',
-      'Cache-Control': 'no-store'
-    }
+      'Cache-Control': 'no-store',
+    },
   });
 }
