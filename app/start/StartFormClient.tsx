@@ -1,264 +1,217 @@
+// app/start/StartFormClient.tsx
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
-
-type AnyRecord = Record<string, any>;
+import React from 'react';
 
 type Item = {
-  id: string;                 // required by API
-  stem?: string;              // item prompt
-  prompt?: string;            // alt name
-  question?: string;          // alt name
-  options?: string[];
-  choices?: string[];
-  answers?: string[];
-  answer_options?: string[];
-  correct_answer?: string | null;
-  distractors?: string[] | null;
+  id: string;
+  prompt: string;
+  type?: 'mcq' | 'free';
+  // If present and length > 0 we treat as MCQ regardless of "type"
+  options?: string[]; // e.g. ["A", "B", "C", "D"] or full text options
 };
 
-type NextItemResponse = {
-  ok: boolean;
-  item?: Item | null;
-  message?: string;
-};
+type NextItemResponse =
+  | { ok: true; item: Item | null }
+  | { ok: false; error: string };
 
-function pickPrompt(i: Item): string {
-  return i.stem ?? i.prompt ?? i.question ?? '';
-}
-
-function extractOptions(i: Item): string[] {
-  const fromArrays =
-    i.options ?? i.choices ?? i.answers ?? i.answer_options ?? null;
-
-  if (Array.isArray(fromArrays) && fromArrays.length > 0) {
-    return fromArrays.filter(Boolean).map(String);
-  }
-
-  const pool: string[] = [];
-  if (i.correct_answer) pool.push(String(i.correct_answer));
-  if (Array.isArray(i.distractors)) {
-    pool.push(...i.distractors.filter(Boolean).map(String));
-  }
-  return pool;
-}
-
-function shuffle<T>(arr: T[]): T[] {
-  const copy = [...arr];
-  for (let i = copy.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
+function getUrlSid(): string | null {
+  if (typeof window === 'undefined') return null;
+  const p = new URLSearchParams(window.location.search);
+  return p.get('sid');
 }
 
 export default function StartFormClient() {
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [item, setItem] = useState<Item | null>(null);
-  const [options, setOptions] = useState<string[]>([]);
-  const [choice, setChoice] = useState<string>(''); // for MCQ
-  const [text, setText] = useState<string>('');     // for free-text
-  const [loading, setLoading] = useState<boolean>(true);
-  const [submitting, setSubmitting] = useState<boolean>(false);
-  const [error, setError] = useState<string>('');
+  const [sessionId, setSessionId] = React.useState<string | null>(null);
+  const [item, setItem] = React.useState<Item | null>(null);
 
-  // Ensure we have a session
-  useEffect(() => {
-    let mounted = true;
+  // state for responses
+  const [textResponse, setTextResponse] = React.useState('');
+  const [mcqResponse, setMcqResponse] = React.useState<string>('');
 
-    async function ensureSession() {
-      try {
-        let sid = localStorage.getItem('evalent_session_id');
-        if (!sid) {
-          const r = await fetch('/api/start-session', { method: 'POST' });
-          if (!r.ok) {
-            const t = await r.text();
-            throw new Error(`start-session failed: ${t}`);
-          }
-          const j = await r.json();
-          sid = j?.session_id;
-          if (!sid) throw new Error('start-session: no session_id returned');
-          localStorage.setItem('evalent_session_id', sid);
-        }
-        if (mounted) setSessionId(sid);
-      } catch (e: any) {
-        console.error(e);
-        if (mounted) setError(e?.message ?? String(e));
-      }
+  const [submitting, setSubmitting] = React.useState(false);
+  const [loadingItem, setLoadingItem] = React.useState(false);
+  const [serverError, setServerError] = React.useState<string | null>(null);
+
+  const isMCQ = !!(item?.options && item.options.length > 0);
+
+  // A response exists if (MCQ && mcqResponse chosen) or (free && non-empty text)
+  const hasResponse = isMCQ ? mcqResponse.trim() !== '' : textResponse.trim() !== '';
+
+  // ---- Session bootstrap
+  React.useEffect(() => {
+    // Priority: URL ?sid=...  → sessionStorage → create one (dev)
+    const fromUrl = getUrlSid();
+    if (fromUrl) {
+      sessionStorage.setItem('evalent_sid', fromUrl);
+      setSessionId(fromUrl);
+      return;
     }
-
-    ensureSession();
-    return () => { mounted = false; };
+    const existing = sessionStorage.getItem('evalent_sid');
+    if (existing) {
+      setSessionId(existing);
+      return;
+    }
+    // Fallback: create a throwaway local SID (works for dev)
+    const sid = `local-${crypto.randomUUID()}`;
+    sessionStorage.setItem('evalent_sid', sid);
+    setSessionId(sid);
   }, []);
 
-  // With a session, fetch the next item
-  useEffect(() => {
+  // ---- Load first item
+  React.useEffect(() => {
     if (!sessionId) return;
-    let mounted = true;
-
-    async function loadNext() {
-      setLoading(true);
-      setError('');
-      setChoice('');
-      setText('');
-
-      try {
-        // non-null assertion: we already guard if (!sessionId) return above
-        const r = await fetch(`/api/next-item?sid=${encodeURIComponent(sessionId!)}`, {
-          method: 'GET',
-          cache: 'no-store',
-        });
-        if (!r.ok) {
-          const t = await r.text();
-          throw new Error(`next-item failed: ${t}`);
-        }
-        const j: NextItemResponse = await r.json();
-        if (!j.ok || !j.item) {
-          if (mounted) {
-            setItem(null);
-            setOptions([]);
-            setError(j.message || 'No more items available.');
-          }
-          return;
-        }
-
-        const prompt = pickPrompt(j.item);
-        const opts = extractOptions(j.item);
-
-        if (mounted) {
-          setItem({ ...j.item, stem: prompt });
-          setOptions(opts.length > 0 ? shuffle(opts) : []);
-        }
-      } catch (e: any) {
-        console.error(e);
-        if (mounted) setError(e?.message ?? String(e));
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    }
-
-    loadNext();
-    return () => { mounted = false; };
+    void loadNext();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
-  const isMCQ = useMemo(() => options.length > 0, [options]);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!sessionId || !item?.id) {
-      setError('Missing session or item. Please refresh the page.');
-      return;
-    }
-    const responsePayload = isMCQ ? choice : text.trim();
-    if (!responsePayload) {
-      setError('Please provide an answer before submitting.');
-      return;
-    }
-
-    setSubmitting(true);
-    setError('');
+  async function loadNext() {
+    if (!sessionId) return;
+    setLoadingItem(true);
+    setServerError(null);
+    setTextResponse('');
+    setMcqResponse('');
     try {
-      const r = await fetch('/api/submit', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          session_id: sessionId!, // non-null assertion
-          item_id: item.id,
-          response: responsePayload,
-        }),
-      });
+      const url = `/api/next-item?sid=${encodeURIComponent(sessionId)}`;
+      const r = await fetch(url, { method: 'GET', cache: 'no-store' });
+      const data = (await r.json()) as NextItemResponse;
 
-      if (!r.ok) {
-        const t = await r.text();
-        throw new Error(t || 'Submit failed');
-      }
-
-      const next = await fetch(`/api/next-item?sid=${encodeURIComponent(sessionId!)}`, {
-        cache: 'no-store',
-      });
-      if (!next.ok) {
-        const t = await next.text();
-        throw new Error(`next-item failed: ${t}`);
-      }
-      const j: NextItemResponse = await next.json();
-      if (!j.ok || !j.item) {
+      if (!r.ok || !('ok' in data) || !data.ok) {
+        const msg = !r.ok ? await r.text() : (data as any)?.error ?? 'Unknown error';
+        setServerError(`Next item error: ${msg}`);
         setItem(null);
-        setOptions([]);
-        setError(j.message || 'All done — no more items.');
         return;
       }
 
-      const prompt = pickPrompt(j.item);
-      const opts = extractOptions(j.item);
-
-      setItem({ ...j.item, stem: prompt });
-      setOptions(opts.length > 0 ? shuffle(opts) : []);
-      setChoice('');
-      setText('');
+      setItem(data.item ?? null);
     } catch (e: any) {
-      console.error(e);
-      setError(e?.message ?? String(e));
+      setServerError(`Next item fetch failed: ${e?.message ?? e}`);
+      setItem(null);
+    } finally {
+      setLoadingItem(false);
+    }
+  }
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!sessionId || !item || submitting || !hasResponse) return;
+
+    setSubmitting(true);
+    setServerError(null);
+
+    try {
+      const body = {
+        session_id: sessionId,
+        item_id: item.id,
+        response: isMCQ ? mcqResponse : textResponse,
+      };
+
+      const r = await fetch('/api/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (!r.ok) {
+        const msg = await r.text();
+        setServerError(msg || 'Attempt insert failed');
+        return;
+      }
+
+      // Success → load next item
+      await loadNext();
+    } catch (e: any) {
+      setServerError(`Submit failed: ${e?.message ?? e}`);
     } finally {
       setSubmitting(false);
     }
   }
 
-  const promptText = item?.stem || 'Loading…';
-
+  // ---- Render
   return (
-    <div className="rounded-2xl border p-6">
-      {error && (
-        <div className="mb-4 rounded-md border border-red-300 bg-red-50 p-3 text-red-700">
-          {error}
-        </div>
-      )}
+    <div className="mx-auto max-w-5xl">
+      <form onSubmit={onSubmit}>
+        <div className="rounded-2xl border p-6 md:p-8">
+          {item ? (
+            <>
+              <h2 className="text-2xl font-semibold mb-4">
+                {item.prompt}
+              </h2>
 
-      <h1 className="mb-4 text-2xl font-semibold">
-        {loading ? 'Loading question…' : promptText}
-      </h1>
-
-      {!loading && item && (
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {isMCQ ? (
-            <fieldset className="space-y-3">
-              {options.map((opt) => (
-                <label key={opt} className="flex items-center gap-3">
-                  <input
-                    type="radio"
-                    name="mcq"
-                    value={opt}
-                    checked={choice === opt}
-                    onChange={(e) => setChoice(e.target.value)}
+              {/* MCQ */}
+              {isMCQ ? (
+                <fieldset className="space-y-3 mb-6">
+                  {item.options!.map((opt, idx) => {
+                    // If options are encoded like "A) text" or "A", just show raw text
+                    const value = String(opt);
+                    const id = `opt-${idx}`;
+                    return (
+                      <label
+                        key={id}
+                        htmlFor={id}
+                        className="flex items-start gap-3 cursor-pointer"
+                      >
+                        <input
+                          id={id}
+                          type="radio"
+                          name="mcq"
+                          value={value}
+                          checked={mcqResponse === value}
+                          onChange={(ev) => setMcqResponse(ev.target.value)}
+                          className="mt-1"
+                        />
+                        <span>{value}</span>
+                      </label>
+                    );
+                  })}
+                </fieldset>
+              ) : (
+                // Free text
+                <div className="mb-6">
+                  <textarea
+                    className="w-full min-h-[140px] rounded-xl border p-4 text-lg"
+                    value={textResponse}
+                    onChange={(e) => setTextResponse(e.target.value)}
+                    placeholder="Type your answer…"
                   />
-                  <span>{opt}</span>
-                </label>
-              ))}
-            </fieldset>
+                </div>
+              )}
+
+              {serverError && (
+                <p className="mb-4 text-red-600 font-medium">{serverError}</p>
+              )}
+
+              <button
+                type="submit"
+                disabled={!hasResponse || submitting || loadingItem}
+                className={`rounded-xl px-5 py-3 text-white font-medium
+                  ${!hasResponse || submitting || loadingItem ? 'bg-gray-400 cursor-not-allowed' : 'bg-black'}
+                `}
+              >
+                {submitting ? 'Submitting…' : 'Submit answer'}
+              </button>
+            </>
           ) : (
-            <textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              rows={4}
-              className="w-full rounded-lg border p-3"
-              placeholder="Type your answer…"
-            />
+            <>
+              <h2 className="text-2xl font-semibold mb-4">
+                {loadingItem ? 'Loading question…' : 'No more questions'}
+              </h2>
+              {serverError && (
+                <p className="text-red-600 font-medium">{serverError}</p>
+              )}
+              {!loadingItem && (
+                <button
+                  type="button"
+                  onClick={() => void loadNext()}
+                  className="mt-2 rounded-xl px-5 py-3 bg-black text-white font-medium"
+                >
+                  Reload
+                </button>
+              )}
+            </>
           )}
-
-          <div className="pt-2">
-            <button
-              type="submit"
-              disabled={submitting}
-              className="rounded-lg bg-black px-4 py-2 text-white disabled:opacity-50"
-            >
-              {submitting ? 'Submitting…' : 'Submit answer'}
-            </button>
-          </div>
-        </form>
-      )}
-
-      {!loading && !item && (
-        <p className="text-neutral-600">No item available.</p>
-      )}
+        </div>
+      </form>
     </div>
   );
 }
