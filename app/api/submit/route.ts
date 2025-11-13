@@ -37,15 +37,15 @@ export async function GET(req: NextRequest) {
   }
 
   // 3) Insert attempt row
-  //    NOTE: the Supabase DB has a NOT NULL + CHECK on attempts.kind,
-  //    so we always use the generic value 'item' here.
+  //    Your Supabase attempts table has a NOT NULL + CHECK on "kind".
+  //    We treat every student response as an "answer" event.
   const { error: insertError } = await supabaseAdmin.from('attempts').insert([
     {
       session_id: sessionId,
       item_id: itemId,
-      kind: 'item',
-      response,   // student’s answer
-      correct,    // true / false / null
+      kind: 'answer',   // <<< key change
+      response,         // student's answer
+      correct,          // true / false / null
     },
   ]);
 
