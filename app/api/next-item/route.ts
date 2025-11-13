@@ -1,6 +1,6 @@
 // app/api/next-item/route.ts
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabaseClient';
+import { supabaseAdmin } from '../../../lib/supabaseClient';
 import { randomUUID } from 'crypto';
 
 export const dynamic = 'force-dynamic';
