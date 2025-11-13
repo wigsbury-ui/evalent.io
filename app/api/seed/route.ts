@@ -1,207 +1,171 @@
-import { NextResponse } from 'next/server'
-import { parse } from 'csv-parse/sync'
-import { createClient } from '@supabase/supabase-js'
-import { env } from '../../../lib/env'
+// app/api/seed/route.ts
+import { NextResponse } from 'next/server';
+import { parse as parseCsv } from 'csv-parse/sync';
+import { supabaseAdmin } from '../../../lib/supabaseClient';
 
-// If you have a Database type you can import it and use createClient<Database>,
-// but it's optional. We'll keep it generic to avoid type errors.
-const supabaseAdmin = createClient(
-  env.SUPABASE_URL,
-  env.SUPABASE_SERVICE_ROLE_KEY,
-  {
-    auth: { persistSession: false }
-  }
-)
+type CsvRow = Record<string, string>;
 
-type Row = Record<string, string>
+/* ---------- helpers ---------- */
 
-// --- Helpers --------------------------------------------------------------
+async function loadCsvFromUrl(url: string | undefined, label: string) {
+  if (!url) return { rows: [], label };
 
-const NUMERIC_COLS = new Set(['script_version', 'duration_seconds'])
-
-/**
- * Convert arbitrary spreadsheet header into snake_case Postgres column name.
- */
-function toSnake(rawKey: string): string {
-  const key = rawKey.trim()
-  if (!key) return ''
-
-  let out = ''
-  for (let i = 0; i < key.length; i++) {
-    const ch = key[i]
-    const prev = i > 0 ? key[i - 1] : ''
-
-    // lower->upper boundary => insert underscore
-    if (prev && /[a-z]/.test(prev) && /[A-Z]/.test(ch)) {
-      out += '_'
-    }
-
-    if (/[0-9A-Za-z]/.test(ch)) {
-      out += ch.toLowerCase()
-    } else {
-      out += '_'
-    }
-  }
-
-  out = out.replace(/_+/g, '_').replace(/^_+|_+$/g, '')
-  if (!out) return ''
-
-  if (/^[0-9]/.test(out)) {
-    return `col_${out}`
-  }
-  return out
-}
-
-// Columns we actually persist into the `assets` table.
-const ASSET_ALLOWED = new Set<string>([
-  'item_id',
-  'programme',
-  'stage',
-  'grade',
-  'year',
-  'video_title',
-  'script_audio',
-  'script_version',
-  'video_id',
-  'share_url',
-  'download_url',
-  'duration_seconds',
-  'avatar_voice_id',
-  'avatar_style',
-  'background',
-  'resolution',
-  'video_thumbnail',
-  'thumbnail_url',
-  'player_url',
-  'language_locale',
-  'voice_id',
-  'current_script_hash',
-  'last_rendered_script_hash',
-  'status',
-  'notes',
-  '_has_vid',
-  '_has_share',
-  '__sheet',
-])
-
-function normaliseAsset(row: Row): Record<string, any> {
-  const out: Record<string, any> = {}
-
-  for (const [rawKey, rawValue] of Object.entries(row)) {
-    const key = toSnake(rawKey)
-    if (!key || !ASSET_ALLOWED.has(key)) continue
-
-    const value = typeof rawValue === 'string' ? rawValue.trim() : rawValue
-
-    if (value === '' || value == null) {
-      out[key] = null
-      continue
-    }
-
-    if (NUMERIC_COLS.has(key)) {
-      const n = Number(value)
-      out[key] = Number.isFinite(n) ? n : null
-      continue
-    }
-
-    out[key] = value
-  }
-
-  // Map Google Sheet URL columns into share_url if needed
-  if (!out.share_url && typeof row['Video_URL'] === 'string' && row['Video_URL'].trim() !== '') {
-    out.share_url = row['Video_URL'].trim()
-  }
-  if (!out.share_url && typeof row['video_url'] === 'string' && row['video_url'].trim() !== '') {
-    out.share_url = row['video_url'].trim()
-  }
-  if (!out.share_url && typeof out.player_url === 'string' && out.player_url.trim() !== '') {
-    out.share_url = out.player_url
-  }
-
-  return out
-}
-
-async function fetchCsvRows(url: string): Promise<Row[]> {
-  const res = await fetch(url)
+  const res = await fetch(url);
   if (!res.ok) {
-    throw new Error(`CSV fetch failed (${res.status}) for ${url}`)
+    throw new Error(`Failed to fetch ${label} CSV (${res.status})`);
   }
-  const text = await res.text()
-
-  const rows = parse(text, {
+  const text = await res.text();
+  const rows = parseCsv(text, {
     columns: true,
     skip_empty_lines: true,
-  }) as Row[]
+  }) as CsvRow[];
 
-  return rows
+  return { rows, label };
 }
 
-async function countRows(table: string): Promise<number> {
-  const { count, error } = await supabaseAdmin
-    .from(table)
-    .select('*', { count: 'exact', head: true })
-
-  if (error) throw error
-  return count ?? 0
+function normaliseId(id: string | number | null | undefined) {
+  return (id ?? '').toString().trim();
 }
 
-// --- Route handler --------------------------------------------------------
+/* These are intentionally small & forgiving. Adapt column names if needed. */
+function prepareItemsCsv(rows: CsvRow[]) {
+  const prepared: CsvRow[] = [];
+  const skipped: CsvRow[] = [];
 
-export async function POST() {
+  for (const raw of rows) {
+    const id = normaliseId(raw.item_id ?? raw.id);
+    if (!id) {
+      skipped.push(raw);
+      continue;
+    }
+    prepared.push({ ...raw, item_id: id });
+  }
+  return { prepared, skipped };
+}
+
+function prepareAssetsCsv(rows: CsvRow[]) {
+  const prepared: CsvRow[] = [];
+  const skipped: CsvRow[] = [];
+
+  for (const raw of rows) {
+    const id = normaliseId(raw.item_id ?? raw.id);
+    if (!id) {
+      skipped.push(raw);
+      continue;
+    }
+    prepared.push({ ...raw, item_id: id });
+  }
+  return { prepared, skipped };
+}
+
+function prepareBlueprintsCsv(rows: CsvRow[]) {
+  const prepared: CsvRow[] = [];
+  const skipped: CsvRow[] = [];
+
+  for (const raw of rows) {
+    const id = normaliseId(raw.id);
+    if (!id) {
+      skipped.push(raw);
+      continue;
+    }
+    prepared.push({ ...raw, id });
+  }
+  return { prepared, skipped };
+}
+
+/* ---------- main handler ---------- */
+
+async function handleSeed() {
   try {
-    if (!env.SHEETS_ASSETS_CSV) {
+    const itemsUrl = process.env.SHEETS_ITEMS_CSV;
+    const assetsUrl = process.env.SHEETS_ASSETS_CSV;
+    const blueprintsUrl = process.env.SHEETS_BLUEPRINTS_CSV;
+
+    // 1) Load CSVs (URL or published Google-Sheet CSVs)
+    const [itemsCsv, assetsCsv, blueprintsCsv] = await Promise.all([
+      loadCsvFromUrl(itemsUrl, 'items'),
+      loadCsvFromUrl(assetsUrl, 'assets'),
+      loadCsvFromUrl(blueprintsUrl, 'blueprints'),
+    ]);
+
+    if (
+      !itemsCsv.rows.length &&
+      !assetsCsv.rows.length &&
+      !blueprintsCsv.rows.length
+    ) {
       return NextResponse.json(
-        { ok: false, error: 'SHEETS_ASSETS_CSV env var is not set' },
-        { status: 500 },
-      )
+        {
+          ok: false,
+          error:
+            'No CSV rows found. Check SHEETS_ITEMS_CSV / SHEETS_ASSETS_CSV / SHEETS_BLUEPRINTS_CSV.',
+        },
+        { status: 400 },
+      );
     }
 
-    // 1. Pull rows from Google Sheets CSV
-    const rawAssetRows = await fetchCsvRows(env.SHEETS_ASSETS_CSV)
+    // 2) Prepare rows
+    const itemsPrep = prepareItemsCsv(itemsCsv.rows);
+    const assetsPrep = prepareAssetsCsv(assetsCsv.rows);
+    const blueprintsPrep = prepareBlueprintsCsv(blueprintsCsv.rows);
 
-    // 2. Normalise & filter
-    const assets = rawAssetRows
-      .map(normaliseAsset)
-      .filter((a) => a.item_id && a.programme)
+    // 3) Upsert into Supabase using the admin client
+    const [itemsRes, assetsRes, blueprintsRes] = await Promise.all([
+      itemsPrep.prepared.length
+        ? supabaseAdmin
+            .from('items')
+            .upsert(itemsPrep.prepared, { onConflict: 'item_id' })
+        : Promise.resolve({ error: null }),
+      assetsPrep.prepared.length
+        ? supabaseAdmin
+            .from('assets')
+            .upsert(assetsPrep.prepared, { onConflict: 'item_id' })
+        : Promise.resolve({ error: null }),
+      blueprintsPrep.prepared.length
+        ? supabaseAdmin
+            .from('blueprints')
+            .upsert(blueprintsPrep.prepared, { onConflict: 'id' })
+        : Promise.resolve({ error: null }),
+    ]);
 
-    // 3. Upsert into `assets`
-    if (assets.length > 0) {
-      const { error } = await supabaseAdmin
-        .from('assets')
-        .upsert(assets, { onConflict: 'item_id' })
+    if (itemsRes.error) throw itemsRes.error;
+    if (assetsRes.error) throw assetsRes.error;
+    if (blueprintsRes.error) throw blueprintsRes.error;
 
-      if (error) {
-        console.error('[seed] upsert assets failed', error)
-        return NextResponse.json(
-          { ok: false, error: error.message ?? 'Upsert into assets failed' },
-          { status: 500 },
-        )
-      }
-    }
-
-    // 4. Diagnostics for Admin screen
-    const [itemsCount, assetsCount, blueprintsCount] = await Promise.all([
-      countRows('items').catch(() => 0),
-      countRows('assets').catch(() => 0),
-      countRows('blueprints').catch(() => 0),
-    ])
-
+    // 4) Return a compact summary so the Admin page shows something useful
     return NextResponse.json({
       ok: true,
-      seeded: {
-        assets: assets.length,
-      },
+      message: 'Seed from CSV completed',
       counts: {
-        items: itemsCount,
-        assets: assetsCount,
-        blueprints: blueprintsCount,
+        items_csv_rows: itemsCsv.rows.length,
+        items_prepared: itemsPrep.prepared.length,
+        items_skipped: itemsPrep.skipped.length,
+
+        assets_csv_rows: assetsCsv.rows.length,
+        assets_prepared: assetsPrep.prepared.length,
+        assets_skipped: assetsPrep.skipped.length,
+
+        blueprints_csv_rows: blueprintsCsv.rows.length,
+        blueprints_prepared: blueprintsPrep.prepared.length,
+        blueprints_skipped: blueprintsPrep.skipped.length,
       },
-    })
-  } catch (err: any) {
-    console.error('[seed] unexpected error', err)
+    });
+  } catch (e: any) {
     return NextResponse.json(
-      { ok: false, error: err?.message ?? 'Unknown error in seed endpoint' },
+      {
+        ok: false,
+        error: e?.message ?? String(e),
+      },
       { status: 500 },
-    )
+    );
   }
+}
+
+/* ---------- Next.js route exports ---------- */
+
+export async function GET() {
+  return handleSeed();
+}
+
+export async function POST() {
+  return handleSeed();
 }
