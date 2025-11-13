@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
     return new NextResponse('session_id required', { status: 400 });
   }
 
-  // 1) Load the session
+  // 1) Load the session (to get year + current index)
   const { data: session, error: sessionError } = await supabase
     .from('sessions')
     .select('id, year, status, item_index')
@@ -29,11 +29,10 @@ export async function GET(req: NextRequest) {
   // 2) Pick the next item for this year
   const { data: items, error: itemError } = await supabase
     .from('items')
-    .select('id, stem, kind, year, option_a, option_b, option_c, option_d')
-    .not('stem', 'is', null)
+    .select('id, stem, kind, year, mcq_options_json, answer_key')
     .eq('year', session.year)
     .order('id', { ascending: true })
-    .range(index, index); // get a single row at this index
+    .range(index, index); // single row
 
   if (itemError) {
     return new NextResponse(itemError.message, { status: 500 });
@@ -41,7 +40,7 @@ export async function GET(req: NextRequest) {
 
   const row = items?.[0];
 
-  // No more items → mark finished
+  // No more items → mark session finished
   if (!row) {
     await supabaseAdmin
       .from('sessions')
@@ -51,16 +50,25 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, item: null });
   }
 
-  // 3) Build options array
-  const options = [row.option_a, row.option_b, row.option_c, row.option_d]
-    .filter(Boolean)
-    .map(String);
+  // 3) Build MCQ options from mcq_options_json
+  let options: string[] = [];
+  if (row.mcq_options_json) {
+    try {
+      const parsed = JSON.parse(row.mcq_options_json as unknown as string);
+      if (Array.isArray(parsed)) {
+        options = parsed.map((v) => String(v));
+      }
+    } catch {
+      // if parsing fails, we just leave options as []
+    }
+  }
 
-  const isMcq = options.length >= 2;
+  const hasMcqOptions = options.length >= 2;
 
-  // DB "kind" (for logging, analytics) and UI "type" (for rendering)
-  const kind = (row.kind as string | null) || (isMcq ? 'mcq' : 'text');
-  const type: 'mcq' | 'short' = isMcq ? 'mcq' : 'short';
+  // DB "kind" vs UI "type"
+  const kind =
+    (row.kind as string | null) || (hasMcqOptions ? 'mcq' : 'text');
+  const type: 'mcq' | 'short' = hasMcqOptions ? 'mcq' : 'short';
 
   // 4) Advance the session index
   await supabaseAdmin
@@ -68,16 +76,18 @@ export async function GET(req: NextRequest) {
     .update({ item_index: index + 1 })
     .eq('id', sessionId);
 
-  // 5) Return exactly what the client expects
+  // 5) Return payload the client expects
   return NextResponse.json({
     ok: true,
     item: {
       id: row.id,
       stem: row.stem,
-      type,
-      options: isMcq ? options : undefined,
+      type,              // 'mcq' or 'short' for the React UI
+      options: hasMcqOptions ? options : undefined,
     },
-    // meta is optional; client ignores it, but it’s useful if you inspect the API response
-    meta: { kind },
+    meta: {
+      kind,
+      answer_key: row.answer_key, // not used by UI, but handy if you inspect
+    },
   });
 }
