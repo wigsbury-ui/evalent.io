@@ -2,11 +2,12 @@
 import StartFormClient from './StartFormClient';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
-export default function StartPage() {
+export default function Page() {
   return (
-    <main className="mx-auto max-w-5xl p-6">
+    <div className="max-w-5xl mx-auto pt-10">
       <StartFormClient />
-    </main>
+    </div>
   );
 }
