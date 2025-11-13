@@ -1,35 +1,34 @@
-// app/api/next-item/route.ts
-import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '../../../lib/supabaseClient';
-import { randomUUID } from 'crypto';
+import { NextResponse, NextRequest } from 'next/server';
+import { supabase } from '@/lib/supabaseClient';
+import { getSid } from '@/lib/getSid';
 
-export const dynamic = 'force-dynamic';
+export async function GET(req: NextRequest) {
+  const sid = getSid(req);
+  if (!sid) return NextResponse.json({ ok: false, error: 'missing_sid' }, { status: 400 });
 
-export async function GET(req: Request) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const sidParam = searchParams.get('sid');
-    const sid =
-      sidParam && /^[0-9a-f-]{36}$/i.test(sidParam) ? sidParam : randomUUID();
+  // TODO: use sessions.item_index; for now just pick the first not-null stem
+  const { data, error } = await supabase
+    .from('items')
+    .select('id, stem, kind, option_a, option_b, option_c, option_d')
+    .not('stem', 'is', null)
+    .order('id', { ascending: true })
+    .limit(1)
+    .maybeSingle();
 
-    // pick any item (you can replace with your real selection logic)
-    const { data, error } = await supabaseAdmin
-      .from('items')
-      .select('id, stem, prompt')
-      .limit(1);
+  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (!data) return NextResponse.json({ ok: false, done: true });
 
-    if (error) throw new Error(error.message);
+  const options = [data.option_a, data.option_b, data.option_c, data.option_d]
+    .filter(Boolean)
+    .map(String);
 
-    const item =
-      data?.[0] ??
-      ({
-        id: 'demo-item',
-        stem: 'In “The cat sat on the mat,” what did the cat sit on?',
-        prompt: null,
-      } as const);
-
-    return NextResponse.json({ sid, item }, { headers: { 'cache-control': 'no-store' } });
-  } catch (e: any) {
-    return new NextResponse(e?.message ?? 'next-item failed', { status: 500 });
-  }
+  return NextResponse.json({
+    ok: true,
+    item: {
+      id: data.id,
+      stem: data.stem,
+      kind: options.length >= 2 ? 'mcq' : (data.kind ?? 'text'),
+      options
+    }
+  });
 }
