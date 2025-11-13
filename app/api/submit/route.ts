@@ -1,30 +1,17 @@
-// app/api/submit/route.ts
-import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '../../../lib/supabaseClient';
+import { NextRequest, NextResponse } from 'next/server';
+import { supabase } from '@/lib/supabaseClient';
+import { getSid } from '@/lib/getSid';
 
-export const dynamic = 'force-dynamic';
+export async function POST(req: NextRequest) {
+  const sid = getSid(req);
+  if (!sid) return NextResponse.json({ ok: false, error: 'missing_sid' }, { status: 400 });
 
-export async function POST(req: Request) {
-  try {
-    const body = await req.json().catch(() => ({}));
-    const sid = String(body?.sid || '');
-    const item_id = String(body?.item_id || '');
-    const answer_text = String(body?.answer_text || '');
+  const body = await req.json();
+  const { item_id, answer } = body || {};
+  if (!item_id) return NextResponse.json({ ok: false, error: 'missing_item_id' }, { status: 400 });
 
-    if (!sid || !item_id) {
-      return new NextResponse('Missing sid or item_id', { status: 400 });
-    }
+  const { error } = await supabase.from('attempts').insert([{ sid, item_id, answer: String(answer ?? '') }]);
+  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
-    // store attempt (adjust to your schema)
-    const { error } = await supabaseAdmin.from('attempts').insert({
-      session_id: sid,
-      item_id,
-      answer_text,
-    });
-    if (error) throw new Error(error.message);
-
-    return NextResponse.json({ ok: true }, { headers: { 'cache-control': 'no-store' } });
-  } catch (e: any) {
-    return new NextResponse(e?.message ?? 'submit failed', { status: 500 });
-  }
+  return NextResponse.json({ ok: true });
 }
