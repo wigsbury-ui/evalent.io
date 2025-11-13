@@ -1,61 +1,62 @@
-// app/api/seed/route.ts
+import { NextResponse } from 'next/server'
+import parse from 'csv-parse/sync'
+import { env } from '../../../env.mjs'
+import { supabaseAdmin } from '../../../lib/supabaseAdmin'
 
-import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-import { fetchCsv } from '@/lib/fetchCsv';
+type Row = Record<string, string>
 
-type AnyRec = Record<string, any>;
+// --- Helpers --------------------------------------------------------------
+
+const NUMERIC_COLS = new Set(['script_version', 'duration_seconds'])
 
 /**
- * This route seeds the DB from the Google Sheets CSV exports.
- *
- * It is deliberately conservative:
- * - Only a whitelisted set of columns is allowed for each table.
- * - Unknown columns are logged but ignored (so Sheets can have extra helper cols).
- * - Upserts are keyed on `id` for items/assets/blueprints so we can re-run safely.
+ * Convert arbitrary spreadsheet header into snake_case Postgres column name.
+ * - Inserts underscores between lower/upper boundaries: "VideoURL" -> "video_url"
+ * - Replaces non-alphanumeric characters with '_'
+ * - Ensures the name does not start with a digit.
  */
+function toSnake(rawKey: string): string {
+  const key = rawKey.trim()
+  if (!key) return ''
 
-const SUPABASE_URL = process.env.SUPABASE_URL!;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const SHEETS_ITEMS_CSV = process.env.SHEETS_ITEMS_CSV!;
-const SHEETS_ASSETS_CSV = process.env.SHEETS_ASSETS_CSV!;
-const SHEETS_BLUEPRINTS_CSV = process.env.SHEETS_BLUEPRINTS_CSV!;
+  let out = ''
+  for (let i = 0; i < key.length; i++) {
+    const ch = key[i]
+    const prev = i > 0 ? key[i - 1] : ''
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    // break on lower->upper like "VideoURL" -> "video_url"
+    if (prev && /[a-z]/.test(prev) && /[A-Z]/.test(ch)) {
+      out += '_'
+    }
 
-const ITEM_ALLOWED = new Set([
-  'id',
-  'programme',
-  'year',
-  'grade',
-  'subject',
-  'domain',
-  'strand',
-  'standard_code_raw',
-  'difficulty',
-  'kind',
-  'question',
-  'option_a',
-  'option_b',
-  'option_c',
-  'option_d',
-  'answer_key',
-  'mcq_options_json',
-  'short_answer_expected',
-  'long_answer_expected',
-  'exemplar_answer',
-  'notes',
-]);
+    if (/[0-9A-Za-z]/.test(ch)) {
+      out += ch.toLowerCase()
+    } else {
+      out += '_'
+    }
+  }
 
-// NOTE: we now include video_url and normalise Video_URL → video_url → share_url.
-const ASSET_ALLOWED = new Set([
-  'id',
+  out = out.replace(/_+/g, '_').replace(/^_+|_+$/g, '')
+  if (!out) return ''
+
+  if (/^[0-9]/.test(out)) {
+    return `col_${out}`
+  }
+  return out
+}
+
+// Columns we actually persist into the `assets` table.
+// This is deliberately conservative – anything not in this list is ignored.
+const ASSET_ALLOWED = new Set<string>([
   'item_id',
   'programme',
+  'stage',
+  'grade',
+  'year',
   'video_title',
   'script_audio',
+  'script_version',
   'video_id',
-  'video_url',      // <-- added
   'share_url',
   'download_url',
   'duration_seconds',
@@ -64,267 +65,137 @@ const ASSET_ALLOWED = new Set([
   'background',
   'resolution',
   'video_thumbnail',
+  'thumbnail_url',
   'player_url',
+  'language_locale',
+  'voice_id',
   'current_script_hash',
   'last_rendered_script_hash',
   'status',
   'notes',
-]);
+  '_has_vid',
+  '_has_share',
+  '__sheet',
+])
 
-const BLUEPRINT_ALLOWED = new Set([
-  'id',
-  'school_id',
-  'programme',
-  'year',
-  'name',
-  'description',
-  'target_items',
-  'target_minutes',
-  'english_items',
-  'maths_items',
-  'reasoning_items',
-  'readiness_items',
-  'created_at',
-]);
+function normaliseAsset(row: Row): Record<string, any> {
+  const out: Record<string, any> = {}
 
-// Better snake_case converter so "Video_URL" -> "video_url" (not "video__u_r_l")
-const toSnake = (k: string) =>
-  k
-    .trim()
-    // turn spaces, dashes and slashes into single underscores
-    .replace(/[\s\-\/]+/g, '_')
-    // insert underscores at camelCase boundaries, e.g. "VideoURL" -> "Video_URL"
-    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
-    .toLowerCase()
-    // collapse any double-underscores that may have been introduced ("video__url" -> "video_url")
-    .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '');
+  for (const [rawKey, rawValue] of Object.entries(row)) {
+    const key = toSnake(rawKey)
+    if (!key || !ASSET_ALLOWED.has(key)) continue
 
-// --- helpers -------------------------------------------------------------
+    const value = typeof rawValue === 'string' ? rawValue.trim() : rawValue
 
-const coerceBoolean = (v: any): boolean | null => {
-  if (v === null || v === undefined || v === '') return null;
-  if (typeof v === 'boolean') return v;
-  const s = String(v).trim().toLowerCase();
-  if (['y', 'yes', 'true', '1'].includes(s)) return true;
-  if (['n', 'no', 'false', '0'].includes(s)) return false;
-  return null;
-};
-
-const coerceNumber = (v: any): number | null => {
-  if (v === null || v === undefined || v === '') return null;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-};
-
-const parseJson = (v: any): any | null => {
-  if (v === null || v === undefined || v === '') return null;
-  if (typeof v !== 'string') return v;
-  try {
-    return JSON.parse(v);
-  } catch {
-    return null;
-  }
-};
-
-// --- prepare ITEMS -------------------------------------------------------
-
-function prepareItems(rows: AnyRec[]) {
-  const droppedKeySamples: Record<string, number> = {};
-  const cleaned: AnyRec[] = [];
-
-  for (const row of rows) {
-    const mapped: AnyRec = {};
-
-    for (const [rawKey, rawVal] of Object.entries(row)) {
-      const key = toSnake(rawKey);
-
-      if (!ITEM_ALLOWED.has(key)) {
-        droppedKeySamples[key] = (droppedKeySamples[key] ?? 0) + 1;
-        continue;
-      }
-
-      let v: any = rawVal;
-      switch (key) {
-        case 'difficulty':
-          v = v || 'Core';
-          break;
-        case 'mcq_options_json':
-          v = parseJson(v);
-          break;
-        default:
-          break;
-      }
-
-      mapped[key] = v;
+    if (value === '' || value == null) {
+      out[key] = null
+      continue
     }
 
-    if (!mapped.id) continue; // must have id
-
-    // Normalise kind: MCQ vs SHORT vs LONG
-    if (!mapped.kind) {
-      if (mapped.mcq_options_json) mapped.kind = 'MCQ';
-      else if (mapped.long_answer_expected) mapped.kind = 'LONG';
-      else mapped.kind = 'SHORT';
+    if (NUMERIC_COLS.has(key)) {
+      const n = Number(value)
+      out[key] = Number.isFinite(n) ? n : null
+      continue
     }
 
-    cleaned.push(mapped);
+    out[key] = value
   }
 
-  return { cleaned, droppedKeySamples };
+  // Bridge Google Sheet column names to DB fields:
+  // - Many of the sheets use "Video_URL" or "video_url" – we want that as share_url.
+  // - Some flows also have a direct player_url that we can treat as share_url fallback.
+  if (!out.share_url && typeof row['Video_URL'] === 'string' && row['Video_URL'].trim() !== '') {
+    out.share_url = row['Video_URL'].trim()
+  }
+  if (!out.share_url && typeof row['video_url'] === 'string' && row['video_url'].trim() !== '') {
+    out.share_url = row['video_url'].trim()
+  }
+  if (!out.share_url && typeof out.player_url === 'string' && out.player_url.trim() !== '') {
+    out.share_url = out.player_url
+  }
+
+  return out
 }
 
-// --- prepare ASSETS ------------------------------------------------------
-
-function prepareAssets(rows: AnyRec[]) {
-  const droppedKeySamples: Record<string, number> = {};
-  const cleaned: AnyRec[] = [];
-
-  for (const row of rows) {
-    const _r = row;
-
-    const mapped: AnyRec = {};
-    for (const [k, v] of Object.entries(_r)) {
-      const snake = toSnake(k);
-      mapped[snake] = v;
-    }
-
-    // normalise video/share URLs: if we have video_url but no share_url, copy it across
-    if (mapped.video_url && !mapped.share_url) {
-      mapped.share_url = mapped.video_url;
-    }
-
-    // 2) require item_id
-    if (!mapped.item_id) {
-      continue;
-    }
-
-    // 3) filter allowed keys + type coercion
-    const filtered: AnyRec = { item_id: mapped.item_id };
-
-    for (const [k, v] of Object.entries(mapped)) {
-      if (!ASSET_ALLOWED.has(k)) {
-        droppedKeySamples[k] = (droppedKeySamples[k] ?? 0) + 1;
-        continue;
-      }
-
-      let val: any = v;
-      switch (k) {
-        case 'duration_seconds':
-          val = coerceNumber(v);
-          break;
-        default:
-          break;
-      }
-
-      filtered[k] = val;
-    }
-
-    cleaned.push(filtered);
+async function fetchCsvRows(url: string): Promise<Row[]> {
+  const res = await fetch(url)
+  if (!res.ok) {
+    throw new Error(`CSV fetch failed (${res.status}) for ${url}`)
   }
-
-  return { cleaned, droppedKeySamples };
+  const text = await res.text()
+  const rows = parse(text, {
+    columns: true,
+    skip_empty_lines: true,
+  }) as Row[]
+  return rows
 }
 
-// --- prepare BLUEPRINTS --------------------------------------------------
+async function countRows(table: string): Promise<number> {
+  const { count, error } = await supabaseAdmin
+    .from(table)
+    .select('*', { count: 'exact', head: true })
 
-function prepareBlueprints(rows: AnyRec[]) {
-  const droppedKeySamples: Record<string, number> = {};
-  const cleaned: AnyRec[] = [];
-
-  for (const row of rows) {
-    const mapped: AnyRec = {};
-    for (const [rawKey, rawVal] of Object.entries(row)) {
-      const key = toSnake(rawKey);
-
-      if (!BLUEPRINT_ALLOWED.has(key)) {
-        droppedKeySamples[key] = (droppedKeySamples[key] ?? 0) + 1;
-        continue;
-      }
-
-      let v: any = rawVal;
-      switch (key) {
-        case 'target_items':
-        case 'target_minutes':
-        case 'english_items':
-        case 'maths_items':
-        case 'reasoning_items':
-        case 'readiness_items':
-          v = coerceNumber(v);
-          break;
-        default:
-          break;
-      }
-
-      mapped[key] = v;
-    }
-
-    if (!mapped.id) continue;
-    cleaned.push(mapped);
-  }
-
-  return { cleaned, droppedKeySamples };
+  if (error) throw error
+  return count ?? 0
 }
 
-// --- route handler -------------------------------------------------------
+// --- Route handler --------------------------------------------------------
 
 export async function POST() {
   try {
-    // 1) fetch CSV from Sheets
-    const [itemsCsv, assetsCsv, blueprintsCsv] = await Promise.all([
-      fetchCsv(SHEETS_ITEMS_CSV),
-      fetchCsv(SHEETS_ASSETS_CSV),
-      fetchCsv(SHEETS_BLUEPRINTS_CSV),
-    ]);
+    if (!env.SHEETS_ASSETS_CSV) {
+      return NextResponse.json(
+        { ok: false, error: 'SHEETS_ASSETS_CSV env var is not set' },
+        { status: 500 },
+      )
+    }
 
-    // 2) normalise / filter / coerce
-    const {
-      cleaned: items,
-      droppedKeySamples: itemDrops,
-    } = prepareItems(itemsCsv.rows);
+    // 1. Pull rows from Google Sheets CSV
+    const rawAssetRows = await fetchCsvRows(env.SHEETS_ASSETS_CSV)
 
-    const {
-      cleaned: assets,
-      droppedKeySamples: assetDrops,
-    } = prepareAssets(assetsCsv.rows);
+    // 2. Normalise & filter
+    const assets = rawAssetRows
+      .map(normaliseAsset)
+      .filter((a) => a.item_id && a.programme)
 
-    const {
-      cleaned: blueprints,
-      droppedKeySamples: blueprintDrops,
-    } = prepareBlueprints(blueprintsCsv.rows);
+    // 3. Upsert into `assets`
+    if (assets.length > 0) {
+      const { error } = await supabaseAdmin
+        .from('assets')
+        .upsert(assets, { onConflict: 'item_id' })
 
-    // 3) upsert into Supabase
-    const [itemsRes, assetsRes, blueprintsRes] = await Promise.all([
-      supabase.from('items').upsert(items, { onConflict: 'id' }),
-      supabase.from('assets').upsert(assets, { onConflict: 'id' }),
-      supabase.from('blueprints').upsert(blueprints, { onConflict: 'id' }),
-    ]);
+      if (error) {
+        console.error('[seed] upsert assets failed', error)
+        return NextResponse.json(
+          { ok: false, error: error.message ?? 'Upsert into assets failed' },
+          { status: 500 },
+        )
+      }
+    }
 
-    if (itemsRes.error) throw itemsRes.error;
-    if (assetsRes.error) throw assetsRes.error;
-    if (blueprintsRes.error) throw blueprintsRes.error;
+    // 4. Return some diagnostics so the Admin screen can show counts
+    const [itemsCount, assetsCount, blueprintsCount] = await Promise.all([
+      countRows('items').catch(() => 0),
+      countRows('assets').catch(() => 0),
+      countRows('blueprints').catch(() => 0),
+    ])
 
-    const summary = {
-      counts: {
-        items: items.length,
+    return NextResponse.json({
+      ok: true,
+      seeded: {
         assets: assets.length,
-        blueprints: blueprints.length,
       },
-      drops: {
-        items: itemDrops,
-        assets: assetDrops,
-        blueprints: blueprintDrops,
+      counts: {
+        items: itemsCount,
+        assets: assetsCount,
+        blueprints: blueprintsCount,
       },
-    };
-
-    return NextResponse.json(summary);
-  } catch (error: any) {
-    console.error('Seed from CSV failed', error);
+    })
+  } catch (err: any) {
+    console.error('[seed] unexpected error', err)
     return NextResponse.json(
-      { error: String(error?.message ?? error) },
+      { ok: false, error: err?.message ?? 'Unknown error in seed endpoint' },
       { status: 500 },
-    );
+    )
   }
 }
-
-export const dynamic = 'force-dynamic';
