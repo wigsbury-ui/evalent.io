@@ -6,7 +6,6 @@ async function count(name: string) {
   const { count, error } = await supabase
     .from(name)
     .select('id', { count: 'exact', head: true });
-
   if (error) return null;
   return count;
 }
@@ -25,7 +24,6 @@ export async function GET() {
     RESEND_API_KEY: !!env.RESEND_API_KEY,
   };
 
-  // Prefer the views, fall back to base tables if needed
   const [itemsV, assetsV, blueprintsV] = await Promise.all([
     count('items_vw'),
     count('assets_vw'),
