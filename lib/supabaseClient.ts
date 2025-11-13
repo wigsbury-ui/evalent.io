@@ -1,6 +1,5 @@
 // lib/supabaseClient.ts
-// Shared Supabase client for anonymous (non-admin) access, used by the
-// student test flow and diagnostics/reporting API routes.
+// Anonymous Supabase client for all read-only / public operations.
 
 import { createClient } from '@supabase/supabase-js';
 import { env } from './env';
