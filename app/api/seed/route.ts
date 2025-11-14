@@ -215,7 +215,9 @@ function prepareItems(rows: any[]) {
 }
 
 function prepareAssets(rows: any[], validItemIds: Set<string>) {
-  const assets: any[] = [];
+  // Use a map so that we end up with AT MOST ONE row per item_id.
+  const byItemId = new Map<string, any>();
+  const duplicateAssetIds = new Set<string>();
   let skippedMissingId = 0;
   let skippedUnknownItem = 0;
 
@@ -234,11 +236,12 @@ function prepareAssets(rows: any[], validItemIds: Set<string>) {
       continue;
     }
 
+    // Build the asset row
     const duration_seconds = parseNumericOrNull(getStr(row, 'duration_seconds', 'duration'));
     const _has_vid = parseBoolOrNull(getStr(row, '_has_vid')) ?? false;
     const _has_share = parseBoolOrNull(getStr(row, '_has_share')) ?? false;
 
-    assets.push({
+    const asset = {
       item_id: itemId,
       video_title: getStr(row, 'video_title'),
       video_id: getStr(row, 'video_id'),
@@ -271,11 +274,21 @@ function prepareAssets(rows: any[], validItemIds: Set<string>) {
       talking_photo_id: getStr(row, 'talking_photo_id'),
       notes: getStr(row, 'notes'),
       player_url: getStr(row, 'player_url'),
-    });
+    };
+
+    if (byItemId.has(itemId)) {
+      // We overwrite, but record that this item_id appeared more than once.
+      duplicateAssetIds.add(itemId);
+    }
+
+    byItemId.set(itemId, asset);
   }
+
+  const assets = Array.from(byItemId.values());
 
   return {
     assets,
+    duplicateAssetIds: Array.from(duplicateAssetIds),
     skippedMissingId,
     skippedUnknownItem,
   };
@@ -346,6 +359,7 @@ async function runSeed() {
   const validItemIdSet = new Set(items.map((i) => i.id));
   const {
     assets,
+    duplicateAssetIds,
     skippedMissingId,
     skippedUnknownItem,
   } = prepareAssets(assetsRows, validItemIdSet);
@@ -362,11 +376,10 @@ async function runSeed() {
     .neq('id', '00000000-0000-0000-0000-000000000000');
   await supabase.from('items').delete().neq('id', '');
 
-  // 4) Upsert items (onConflict: id) – even if there were duplicates in the CSV,
-  //    Postgres resolves them.
+  // 4) Insert items (no duplicates at this point)
   const { error: itemsError } = await supabase
     .from('items')
-    .upsert(items, { onConflict: 'id' });
+    .insert(items);
 
   if (itemsError) {
     return NextResponse.json(
@@ -385,10 +398,10 @@ async function runSeed() {
     );
   }
 
-  // 5) Upsert assets (onConflict: item_id) – this is the big change.
+  // 5) Insert assets – now guaranteed ONE row per item_id.
   const { error: assetsError } = await supabase
     .from('assets')
-    .upsert(assets, { onConflict: 'item_id' });
+    .insert(assets);
 
   if (assetsError) {
     return NextResponse.json(
@@ -398,6 +411,7 @@ async function runSeed() {
         debug: {
           assetsPrepared: assets.length,
           assetsCsvRows: assetsRows.length,
+          duplicateAssetIds,
           skippedMissingId,
           skippedUnknownItem,
         },
@@ -406,7 +420,7 @@ async function runSeed() {
     );
   }
 
-  // 6) Insert blueprints (simple insert; PK is generated UUID)
+  // 6) Insert blueprints
   const { error: blueprintsError } = await supabase
     .from('blueprints')
     .insert(blueprints);
@@ -432,7 +446,10 @@ async function runSeed() {
     itemsInserted: items.length,
     assetsInserted: assets.length,
     blueprintsInserted: blueprints.length,
-    duplicatesSkipped: duplicateIds.length,
+    duplicatesSkipped: {
+      items: duplicateIds.length,
+      assets: duplicateAssetIds.length,
+    },
     skippedNoIdCount,
     skippedNoStemCount,
     assetsSkipped: {
@@ -458,7 +475,6 @@ export async function POST() {
   }
 }
 
-// Optional: allow GET to trigger the same logic (for manual testing)
 export async function GET() {
   return POST();
 }
