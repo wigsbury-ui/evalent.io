@@ -1,11 +1,11 @@
 // app/api/seed/route.ts
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabaseAdmin';
 import { env } from '@/lib/env';
+import { supabaseAdmin } from '@/lib/supabaseClient';
 
-type CsvRow = Record<string, string>;
+type CsvRow = Record<string, string | undefined>;
 
-// ---------- CSV helpers ----------
+// ---------- CSV helpers ----------------------------------------------------
 
 function splitCsvLine(line: string): string[] {
   const out: string[] = [];
@@ -16,6 +16,7 @@ function splitCsvLine(line: string): string[] {
     const ch = line[i];
 
     if (ch === '"') {
+      // handle escaped quotes ("")
       if (inQuotes && line[i + 1] === '"') {
         current += '"';
         i++;
@@ -61,126 +62,121 @@ async function fetchCsv(url?: string): Promise<CsvRow[]> {
   if (!url) return [];
   const res = await fetch(url);
   if (!res.ok) {
-    throw new Error(`Failed to fetch CSV from ${url}: ${res.status} ${res.statusText}`);
+    throw new Error(`CSV fetch failed: ${res.status} ${res.statusText}`);
   }
   const text = await res.text();
   return parseCsv(text);
 }
 
-function clean(v: string | undefined): string | null {
-  if (!v) return null;
-  const t = v.trim();
+function clean(v: string | undefined | null): string | null {
+  if (v == null) return null;
+  const t = String(v).trim();
   return t === '' ? null : t;
 }
 
-// ---------- PREP: items ----------
+// ---------- Prepare ITEMS (matches public.items) ---------------------------
 
 function prepareItems(rows: CsvRow[]) {
   const seenIds = new Set<string>();
-  const prepared: any[] = [];
+  const out: any[] = [];
 
   for (const r of rows) {
     const id = (r['item_id'] || r['id'] || '').trim();
     if (!id || seenIds.has(id)) continue;
     seenIds.add(id);
 
-    // options: from mcq_options_json (confirmed) or fallbacks
-    let options: string[] | null = null;
-    const rawOptions =
-      r['mcq_options_json'] ||
-      r['options_joined'] ||
-      r['options'] ||
-      r['mcq_options'] ||
-      '';
-
-    if (rawOptions) {
-      try {
-        if (rawOptions.trim().startsWith('[')) {
-          const parsed = JSON.parse(rawOptions);
-          options = Array.isArray(parsed)
-            ? parsed.map((x: any) => String(x))
-            : null;
-        } else {
-          options = String(rawOptions)
-            .split('\n')
-            .map((s) => s.trim())
-            .filter(Boolean);
-        }
-      } catch {
-        // swallow, leave options = null
-      }
-    }
-
-    const correct =
-      r['answer_key'] ??
-      r['correct'] ??
-      r['correct_answer'] ??
-      null;
-
+    // Year token (e.g. "Y7-ENG-..." -> "Y7")
     const yearToken =
-      (id.includes('-') && id.split('-')[0]) ||
+      (id.includes('-') ? id.split('-')[0] : undefined) ||
       r['year'] ||
       r['year_label'] ||
       r['grade'] ||
       'Y7';
 
-    prepared.push({
+    // Options: try JSON array first, else split on newlines
+    const options = (() => {
+      const raw =
+        r['mcq_options_json'] ||
+        r['options_joined'] ||
+        r['options'] ||
+        r['mcq_options'] ||
+        '';
+
+      if (typeof raw === 'string') {
+        const trimmed = raw.trim();
+        if (trimmed.startsWith('[')) {
+          try {
+            const parsed = JSON.parse(trimmed);
+            if (Array.isArray(parsed)) {
+              return parsed.map((x) => String(x));
+            }
+          } catch {
+            // fall through to newline split
+          }
+        }
+        return trimmed
+          .split('\n')
+          .map((x) => x.trim())
+          .filter(Boolean);
+      }
+
+      return [];
+    })();
+
+    const correct =
+      r['answer_key'] !== undefined && r['answer_key'] !== null
+        ? String(r['answer_key'])
+        : r['correct'] || r['correct_answer'] || null;
+
+    const typeRaw = (r['type'] || 'MCQ').toString().toLowerCase();
+    const type: 'mcq' | 'short' = typeRaw === 'mcq' ? 'mcq' : 'short';
+
+    const stem =
+      r['display_question'] ||
+      r['stimulus_text'] ||
+      r['stem'] ||
+      r['text'] ||
+      r['prompt'] ||
+      '';
+
+    out.push({
       id,
-      year: yearToken,
-      domain: r['domain'] || 'English',
-      stem:
-        r['display_question'] ||
-        r['stimulus_text'] ||
-        r['stem'] ||
-        r['text'] ||
-        r['prompt'] ||
-        '',
-      type:
-        (r['type'] || 'mcq').toString().toLowerCase() === 'mcq'
-          ? 'mcq'
-          : 'short',
-      options: options ? JSON.stringify(options) : null,
-      correct: correct != null ? String(correct) : null,
-      programme: r['programme'] || r['curriculum'] || 'UK',
+      year: String(yearToken),
+      domain: (r['domain'] || 'English').toString(),
+      stem: String(stem),
+      type,
+      options,
+      correct: correct == null ? null : String(correct),
+      programme: (r['programme'] || r['curriculum'] || 'UK').toString(),
     });
   }
 
-  return prepared;
+  return out;
 }
 
-// ---------- PREP: assets ----------
+// ---------- Prepare ASSETS (matches public.assets) -------------------------
 
 function prepareAssets(rows: CsvRow[]) {
   const seenItemIds = new Set<string>();
-  const prepared: any[] = [];
+  const out: any[] = [];
 
   for (const r of rows) {
     const itemId = (r['item_id'] || '').trim();
     if (!itemId || seenItemIds.has(itemId)) continue;
     seenItemIds.add(itemId);
 
-    const videoUrl =
-      clean(r['player_url']) ||
-      clean(r['Video_URL']) ||
-      clean(r['video_url']) ||
-      clean(r['Share_URL']) ||
-      clean(r['share_url']);
-
-    prepared.push({
-      // id will be auto-generated (uuid)
+    out.push({
       item_id: itemId,
       video_title: clean(r['video_title']),
       video_id: clean(r['video_id']),
-      share_url: clean(r['share_url']) || clean(r['Share_URL']),
-      download_url: clean(r['download_url']) || clean(r['Download_URL']),
-      video_thumbnail:
-        clean(r['video_thumbnail']) || clean(r['Thumbnail_URL']),
-      player_url: videoUrl,
+      share_url: clean(r['share_url']),
+      download_url: clean(r['download_url']),
       duration_seconds: clean(r['duration_seconds']),
       avatar_voice_id: clean(r['avatar_voice_id']),
       avatar_style: clean(r['avatar_style']),
       background: clean(r['background']),
       resolution: clean(r['resolution']),
+      video_thumbnail: clean(r['video_thumbnail']),
       script_audio: clean(r['script_audio']),
       script_audio_original: clean(r['script_audio_original']),
       intro: clean(r['intro']),
@@ -194,45 +190,68 @@ function prepareAssets(rows: CsvRow[]) {
       current_script_hash: clean(r['current_script_hash']),
       last_rendered_script_hash: clean(r['last_rendered_script_hash']),
       error: clean(r['error']),
-      status: clean(r['status']) || clean(r['Status']),
+      status: clean(r['status']),
       __sheet: clean(r['__sheet']),
       programme: clean(r['programme']),
       _has_vid:
-        String(r['_has_vid']).toLowerCase() === 'true' ? true : false,
+        String(r['_has_vid'] ?? '')
+          .trim()
+          .toLowerCase() === 'true',
       _has_share:
-        String(r['_has_share']).toLowerCase() === 'true' ? true : false,
+        String(r['_has_share'] ?? '')
+          .trim()
+          .toLowerCase() === 'true',
       talking_photo_id: clean(r['talking_photo_id']),
-      notes: clean(r['notes']) || clean(r['Notes']),
-      regenerate: clean(r['regenerate']) || clean(r['Regenerate']),
+      notes: clean(r['notes']),
+      player_url: clean(r['player_url']),
+      // IMPORTANT: we deliberately do NOT send any `regenerate` field here,
+      // because there is no `regenerate` column in the Supabase `assets` table.
     });
   }
 
-  return prepared;
+  return out;
 }
 
-// ---------- PREP: blueprints ----------
+// ---------- Prepare BLUEPRINTS (matches public.blueprints) -----------------
 
 function prepareBlueprints(rows: CsvRow[]) {
-  const prepared: any[] = [];
+  const seenKeys = new Set<string>();
+  const out: any[] = [];
 
   for (const r of rows) {
-    if (!r['programme'] || !r['grade'] || !r['subject']) continue;
+    // Minimal uniqueness: programme + grade + subject
+    const key = `${r['programme'] || ''}|${r['grade'] || ''}|${
+      r['subject'] || ''
+    }`;
+    if (seenKeys.has(key)) continue;
+    seenKeys.add(key);
 
-    prepared.push({
+    out.push({
       programme: r['programme'],
-      grade: Number(r['grade']),
+      grade: Number(r['grade'] ?? 0),
       subject: r['subject'],
-      base_count: Number(r['base_count'] || 0),
-      easy_count: Number(r['easy_count'] || 0),
-      core_count: Number(r['core_count'] || 0),
-      hard_count: Number(r['hard_count'] || 0),
+      base_count: Number(r['base_count'] ?? 0),
+      easy_count: Number(r['easy_count'] ?? 0),
+      core_count: Number(r['core_count'] ?? 0),
+      hard_count: Number(r['hard_count'] ?? 0),
     });
   }
 
-  return prepared;
+  return out;
 }
 
-// ---------- MAIN HANDLER ----------
+// ---------- Upsert helper --------------------------------------------------
+
+async function upsert(table: string, rows: any[]) {
+  if (!rows.length) return { count: 0 };
+  const { error } = await supabaseAdmin.from(table).upsert(rows);
+  if (error) {
+    throw new Error(`Upsert into ${table} failed: ${error.message}`);
+  }
+  return { count: rows.length };
+}
+
+// ---------- Main handler ---------------------------------------------------
 
 async function handleSeed() {
   try {
@@ -242,7 +261,7 @@ async function handleSeed() {
 
     if (!itemsUrl && !assetsUrl && !blueprintsUrl) {
       throw new Error(
-        'No SHEETS_*_CSV env vars are set. Please set SHEETS_ITEMS_CSV, SHEETS_ASSETS_CSV, SHEETS_BLUEPRINTS_CSV.',
+        'No SHEETS_*_CSV env vars set. Please set SHEETS_ITEMS_CSV, SHEETS_ASSETS_CSV, SHEETS_BLUEPRINTS_CSV.'
       );
     }
 
@@ -256,37 +275,9 @@ async function handleSeed() {
     const assetsPrepared = prepareAssets(assetsCsv);
     const blueprintsPrepared = prepareBlueprints(blueprintsCsv);
 
-    const inserted: Record<string, number> = {};
-
-    // Wipe and re-insert for simplicity
-    if (itemsPrepared.length) {
-      await supabaseAdmin.from('items').delete().neq('id', '');
-      const { error } = await supabaseAdmin
-        .from('items')
-        .insert(itemsPrepared);
-      if (error) throw new Error(`Insert into items failed: ${error.message}`);
-      inserted.items = itemsPrepared.length;
-    }
-
-    if (assetsPrepared.length) {
-      await supabaseAdmin.from('assets').delete().neq('item_id', '');
-      const { error } = await supabaseAdmin
-        .from('assets')
-        .insert(assetsPrepared);
-      if (error)
-        throw new Error(`Insert into assets failed: ${error.message}`);
-      inserted.assets = assetsPrepared.length;
-    }
-
-    if (blueprintsPrepared.length) {
-      await supabaseAdmin.from('blueprints').delete().neq('programme', '');
-      const { error } = await supabaseAdmin
-        .from('blueprints')
-        .insert(blueprintsPrepared);
-      if (error)
-        throw new Error(`Insert into blueprints failed: ${error.message}`);
-      inserted.blueprints = blueprintsPrepared.length;
-    }
+    const itemsResult = await upsert('items', itemsPrepared);
+    const assetsResult = await upsert('assets', assetsPrepared);
+    const blueprintsResult = await upsert('blueprints', blueprintsPrepared);
 
     return NextResponse.json({
       ok: true,
@@ -295,21 +286,25 @@ async function handleSeed() {
         assetsCsvRows: assetsCsv.length,
         blueprintsCsvRows: blueprintsCsv.length,
       },
-      inserted,
+      upserted: {
+        items: itemsResult.count,
+        assets: assetsResult.count,
+        blueprints: blueprintsResult.count,
+      },
     });
   } catch (err: any) {
     console.error('[seed] error', err);
     return NextResponse.json(
       { ok: false, error: err?.message ?? 'Unknown error in seed endpoint' },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
 
-export async function GET() {
+export async function POST() {
   return handleSeed();
 }
 
-export async function POST() {
+export async function GET() {
   return handleSeed();
 }
