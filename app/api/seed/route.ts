@@ -1,11 +1,12 @@
 // app/api/seed/route.ts
 import { NextResponse } from 'next/server';
-import { supabaseAdmin } from '../../../lib/supabaseClient';
-import { env } from '../../../lib/env';
+import { env } from '@/lib/env';
+import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { fetchCsv } from '@/lib/fetchCsv';
 
 type CsvRow = Record<string, string>;
 
-// --- CSV helpers ----------------------------------------------------------
+// ---------- CSV parsing (same idea as your CLI) ------------------------
 
 function splitCsvLine(line: string): string[] {
   const out: string[] = [];
@@ -18,7 +19,7 @@ function splitCsvLine(line: string): string[] {
     if (ch === '"') {
       if (inQuotes && line[i + 1] === '"') {
         current += '"';
-        i++;
+        i++; // skip escaped quote
       } else {
         inQuotes = !inQuotes;
       }
@@ -57,225 +58,177 @@ function parseCsv(text: string): CsvRow[] {
   return rows;
 }
 
-async function fetchCsv(url?: string): Promise<CsvRow[]> {
-  if (!url) return [];
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw new Error(`Failed to fetch CSV from ${url}: ${res.status} ${res.statusText}`);
+// ---------- Helpers -----------------------------------------------------
+
+async function upsert(table: string, rows: any[]) {
+  if (!rows.length) return;
+  const { error } = await supabaseAdmin.from(table).upsert(rows);
+  if (error) {
+    throw new Error(`Upsert into ${table} failed: ${error.message}`);
   }
-  const text = await res.text();
-  return parseCsv(text);
 }
 
-function cleanVal(v: string | undefined): string | null {
-  if (!v) return null;
-  const trimmed = v.trim();
-  return trimmed === '' ? null : trimmed;
-}
+// ---------- Mappers (aligned with sql/schema.sql + scripts/seed.ts) -----
 
-// --- PREPARE ITEMS --------------------------------------------------------
+function buildItems(rows: CsvRow[]) {
+  return rows.map((r) => {
+    const id = r.item_id || r.id;
 
-function prepareItems(rows: CsvRow[], schoolId: string) {
-  const seenAnchors = new Set<string>();
-  const prepared: any[] = [];
-
-  for (const r of rows) {
-    const anchor = (r['anchor'] || r['item_id'] || '').trim();
-    if (!anchor) continue;
-    if (seenAnchors.has(anchor)) continue;
-    seenAnchors.add(anchor);
-
-    // mcq_options_json (confirmed by you)
-    let mcqOptions: any = null;
-    const mcqRaw = r['mcq_options_json'];
-    if (mcqRaw && mcqRaw.trim() !== '') {
-      try {
-        mcqOptions = JSON.parse(mcqRaw);
-      } catch {
-        mcqOptions = null;
+    const yearToken = (() => {
+      if (id && String(id).includes('-')) {
+        return String(id).split('-')[0];
       }
-    }
+      return r.year || r.year_label || r.grade || 'Y7';
+    })();
 
-    prepared.push({
-      school_id: schoolId,
-      anchor,
+    const options = (() => {
+      const raw =
+        r.mcq_options_json ||
+        r.options_joined ||
+        (r.options as any) ||
+        (r.mcq_options as any) ||
+        '';
 
-      grade_label: cleanVal(r['grade_label'] || r['grade']),
-      grade_number: cleanVal(r['grade_number']),
-      stage: cleanVal(r['stage']),
-      domain: cleanVal(r['domain']),
-      strand: cleanVal(r['strand'] || r['strand_raw']),
-      standard_code_raw: cleanVal(r['standard_code_raw'] || r['standard_code']),
-      language_locale: cleanVal(r['language_locale']),
+      // If it looks like JSON array, try to parse it
+      if (typeof raw === 'string') {
+        const trimmed = raw.trim();
+        if (trimmed.startsWith('[')) {
+          try {
+            return JSON.parse(trimmed).map((x: any) => String(x));
+          } catch {
+            // fall through to split-on-newlines
+          }
+        }
+      }
 
-      difficulty: cleanVal(r['difficulty']),
-      item_kind:
-        cleanVal(r['item_kind']) ||
-        cleanVal(r['type']) ||
-        (mcqOptions ? 'mcq' : 'prompt'),
+      return String(raw)
+        .split('\n')
+        .filter(Boolean)
+        .map((x: any) => String(x));
+    })();
 
-      display_question:
-        cleanVal(r['display_question']) ||
-        cleanVal(r['stem']) ||
-        cleanVal(r['stimulus_text']),
+    const correct =
+      r.answer_key !== undefined && r.answer_key !== null && r.answer_key !== ''
+        ? String(r.answer_key)
+        : r.correct || r.correct_answer || null;
 
-      stimulus_text: cleanVal(r['stimulus_text']),
-      stem_text: cleanVal(r['stem'] || r['stem_text']),
+    const typeRaw = (r.type || 'MCQ').toString().toLowerCase();
+    const type = typeRaw === 'mcq' ? 'mcq' : 'short';
 
-      mcq_options_json: mcqOptions,
-      correct_index: cleanVal(r['correct_index']),
-      answer_key: cleanVal(r['answer_key']),
-
-      share_url:
-        cleanVal(r['share_url']) ||
-        cleanVal(r['Share_URL']) ||
-        cleanVal(r['Video_URL']) ||
-        cleanVal(r['video_url']),
-    });
-  }
-
-  return prepared;
+    return {
+      id,
+      year: yearToken,
+      domain: r.domain || 'English',
+      stem:
+        r.display_question ||
+        r.stimulus_text ||
+        r.stem ||
+        r.text ||
+        r.prompt ||
+        '',
+      type,
+      options,
+      correct,
+      programme: r.programme || r.curriculum || 'UK',
+    };
+  });
 }
 
-// --- PREPARE ASSETS -------------------------------------------------------
-
-function prepareAssets(rows: CsvRow[], schoolId: string) {
-  const seenKeys = new Set<string>();
-  const prepared: any[] = [];
-
-  for (const r of rows) {
-    const assetKey = (r['asset_key'] || r['item_id'] || '').trim();
-    if (!assetKey) continue;
-    if (seenKeys.has(assetKey)) continue;
-    seenKeys.add(assetKey);
-
-    prepared.push({
-      school_id: schoolId,
-      asset_key: assetKey,
-      item_id: cleanVal(r['item_id']),
-
-      video_title: cleanVal(r['video_title'] || r['Video_Title']),
-      share_url:
-        cleanVal(r['Video_URL']) ||
-        cleanVal(r['video_url']) ||
-        cleanVal(r['Share_URL']) ||
-        cleanVal(r['share_url']),
-
-      download_url: cleanVal(r['Download_URL'] || r['download_url']),
-      notes: cleanVal(r['Notes'] || r['notes']),
-      regenerate: cleanVal(r['Regenerate'] || r['regenerate']),
-    });
-  }
-
-  return prepared;
+function buildAssets(rows: CsvRow[]) {
+  return rows.map((r) => ({
+    item_id: r.item_id,
+    video_title: r.video_title,
+    video_id: r.video_id,
+    share_url: r.share_url,
+    download_url: r.download_url,
+    duration_seconds: r.duration_seconds,
+    avatar_voice_id: r.avatar_voice_id,
+    avatar_style: r.avatar_style,
+    background: r.background,
+    resolution: r.resolution,
+    video_thumbnail: r.video_thumbnail,
+    script_audio: r.script_audio,
+    script_audio_original: r.script_audio_original,
+    intro: r.intro,
+    outro: r.outro,
+    a_intro: r.a_intro,
+    b_intro: r.b_intro,
+    c_intro: r.c_intro,
+    d_intro: r.d_intro,
+    end: r.end,
+    script_version: r.script_version,
+    current_script_hash: r.current_script_hash,
+    last_rendered_script_hash: r.last_rendered_script_hash,
+    error: r.error,
+    status: r.status,
+    __sheet: r.__sheet,
+    programme: r.programme,
+    _has_vid: String(r._has_vid).toLowerCase() === 'true',
+    _has_share: String(r._has_share).toLowerCase() === 'true',
+    talking_photo_id: r.talking_photo_id,
+    notes: r.notes,
+    player_url: r.player_url,
+  }));
 }
 
-// --- PREPARE BLUEPRINTS ---------------------------------------------------
-
-function prepareBlueprints(rows: CsvRow[], schoolId: string) {
-  const seenKeys = new Set<string>();
-  const prepared: any[] = [];
-
-  for (const r of rows) {
-    const key = (r['key'] || '').trim();
-    if (!key) continue;
-    if (seenKeys.has(key)) continue;
-    seenKeys.add(key);
-
-    prepared.push({
-      school_id: schoolId,
-      key,
-      label: cleanVal(r['label']),
-      domain: cleanVal(r['domain']),
-      grade_label: cleanVal(r['grade_label']),
-      grade_number: cleanVal(r['grade_number']),
-      stage: cleanVal(r['stage']),
-      item_ids: cleanVal(r['item_ids']),
-    });
-  }
-
-  return prepared;
+function buildBlueprints(rows: CsvRow[]) {
+  return rows.map((r) => ({
+    programme: r.programme,
+    grade: Number(r.grade),
+    subject: r.subject,
+    base_count: Number(r.base_count || 0),
+    easy_count: Number(r.easy_count || 0),
+    core_count: Number(r.core_count || 0),
+    hard_count: Number(r.hard_count || 0),
+  }));
 }
 
-// --- MAIN HANDLER ---------------------------------------------------------
+// ---------- Main handler --------------------------------------------------
 
 async function handleSeed() {
   try {
-    const schoolId = env.DEFAULT_SCHOOL_ID;
-    if (!schoolId) {
-      throw new Error('DEFAULT_SCHOOL_ID is not set in env');
+    const results: any = {
+      items: null,
+      assets: null,
+      blueprints: null,
+    };
+
+    // ITEMS
+    if (env.SHEETS_ITEMS_CSV) {
+      const csvText = await fetchCsv(env.SHEETS_ITEMS_CSV);
+      const rows = parseCsv(csvText);
+      const items = buildItems(rows);
+      await upsert('items', items);
+      results.items = { csvRows: rows.length, upserted: items.length };
     }
 
-    const itemsUrl = env.SHEETS_ITEMS_CSV;
-    const assetsUrl = env.SHEETS_ASSETS_CSV;
-    const blueprintsUrl = env.SHEETS_BLUEPRINTS_CSV;
-
-    if (!itemsUrl && !assetsUrl && !blueprintsUrl) {
-      throw new Error(
-        'No SHEETS_*_CSV env vars are set. Please set SHEETS_ITEMS_CSV, SHEETS_ASSETS_CSV, SHEETS_BLUEPRINTS_CSV.',
-      );
+    // ASSETS
+    if (env.SHEETS_ASSETS_CSV) {
+      const csvText = await fetchCsv(env.SHEETS_ASSETS_CSV);
+      const rows = parseCsv(csvText);
+      const assets = buildAssets(rows);
+      await upsert('assets', assets);
+      results.assets = { csvRows: rows.length, upserted: assets.length };
     }
 
-    const [itemsCsv, assetsCsv, blueprintsCsv] = await Promise.all([
-      fetchCsv(itemsUrl),
-      fetchCsv(assetsUrl),
-      fetchCsv(blueprintsUrl),
-    ]);
-
-    const itemsPrepared = prepareItems(itemsCsv, schoolId);
-    const assetsPrepared = prepareAssets(assetsCsv, schoolId);
-    const blueprintsPrepared = prepareBlueprints(blueprintsCsv, schoolId);
-
-    // Delete everything for this school_id first (simple, predictable)
-    await supabaseAdmin.from('items').delete().eq('school_id', schoolId);
-    await supabaseAdmin.from('assets').delete().eq('school_id', schoolId);
-    await supabaseAdmin.from('blueprints').delete().eq('school_id', schoolId);
-
-    const results: any = {};
-
-    if (itemsPrepared.length > 0) {
-      const { error } = await supabaseAdmin.from('items').insert(itemsPrepared);
-      if (error) {
-        throw new Error(`Insert into items failed: ${error.message}`);
-      }
-      results.itemsInserted = itemsPrepared.length;
-    } else {
-      results.itemsInserted = 0;
-    }
-
-    if (assetsPrepared.length > 0) {
-      const { error } = await supabaseAdmin.from('assets').insert(assetsPrepared);
-      if (error) {
-        throw new Error(`Insert into assets failed: ${error.message}`);
-      }
-      results.assetsInserted = assetsPrepared.length;
-    } else {
-      results.assetsInserted = 0;
-    }
-
-    if (blueprintsPrepared.length > 0) {
-      const { error } = await supabaseAdmin
-        .from('blueprints')
-        .insert(blueprintsPrepared);
-      if (error) {
-        throw new Error(`Insert into blueprints failed: ${error.message}`);
-      }
-      results.blueprintsInserted = blueprintsPrepared.length;
-    } else {
-      results.blueprintsInserted = 0;
+    // BLUEPRINTS
+    if (env.SHEETS_BLUEPRINTS_CSV) {
+      const csvText = await fetchCsv(env.SHEETS_BLUEPRINTS_CSV);
+      const rows = parseCsv(csvText);
+      const blueprints = buildBlueprints(rows);
+      await upsert('blueprints', blueprints);
+      results.blueprints = {
+        csvRows: rows.length,
+        upserted: blueprints.length,
+      };
     }
 
     return NextResponse.json({
       ok: true,
-      csvCounts: {
-        itemsCsvRows: itemsCsv.length,
-        assetsCsvRows: assetsCsv.length,
-        blueprintsCsvRows: blueprintsCsv.length,
-      },
-      inserted: results,
+      results,
     });
   } catch (err: any) {
-    console.error('[seed] error', err);
+    console.error('[api/seed] error', err);
     return NextResponse.json(
       { ok: false, error: err?.message ?? 'Unknown error in seed endpoint' },
       { status: 500 },
@@ -283,10 +236,10 @@ async function handleSeed() {
   }
 }
 
-export async function POST() {
+export async function GET() {
   return handleSeed();
 }
 
-export async function GET() {
+export async function POST() {
   return handleSeed();
 }
