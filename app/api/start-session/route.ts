@@ -1,64 +1,55 @@
 // app/api/start-session/route.ts
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
-import { env } from '@/lib/env';
 
-type StartBody = {
-  candidate_name?: string;
-  year?: string;
-  passcode?: string;
-};
+const SESSION_COOKIE = 'evalent_session_id';
 
-export async function POST(req: Request) {
-  let body: StartBody | null = null;
+export async function POST(req: NextRequest) {
+  const supabase: any = supabaseAdmin;
+
+  // Optional: allow programme/grade in body, but don’t depend on them
+  let body: any = {};
   try {
-    body = (await req.json()) as StartBody;
+    body = await req.json();
   } catch {
-    body = null;
+    body = {};
   }
 
-  const candidate_name = body?.candidate_name?.trim();
-  const year = body?.year?.trim();
-  const passcode = body?.passcode?.trim();
+  const schoolId = process.env.DEFAULT_SCHOOL_ID || null;
 
-  if (!candidate_name || !year) {
-    return new Response('candidate_name and year required', { status: 400 });
-  }
+  const insertPayload: any = {
+    item_index: 0,          // *** THIS IS THE IMPORTANT PART ***
+  };
 
-  // Optional passcode gate
-  if (env.NEXT_PUBLIC_START_PASSCODE) {
-    if (passcode !== env.NEXT_PUBLIC_START_PASSCODE) {
-      return new Response('Invalid passcode', { status: 401 });
-    }
-  }
+  if (schoolId) insertPayload.school_id = schoolId;
+  if (body.programme) insertPayload.programme = body.programme;
+  if (body.grade) insertPayload.grade = body.grade;
 
-  if (!env.DEFAULT_SCHOOL_ID) {
-    return new Response('DEFAULT_SCHOOL_ID not configured', { status: 500 });
-  }
-
-  const { data, error } = await supabaseAdmin
+  const { data, error } = await supabase
     .from('sessions')
-    .insert([
-      {
-        school_id: env.DEFAULT_SCHOOL_ID,
-        year,
-        candidate_name,
-      },
-    ])
-    .select('*')
+    .insert(insertPayload)
+    .select('id, item_index')
     .single();
 
   if (error || !data) {
-    return new Response(error?.message ?? 'Failed to create session', {
-      status: 500,
-    });
+    return NextResponse.json(
+      { ok: false, error: error?.message || 'Failed to create session' },
+      { status: 500 }
+    );
   }
 
-  // `sid` for backwards compatibility with the older /start client;
-  // `session` for the new /test/[sessionId] flow.
-  return NextResponse.json({
+  const res = NextResponse.json({
     ok: true,
-    sid: data.id,
-    session: data,
+    sessionId: data.id,
   });
+
+  // Set a cookie so /api/next-item can find the session automatically
+  res.cookies.set(SESSION_COOKIE, data.id, {
+    httpOnly: true,
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 60 * 60, // 1 hour
+  });
+
+  return res;
 }
