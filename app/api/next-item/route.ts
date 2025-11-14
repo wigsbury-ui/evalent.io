@@ -48,26 +48,7 @@ function getSupabaseServiceClient(): any {
 
 // -------- helpers --------
 
-async function getSessionId(req: Request): Promise<string> {
-  const { searchParams } = new URL(req.url);
-  const fromQuery = searchParams.get('sessionId');
-  if (fromQuery) return fromQuery;
-
-  if (req.method === 'POST') {
-    try {
-      const body = await req.json().catch(() => null);
-      if (body && typeof body.sessionId === 'string' && body.sessionId.trim() !== '') {
-        return body.sessionId.trim();
-      }
-    } catch {
-      // ignore JSON parse issues
-    }
-  }
-
-  throw new Error('Missing sessionId');
-}
-
-async function getSession(supabase: any, sessionId: string): Promise<SessionRow> {
+async function getSessionById(supabase: any, sessionId: string): Promise<SessionRow> {
   const { data, error } = await supabase
     .from('sessions')
     .select('*')
@@ -76,6 +57,49 @@ async function getSession(supabase: any, sessionId: string): Promise<SessionRow>
 
   if (error || !data) {
     throw new Error(`Session not found for id=${sessionId}`);
+  }
+
+  return data as SessionRow;
+}
+
+/**
+ * Resolve a session for this request:
+ * 1) Use ?sessionId=... if present
+ * 2) Or use { sessionId } in POST body
+ * 3) Or fall back to the most recently created session
+ */
+async function resolveSessionForRequest(
+  supabase: any,
+  req: Request
+): Promise<SessionRow> {
+  const url = new URL(req.url);
+  const fromQuery = url.searchParams.get('sessionId');
+
+  if (fromQuery && fromQuery.trim() !== '') {
+    return getSessionById(supabase, fromQuery.trim());
+  }
+
+  if (req.method === 'POST') {
+    try {
+      const body = await req.json().catch(() => null);
+      if (body && typeof body.sessionId === 'string' && body.sessionId.trim() !== '') {
+        return getSessionById(supabase, body.sessionId.trim());
+      }
+    } catch {
+      // ignore JSON errors
+    }
+  }
+
+  // Fallback: last created session row
+  const { data, error } = await supabase
+    .from('sessions')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data) {
+    throw new Error('No sessionId provided and no existing session found');
   }
 
   return data as SessionRow;
@@ -137,8 +161,9 @@ async function getAssetForItem(
 
 async function handleNextItem(req: Request) {
   const supabase = getSupabaseServiceClient();
-  const sessionId = await getSessionId(req);
-  const session = await getSession(supabase, sessionId);
+
+  // NEW: resolve session with fallbacks instead of throwing "Missing sessionId"
+  const session = await resolveSessionForRequest(supabase, req);
 
   const items = await getCandidateItemsForSession(supabase, session);
 
