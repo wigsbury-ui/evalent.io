@@ -8,7 +8,7 @@ type SessionRow = {
   school_id?: string | null;
   programme?: string | null;
   year?: string | null;        // e.g. "Y7"
-  grade?: number | null;       // optional
+  grade?: number | null;
   item_index?: number | null;  // progress pointer
 };
 
@@ -33,10 +33,6 @@ type AssetRow = {
   status: string | null;
 };
 
-type SessionSource = 'query' | 'body' | 'fallback';
-
-// -------- Supabase client --------
-
 function getSupabaseServiceClient(): any {
   const url = process.env.SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -48,7 +44,7 @@ function getSupabaseServiceClient(): any {
   return createClient(url, serviceKey);
 }
 
-// -------- helpers --------
+// ---- session helpers ----
 
 async function getSessionById(
   supabase: any,
@@ -69,35 +65,32 @@ async function getSessionById(
 
 /**
  * Resolve a session for this request:
- * 1) Use ?sessionId=... if present   → source: "query"
- * 2) Or use { sessionId } in body    → source: "body"
- * 3) Or fall back to most recent row → source: "fallback"
+ * 1) ?sessionId=... in query
+ * 2) { sessionId } in POST body
+ * 3) fallback: most recent session row
  */
 async function resolveSessionForRequest(
   supabase: any,
   req: Request
-): Promise<{ session: SessionRow; source: SessionSource }> {
+): Promise<SessionRow> {
   const url = new URL(req.url);
   const fromQuery = url.searchParams.get('sessionId');
 
   if (fromQuery && fromQuery.trim() !== '') {
-    const session = await getSessionById(supabase, fromQuery.trim());
-    return { session, source: 'query' };
+    return getSessionById(supabase, fromQuery.trim());
   }
 
   if (req.method === 'POST') {
     try {
       const body = await req.json().catch(() => null);
       if (body && typeof body.sessionId === 'string' && body.sessionId.trim() !== '') {
-        const session = await getSessionById(supabase, body.sessionId.trim());
-        return { session, source: 'body' };
+        return getSessionById(supabase, body.sessionId.trim());
       }
     } catch {
-      // ignore JSON errors and fall through to fallback
+      // ignore JSON errors
     }
   }
 
-  // Fallback: latest session row
   const { data, error } = await supabase
     .from('sessions')
     .select('*')
@@ -109,8 +102,10 @@ async function resolveSessionForRequest(
     throw new Error('No sessionId provided and no existing session found');
   }
 
-  return { session: data as SessionRow, source: 'fallback' };
+  return data as SessionRow;
 }
+
+// ---- item + asset helpers ----
 
 async function getCandidateItemsForSession(
   supabase: any,
@@ -132,7 +127,6 @@ async function getCandidateItemsForSession(
     query.eq('year', year);
   }
 
-  // deterministic ordering
   query.order('year', { ascending: true }).order('id', { ascending: true });
 
   const { data, error } = await query;
@@ -164,18 +158,16 @@ async function getAssetForItem(
   return (data as AssetRow) ?? null;
 }
 
-// -------- main handler --------
+// ---- main handler ----
 
 async function handleNextItem(req: Request) {
   const supabase = getSupabaseServiceClient();
 
-  const { session, source } = await resolveSessionForRequest(supabase, req);
-  const explicitSession = source !== 'fallback';
-
+  const session = await resolveSessionForRequest(supabase, req);
   const items = await getCandidateItemsForSession(supabase, session);
 
   if (!items || items.length === 0) {
-    // No items for this session’s filters
+    // absolutely no items matching this session's filters
     return NextResponse.json({
       ok: true,
       done: true,
@@ -183,40 +175,28 @@ async function handleNextItem(req: Request) {
     });
   }
 
-  // Normalise the index
+  const total = items.length;
+
+  // normalise / wrap index so it is ALWAYS in [0, total-1]
   let currentIndex =
     typeof session.item_index === 'number' && Number.isFinite(session.item_index)
       ? session.item_index
       : 0;
 
   if (currentIndex < 0) currentIndex = 0;
-
-  // If this is an explicitly requested session and its pointer is past the end,
-  // we respect that and report "done".
-  if (explicitSession && currentIndex >= items.length) {
-    return NextResponse.json({
-      ok: true,
-      done: true,
-      totalItems: items.length,
-      reason: 'session_index_at_or_beyond_total',
-    });
-  }
-
-  // If we got here via fallback and the pointer is past the end,
-  // reset to the start so we actually serve questions.
-  if (!explicitSession && currentIndex >= items.length) {
-    currentIndex = 0;
+  if (currentIndex >= total) {
+    currentIndex = 0; // wrap back to first item if pointer is off the end
   }
 
   const item = items[currentIndex];
-
-  // Optional asset (video)
   const asset = await getAssetForItem(supabase, item.id);
 
-  // Advance the pointer; failure here shouldn’t block question delivery
+  // advance pointer (wrap naturally via modulo next time)
+  const newIndex = currentIndex + 1;
+
   const { error: updateError } = await supabase
     .from('sessions')
-    .update({ item_index: currentIndex + 1 })
+    .update({ item_index: newIndex })
     .eq('id', session.id);
 
   if (updateError) {
@@ -225,10 +205,10 @@ async function handleNextItem(req: Request) {
 
   return NextResponse.json({
     ok: true,
-    done: false,
+    done: false, // IMPORTANT: never "complete" while we still have items
     sessionId: session.id,
     index: currentIndex,
-    totalItems: items.length,
+    totalItems: total,
     item: {
       id: item.id,
       year: item.year,
@@ -237,7 +217,7 @@ async function handleNextItem(req: Request) {
       type: item.type,
       options: item.options,
       programme: item.programme,
-      // NOTE: we deliberately do NOT send `correct` to the student UI
+      // no 'correct' sent to the student
     },
     asset: asset
       ? {
@@ -252,8 +232,6 @@ async function handleNextItem(req: Request) {
       : null,
   });
 }
-
-// -------- Next.js route exports --------
 
 export async function GET(req: Request) {
   try {
