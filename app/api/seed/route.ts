@@ -1,11 +1,12 @@
 // app/api/seed/route.ts
+
 import { NextResponse } from 'next/server';
-import { env } from '@/lib/env';
-import { supabaseAdmin } from '@/lib/supabaseClient';
+import { env } from '../../../lib/env';
+import { supabaseAdmin } from '../../../lib/supabaseClient';
 
-type CsvRow = Record<string, string | undefined>;
+type CsvRow = Record<string, string>;
 
-// ---------- CSV helpers ----------------------------------------------------
+// -------- CSV helpers ------------------------------------------------------
 
 function splitCsvLine(line: string): string[] {
   const out: string[] = [];
@@ -16,7 +17,7 @@ function splitCsvLine(line: string): string[] {
     const ch = line[i];
 
     if (ch === '"') {
-      // handle escaped quotes ("")
+      // Escaped quote ("")
       if (inQuotes && line[i + 1] === '"') {
         current += '"';
         i++;
@@ -62,38 +63,58 @@ async function fetchCsv(url?: string): Promise<CsvRow[]> {
   if (!url) return [];
   const res = await fetch(url);
   if (!res.ok) {
-    throw new Error(`CSV fetch failed: ${res.status} ${res.statusText}`);
+    throw new Error(`CSV fetch failed: ${url} -> ${res.status} ${res.statusText}`);
   }
   const text = await res.text();
   return parseCsv(text);
 }
 
-function clean(v: string | undefined | null): string | null {
+// -------- value helpers ----------------------------------------------------
+
+function clean(v: string | undefined): string | null {
   if (v == null) return null;
-  const t = String(v).trim();
+  const t = v.trim();
   return t === '' ? null : t;
 }
 
-// ---------- Prepare ITEMS (matches public.items) ---------------------------
+function numOrNull(v: string | undefined): number | null {
+  if (v == null) return null;
+  const t = v.trim();
+  if (t === '') return null;
+  const n = Number(t);
+  return Number.isFinite(n) ? n : null;
+}
+
+function boolFromCell(v: string | undefined): boolean {
+  if (v == null) return false;
+  const t = String(v).trim().toLowerCase();
+  return t === 'true' || t === 'yes' || t === 'y' || t === '1';
+}
+
+// -------- prepare ITEMS ----------------------------------------------------
 
 function prepareItems(rows: CsvRow[]) {
+  const prepared: any[] = [];
   const seenIds = new Set<string>();
-  const out: any[] = [];
 
   for (const r of rows) {
-    const id = (r['item_id'] || r['id'] || '').trim();
-    if (!id || seenIds.has(id)) continue;
-    seenIds.add(id);
+    const rawId = (r['item_id'] || r['id'] || '').trim();
+    if (!rawId) continue;
+    if (seenIds.has(rawId)) continue;
+    seenIds.add(rawId);
 
-    // Year token (e.g. "Y7-ENG-..." -> "Y7")
-    const yearToken =
-      (id.includes('-') ? id.split('-')[0] : undefined) ||
-      r['year'] ||
-      r['year_label'] ||
-      r['grade'] ||
-      'Y7';
+    // Year token – follow the CLI script logic
+    const yearToken = (() => {
+      if (rawId.includes('-')) return rawId.split('-')[0];
+      return (
+        r['year'] ||
+        r['year_label'] ||
+        r['grade'] ||
+        'Y7'
+      );
+    })();
 
-    // Options: try JSON array first, else split on newlines
+    // Options (MCQ choices)
     const options = (() => {
       const raw =
         r['mcq_options_json'] ||
@@ -102,34 +123,24 @@ function prepareItems(rows: CsvRow[]) {
         r['mcq_options'] ||
         '';
 
-      if (typeof raw === 'string') {
-        const trimmed = raw.trim();
-        if (trimmed.startsWith('[')) {
-          try {
-            const parsed = JSON.parse(trimmed);
-            if (Array.isArray(parsed)) {
-              return parsed.map((x) => String(x));
-            }
-          } catch {
-            // fall through to newline split
-          }
+      try {
+        if (typeof raw === 'string' && raw.trim().startsWith('[')) {
+          return JSON.parse(raw).map((x: any) => String(x));
         }
-        return trimmed
-          .split('\n')
-          .map((x) => x.trim())
-          .filter(Boolean);
+      } catch {
+        // fall through to line-split handling
       }
 
-      return [];
+      return String(raw)
+        .split('\n')
+        .filter(Boolean)
+        .map((x: any) => String(x));
     })();
 
     const correct =
-      r['answer_key'] !== undefined && r['answer_key'] !== null
+      r['answer_key'] !== undefined && r['answer_key'] !== null && r['answer_key'] !== ''
         ? String(r['answer_key'])
-        : r['correct'] || r['correct_answer'] || null;
-
-    const typeRaw = (r['type'] || 'MCQ').toString().toLowerCase();
-    const type: 'mcq' | 'short' = typeRaw === 'mcq' ? 'mcq' : 'short';
+        : (r['correct'] || r['correct_answer'] || null);
 
     const stem =
       r['display_question'] ||
@@ -139,39 +150,46 @@ function prepareItems(rows: CsvRow[]) {
       r['prompt'] ||
       '';
 
-    out.push({
-      id,
-      year: String(yearToken),
-      domain: (r['domain'] || 'English').toString(),
-      stem: String(stem),
+    if (!stem.trim()) continue; // must have a question to show
+
+    const typeCell = (r['type'] || 'MCQ').toString().toLowerCase();
+    const type = typeCell === 'mcq' ? 'mcq' : 'short';
+
+    prepared.push({
+      id: rawId,
+      year: yearToken,
+      domain: r['domain'] || 'English',
+      stem,
       type,
       options,
       correct: correct == null ? null : String(correct),
-      programme: (r['programme'] || r['curriculum'] || 'UK').toString(),
+      programme: r['programme'] || r['curriculum'] || 'UK',
     });
   }
 
-  return out;
+  return prepared;
 }
 
-// ---------- Prepare ASSETS (matches public.assets) -------------------------
+// -------- prepare ASSETS ---------------------------------------------------
 
-function prepareAssets(rows: CsvRow[]) {
+function prepareAssets(rows: CsvRow[], validItemIds: Set<string>) {
+  const prepared: any[] = [];
   const seenItemIds = new Set<string>();
-  const out: any[] = [];
 
   for (const r of rows) {
-    const itemId = (r['item_id'] || '').trim();
-    if (!itemId || seenItemIds.has(itemId)) continue;
-    seenItemIds.add(itemId);
+    const rawItemId = (r['item_id'] || '').trim();
+    if (!rawItemId) continue;
+    if (!validItemIds.has(rawItemId)) continue; // avoid FK violations
+    if (seenItemIds.has(rawItemId)) continue; // one assets row per item_id
+    seenItemIds.add(rawItemId);
 
-    out.push({
-      item_id: itemId,
+    prepared.push({
+      item_id: rawItemId,
       video_title: clean(r['video_title']),
       video_id: clean(r['video_id']),
       share_url: clean(r['share_url']),
       download_url: clean(r['download_url']),
-      duration_seconds: clean(r['duration_seconds']),
+      duration_seconds: numOrNull(r['duration_seconds']),
       avatar_voice_id: clean(r['avatar_voice_id']),
       avatar_style: clean(r['avatar_style']),
       background: clean(r['background']),
@@ -193,65 +211,52 @@ function prepareAssets(rows: CsvRow[]) {
       status: clean(r['status']),
       __sheet: clean(r['__sheet']),
       programme: clean(r['programme']),
-      _has_vid:
-        String(r['_has_vid'] ?? '')
-          .trim()
-          .toLowerCase() === 'true',
-      _has_share:
-        String(r['_has_share'] ?? '')
-          .trim()
-          .toLowerCase() === 'true',
+      _has_vid: boolFromCell(r['_has_vid']),
+      _has_share: boolFromCell(r['_has_share']),
       talking_photo_id: clean(r['talking_photo_id']),
       notes: clean(r['notes']),
       player_url: clean(r['player_url']),
-      // IMPORTANT: we deliberately do NOT send any `regenerate` field here,
-      // because there is no `regenerate` column in the Supabase `assets` table.
     });
   }
 
-  return out;
+  return prepared;
 }
 
-// ---------- Prepare BLUEPRINTS (matches public.blueprints) -----------------
+// -------- prepare BLUEPRINTS ----------------------------------------------
+
+function intOrZero(v: string | undefined): number {
+  if (v == null) return 0;
+  const t = v.trim();
+  if (t === '') return 0;
+  const n = Number(t);
+  return Number.isFinite(n) ? Math.trunc(n) : 0;
+}
 
 function prepareBlueprints(rows: CsvRow[]) {
-  const seenKeys = new Set<string>();
-  const out: any[] = [];
+  const prepared: any[] = [];
 
   for (const r of rows) {
-    // Minimal uniqueness: programme + grade + subject
-    const key = `${r['programme'] || ''}|${r['grade'] || ''}|${
-      r['subject'] || ''
-    }`;
-    if (seenKeys.has(key)) continue;
-    seenKeys.add(key);
+    const programme = (r['programme'] || '').trim();
+    const gradeStr = (r['grade'] || '').trim();
+    const subject = (r['subject'] || '').trim();
 
-    out.push({
-      programme: r['programme'],
-      grade: Number(r['grade'] ?? 0),
-      subject: r['subject'],
-      base_count: Number(r['base_count'] ?? 0),
-      easy_count: Number(r['easy_count'] ?? 0),
-      core_count: Number(r['core_count'] ?? 0),
-      hard_count: Number(r['hard_count'] ?? 0),
+    if (!programme || !gradeStr || !subject) continue;
+
+    prepared.push({
+      programme,
+      grade: Number(gradeStr),
+      subject,
+      base_count: intOrZero(r['base_count']),
+      easy_count: intOrZero(r['easy_count']),
+      core_count: intOrZero(r['core_count']),
+      hard_count: intOrZero(r['hard_count']),
     });
   }
 
-  return out;
+  return prepared;
 }
 
-// ---------- Upsert helper --------------------------------------------------
-
-async function upsert(table: string, rows: any[]) {
-  if (!rows.length) return { count: 0 };
-  const { error } = await supabaseAdmin.from(table).upsert(rows);
-  if (error) {
-    throw new Error(`Upsert into ${table} failed: ${error.message}`);
-  }
-  return { count: rows.length };
-}
-
-// ---------- Main handler ---------------------------------------------------
+// -------- main handler ----------------------------------------------------
 
 async function handleSeed() {
   try {
@@ -261,37 +266,63 @@ async function handleSeed() {
 
     if (!itemsUrl && !assetsUrl && !blueprintsUrl) {
       throw new Error(
-        'No SHEETS_*_CSV env vars set. Please set SHEETS_ITEMS_CSV, SHEETS_ASSETS_CSV, SHEETS_BLUEPRINTS_CSV.'
+        'No SHEETS_*_CSV env vars are set. Please set SHEETS_ITEMS_CSV, SHEETS_ASSETS_CSV, SHEETS_BLUEPRINTS_CSV.'
       );
     }
 
+    // Fetch CSVs in parallel
     const [itemsCsv, assetsCsv, blueprintsCsv] = await Promise.all([
       fetchCsv(itemsUrl),
       fetchCsv(assetsUrl),
       fetchCsv(blueprintsUrl),
     ]);
 
-    const itemsPrepared = prepareItems(itemsCsv);
-    const assetsPrepared = prepareAssets(assetsCsv);
-    const blueprintsPrepared = prepareBlueprints(blueprintsCsv);
+    // Build rows to insert
+    const itemsRows = prepareItems(itemsCsv);
+    const validItemIds = new Set<string>(itemsRows.map((r) => r.id as string));
+    const assetsRows = prepareAssets(assetsCsv, validItemIds);
+    const blueprintsRows = prepareBlueprints(blueprintsCsv);
 
-    const itemsResult = await upsert('items', itemsPrepared);
-    const assetsResult = await upsert('assets', assetsPrepared);
-    const blueprintsResult = await upsert('blueprints', blueprintsPrepared);
+    // Hard reset tables (simple + predictable)
+    await supabaseAdmin.from('attempts').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    await supabaseAdmin.from('sessions').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    await supabaseAdmin.from('assets').delete();
+    await supabaseAdmin.from('items').delete();
+    await supabaseAdmin.from('blueprints').delete();
 
-    return NextResponse.json({
-      ok: true,
+    const results: Record<string, any> = {
       csvCounts: {
         itemsCsvRows: itemsCsv.length,
         assetsCsvRows: assetsCsv.length,
         blueprintsCsvRows: blueprintsCsv.length,
       },
-      upserted: {
-        items: itemsResult.count,
-        assets: assetsResult.count,
-        blueprints: blueprintsResult.count,
-      },
-    });
+    };
+
+    if (itemsRows.length) {
+      const { error } = await supabaseAdmin.from('items').insert(itemsRows);
+      if (error) throw new Error(`Insert into items failed: ${error.message}`);
+      results.itemsInserted = itemsRows.length;
+    } else {
+      results.itemsInserted = 0;
+    }
+
+    if (assetsRows.length) {
+      const { error } = await supabaseAdmin.from('assets').insert(assetsRows);
+      if (error) throw new Error(`Upsert into assets failed: ${error.message}`);
+      results.assetsInserted = assetsRows.length;
+    } else {
+      results.assetsInserted = 0;
+    }
+
+    if (blueprintsRows.length) {
+      const { error } = await supabaseAdmin.from('blueprints').insert(blueprintsRows);
+      if (error) throw new Error(`Insert into blueprints failed: ${error.message}`);
+      results.blueprintsInserted = blueprintsRows.length;
+    } else {
+      results.blueprintsInserted = 0;
+    }
+
+    return NextResponse.json({ ok: true, ...results }, { status: 200 });
   } catch (err: any) {
     console.error('[seed] error', err);
     return NextResponse.json(
