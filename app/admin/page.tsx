@@ -1,65 +1,78 @@
 'use client';
 
-import { useState } from 'react';
-
-type Jsonish = unknown;
+import React, { useState } from 'react';
 
 export default function AdminPage() {
-  const [out, setOut] = useState<Jsonish>(null);
-  const [loading, setLoading] = useState<string | null>(null);
+  const [output, setOutput] = useState<string>('');
 
-  async function hit(path: string) {
+  async function callEndpoint(
+    path: string,
+    method: 'GET' | 'POST' = 'GET'
+  ) {
+    setOutput(`Calling ${method} ${path} …`);
+
     try {
-      setLoading(path);
-      setOut(null);
-      const r = await fetch(path, { method: 'GET', cache: 'no-store' });
-      const text = await r.text();
-      // try parse JSON, else show raw text
+      const res = await fetch(path, {
+        method,
+        cache: 'no-store',
+      });
+
+      const rawText = await res.text();
+
+      // Try to parse JSON first
       try {
-        setOut(JSON.parse(text));
+        const json = JSON.parse(rawText);
+        setOutput(JSON.stringify(json, null, 2));
       } catch {
-        setOut(text);
+        // Fallback: show raw text if not valid JSON
+        setOutput(
+          `Non-JSON response (status ${res.status} ${res.statusText}):\n\n` +
+          rawText
+        );
       }
-    } catch (e: any) {
-      setOut({ ok: false, error: e?.message ?? String(e) });
-    } finally {
-      setLoading(null);
+    } catch (err: any) {
+      setOutput(
+        `Request failed: ${err?.message ?? String(err)}`
+      );
     }
   }
 
   return (
-    <div className="mx-auto max-w-4xl p-6">
-      <h1 className="text-3xl font-semibold mb-6">Admin</h1>
+    <main style={{ padding: '2rem' }}>
+      <h1>Evalent</h1>
+      <h2>Admin</h2>
 
-      <div className="flex flex-wrap gap-4 mb-6">
+      <div style={{ margin: '1rem 0', display: 'flex', gap: '0.5rem' }}>
         <button
-          onClick={() => hit('/api/diag')}
-          disabled={loading !== null}
-          className="rounded border px-4 py-2 bg-gray-100 hover:bg-gray-200 disabled:opacity-50"
+          onClick={() => callEndpoint('/api/diag', 'GET')}
         >
-          {loading === '/api/diag' ? 'Running…' : 'Run Diagnostics'}
+          Run Diagnostics
         </button>
 
         <button
-          onClick={() => hit('/api/seed')}
-          disabled={loading !== null}
-          className="rounded border px-4 py-2 bg-gray-100 hover:bg-gray-200 disabled:opacity-50"
+          onClick={() => callEndpoint('/api/seed', 'POST')}
         >
-          {loading === '/api/seed' ? 'Seeding…' : 'Seed from CSV'}
+          Seed from CSV
         </button>
 
         <button
-          onClick={() => hit('/api/ping')}
-          disabled={loading !== null}
-          className="rounded border px-4 py-2 bg-gray-100 hover:bg-gray-200 disabled:opacity-50"
+          onClick={() => callEndpoint('/api/ping', 'GET')}
         >
-          {loading === '/api/ping' ? 'Pinging…' : 'Ping'}
+          Ping
         </button>
       </div>
 
-      <pre className="whitespace-pre-wrap rounded bg-black/90 text-green-200 p-4 text-sm overflow-auto min-h-[180px]">
-        {out === null ? '— no output yet —' : typeof out === 'string' ? out : JSON.stringify(out, null, 2)}
+      <pre
+        style={{
+          whiteSpace: 'pre-wrap',
+          fontFamily: 'monospace',
+          border: '1px solid #ccc',
+          padding: '1rem',
+          minHeight: '6rem',
+        }}
+      >
+        {output}
       </pre>
-    </div>
+    </main>
   );
 }
