@@ -43,8 +43,6 @@ function getSupabaseServiceClient(): any {
     throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
   }
 
-  // We don’t constrain the generic types here – let your project’s
-  // Supabase typing handle it and treat it as `any` in this file.
   return createClient(url, serviceKey);
 }
 
@@ -74,13 +72,13 @@ async function getSession(supabase: any, sessionId: string): Promise<SessionRow>
     .from('sessions')
     .select('*')
     .eq('id', sessionId)
-    .single<SessionRow>();
+    .single();
 
   if (error || !data) {
     throw new Error(`Session not found for id=${sessionId}`);
   }
 
-  return data;
+  return data as SessionRow;
 }
 
 async function getCandidateItemsForSession(
@@ -106,13 +104,13 @@ async function getCandidateItemsForSession(
   // deterministic ordering
   query.order('year', { ascending: true }).order('id', { ascending: true });
 
-  const { data, error } = await query.returns<ItemRow[]>();
+  const { data, error } = await query;
 
   if (error) {
     throw new Error(`Failed to load items: ${error.message}`);
   }
 
-  return data ?? [];
+  return (data ?? []) as ItemRow[];
 }
 
 async function getAssetForItem(
@@ -125,15 +123,14 @@ async function getAssetForItem(
       'item_id, video_title, video_id, share_url, download_url, player_url, status'
     )
     .eq('item_id', itemId)
-    .maybeSingle<AssetRow>();
+    .maybeSingle();
 
   if (error) {
-    // treat asset lookup errors as non-fatal
     console.error('asset lookup error', error);
     return null;
   }
 
-  return data ?? null;
+  return (data as AssetRow) ?? null;
 }
 
 // -------- main handler --------
