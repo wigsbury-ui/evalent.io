@@ -33,6 +33,8 @@ type AssetRow = {
   status: string | null;
 };
 
+type SessionSource = 'query' | 'body' | 'fallback';
+
 // -------- Supabase client --------
 
 function getSupabaseServiceClient(): any {
@@ -48,7 +50,10 @@ function getSupabaseServiceClient(): any {
 
 // -------- helpers --------
 
-async function getSessionById(supabase: any, sessionId: string): Promise<SessionRow> {
+async function getSessionById(
+  supabase: any,
+  sessionId: string
+): Promise<SessionRow> {
   const { data, error } = await supabase
     .from('sessions')
     .select('*')
@@ -64,33 +69,35 @@ async function getSessionById(supabase: any, sessionId: string): Promise<Session
 
 /**
  * Resolve a session for this request:
- * 1) Use ?sessionId=... if present
- * 2) Or use { sessionId } in POST body
- * 3) Or fall back to the most recently created session
+ * 1) Use ?sessionId=... if present   → source: "query"
+ * 2) Or use { sessionId } in body    → source: "body"
+ * 3) Or fall back to most recent row → source: "fallback"
  */
 async function resolveSessionForRequest(
   supabase: any,
   req: Request
-): Promise<SessionRow> {
+): Promise<{ session: SessionRow; source: SessionSource }> {
   const url = new URL(req.url);
   const fromQuery = url.searchParams.get('sessionId');
 
   if (fromQuery && fromQuery.trim() !== '') {
-    return getSessionById(supabase, fromQuery.trim());
+    const session = await getSessionById(supabase, fromQuery.trim());
+    return { session, source: 'query' };
   }
 
   if (req.method === 'POST') {
     try {
       const body = await req.json().catch(() => null);
       if (body && typeof body.sessionId === 'string' && body.sessionId.trim() !== '') {
-        return getSessionById(supabase, body.sessionId.trim());
+        const session = await getSessionById(supabase, body.sessionId.trim());
+        return { session, source: 'body' };
       }
     } catch {
-      // ignore JSON errors
+      // ignore JSON errors and fall through to fallback
     }
   }
 
-  // Fallback: last created session row
+  // Fallback: latest session row
   const { data, error } = await supabase
     .from('sessions')
     .select('*')
@@ -102,7 +109,7 @@ async function resolveSessionForRequest(
     throw new Error('No sessionId provided and no existing session found');
   }
 
-  return data as SessionRow;
+  return { session: data as SessionRow, source: 'fallback' };
 }
 
 async function getCandidateItemsForSession(
@@ -162,8 +169,8 @@ async function getAssetForItem(
 async function handleNextItem(req: Request) {
   const supabase = getSupabaseServiceClient();
 
-  // NEW: resolve session with fallbacks instead of throwing "Missing sessionId"
-  const session = await resolveSessionForRequest(supabase, req);
+  const { session, source } = await resolveSessionForRequest(supabase, req);
+  const explicitSession = source !== 'fallback';
 
   const items = await getCandidateItemsForSession(supabase, session);
 
@@ -176,15 +183,29 @@ async function handleNextItem(req: Request) {
     });
   }
 
-  const currentIndex = session.item_index ?? 0;
+  // Normalise the index
+  let currentIndex =
+    typeof session.item_index === 'number' && Number.isFinite(session.item_index)
+      ? session.item_index
+      : 0;
 
-  if (currentIndex >= items.length) {
-    // Reached the end
+  if (currentIndex < 0) currentIndex = 0;
+
+  // If this is an explicitly requested session and its pointer is past the end,
+  // we respect that and report "done".
+  if (explicitSession && currentIndex >= items.length) {
     return NextResponse.json({
       ok: true,
       done: true,
       totalItems: items.length,
+      reason: 'session_index_at_or_beyond_total',
     });
+  }
+
+  // If we got here via fallback and the pointer is past the end,
+  // reset to the start so we actually serve questions.
+  if (!explicitSession && currentIndex >= items.length) {
+    currentIndex = 0;
   }
 
   const item = items[currentIndex];
