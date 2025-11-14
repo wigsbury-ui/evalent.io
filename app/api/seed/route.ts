@@ -3,15 +3,6 @@ import { createClient } from '@supabase/supabase-js';
 
 export const runtime = 'nodejs';
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
-}
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
 // ---------- CSV helpers ----------
 
 function splitCsvLine(line: string): string[] {
@@ -24,7 +15,6 @@ function splitCsvLine(line: string): string[] {
 
     if (ch === '"') {
       if (inQuotes && line[i + 1] === '"') {
-        // Escaped quote
         current += '"';
         i++;
       } else {
@@ -149,8 +139,7 @@ function prepareItems(rows: any[]) {
     }
 
     // Year
-    let year =
-      getStr(row, 'year', 'year_label', 'Year') || '';
+    let year = getStr(row, 'year', 'year_label', 'Year') || '';
 
     if (!year) {
       const gradeStr = getStr(row, 'grade', 'Grade');
@@ -167,7 +156,7 @@ function prepareItems(rows: any[]) {
       if (m) {
         year = `Y${m[1]}`;
       } else {
-        year = 'Y7'; // safe default
+        year = 'Y7';
       }
     }
 
@@ -177,7 +166,7 @@ function prepareItems(rows: any[]) {
     const type = typeRaw === 'mcq' ? 'mcq' : 'short';
 
     let options: string[] | null = null;
-    let correct = getStr(row, 'answer_key', 'correct', 'correct_answer');
+    const correct = getStr(row, 'answer_key', 'correct', 'correct_answer');
 
     if (type === 'mcq') {
       const jsonStr = getStr(row, 'mcq_options_json');
@@ -188,7 +177,7 @@ function prepareItems(rows: any[]) {
             options = parsed.map((o: any) => String(o));
           }
         } catch {
-          // ignore JSON parse error, fall through to other sources
+          // ignore
         }
       }
 
@@ -237,11 +226,10 @@ function prepareAssets(rows: any[], validItemIds: Set<string>) {
       '';
 
     if (!itemId || !validItemIds.has(itemId)) {
-      continue; // skip asset rows that don't match a seeded item
+      continue;
     }
 
     const duration_seconds = parseNumericOrNull(getStr(row, 'duration_seconds', 'duration'));
-
     const _has_vid = parseBoolOrNull(getStr(row, '_has_vid')) ?? false;
     const _has_share = parseBoolOrNull(getStr(row, '_has_share')) ?? false;
 
@@ -297,10 +285,9 @@ function prepareBlueprints(rows: any[]) {
     const core_count = parseIntOrZero(getStr(row, 'core_count'));
     const hard_count = parseIntOrZero(getStr(row, 'hard_count'));
 
-    if (!grade) continue; // skip rows without a usable grade
+    if (!grade) continue;
 
     blueprints.push({
-      // id is default-generated UUID in DB
       programme,
       grade,
       subject,
@@ -318,6 +305,21 @@ function prepareBlueprints(rows: any[]) {
 
 export async function POST() {
   try {
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: 'Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY',
+        },
+        { status: 500 }
+      );
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
     // 1) Load CSVs
     const [itemsRows, assetsRows, blueprintsRows] = await Promise.all([
       fetchCsvFromEnv('SHEETS_ITEMS_CSV'),
@@ -325,7 +327,7 @@ export async function POST() {
       fetchCsvFromEnv('SHEETS_BLUEPRINTS_CSV'),
     ]);
 
-    // 2) Prepare rows (with de-duplication)
+    // 2) Prepare rows with de-duplication
     const {
       items,
       duplicateIds,
@@ -337,9 +339,8 @@ export async function POST() {
     const assets = prepareAssets(assetsRows, validItemIdSet);
     const blueprints = prepareBlueprints(blueprintsRows);
 
-    // 3) Hard reset tables (attempts → sessions → assets → blueprints → items)
-    // NOTE: This wipes ALL sessions/attempts; only run from admin.
-    await supabase.from('attempts').delete().neq('session_id', ''); // cheap "delete all" guard
+    // 3) Hard reset tables (admin-only)
+    await supabase.from('attempts').delete().neq('session_id', '');
     await supabase.from('sessions').delete().neq('id', '');
     await supabase.from('assets').delete().neq('item_id', '');
     await supabase.from('blueprints').delete().neq('id', '00000000-0000-0000-0000-000000000000');
@@ -347,13 +348,11 @@ export async function POST() {
 
     // 4) Insert items
     const { error: itemsError } = await supabase.from('items').insert(items);
-
     if (itemsError) {
       return NextResponse.json(
         {
           ok: false,
           error: `Insert into items failed: ${itemsError.message}`,
-          hint: 'Check for unexpected duplicate IDs or mismatched schema in the items CSV.',
           duplicateIds,
           debug: {
             itemsPrepared: items.length,
@@ -362,7 +361,7 @@ export async function POST() {
             skippedNoStemCount,
           },
         },
-        { status: 500 },
+        { status: 500 }
       );
     }
 
@@ -374,7 +373,7 @@ export async function POST() {
           ok: false,
           error: `Insert into assets failed: ${assetsError.message}`,
         },
-        { status: 500 },
+        { status: 500 }
       );
     }
 
@@ -386,7 +385,7 @@ export async function POST() {
           ok: false,
           error: `Insert into blueprints failed: ${blueprintsError.message}`,
         },
-        { status: 500 },
+        { status: 500 }
       );
     }
 
@@ -411,7 +410,7 @@ export async function POST() {
         ok: false,
         error: err?.message ?? String(err),
       },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }
