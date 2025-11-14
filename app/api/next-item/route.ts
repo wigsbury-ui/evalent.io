@@ -1,258 +1,218 @@
-import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { NextRequest, NextResponse } from 'next/server';
+import supabaseAdmin from '@/lib/supabaseAdmin';
 
-export const runtime = 'nodejs';
+const QUESTIONS_PER_SESSION = 8;
 
 type SessionRow = {
   id: string;
-  school_id?: string | null;
-  programme?: string | null;
-  year?: string | null;        // e.g. "Y7"
-  grade?: number | null;
-  item_index?: number | null;  // progress pointer
-};
-
-type ItemRow = {
-  id: string;
-  year: string;
-  domain: string | null;
-  stem: string;
-  type: 'mcq' | 'short';
-  options: string[] | null;
-  correct: string | null;
   programme: string | null;
+  year: string | null;
+  grade: number | null;
+  item_index: number | null;
+  selected_ids: string[] | null;
 };
 
-type AssetRow = {
-  item_id: string;
-  video_title: string | null;
-  video_id: string | null;
-  share_url: string | null;
-  download_url: string | null;
-  player_url: string | null;
-  status: string | null;
-};
-
-function getSupabaseServiceClient(): any {
-  const url = process.env.SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !serviceKey) {
-    throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
-  }
-
-  return createClient(url, serviceKey);
-}
-
-// ---- session helpers ----
-
-async function getSessionById(
-  supabase: any,
-  sessionId: string
-): Promise<SessionRow> {
-  const { data, error } = await supabase
-    .from('sessions')
-    .select('*')
-    .eq('id', sessionId)
-    .single();
-
-  if (error || !data) {
-    throw new Error(`Session not found for id=${sessionId}`);
-  }
-
-  return data as SessionRow;
-}
-
-/**
- * Resolve a session for this request:
- * 1) ?sessionId=... in query
- * 2) { sessionId } in POST body
- * 3) fallback: most recent session row
- */
-async function resolveSessionForRequest(
-  supabase: any,
-  req: Request
-): Promise<SessionRow> {
+function getSessionId(req: NextRequest): string | null {
   const url = new URL(req.url);
-  const fromQuery = url.searchParams.get('sessionId');
 
-  if (fromQuery && fromQuery.trim() !== '') {
-    return getSessionById(supabase, fromQuery.trim());
+  const fromQuery =
+    url.searchParams.get('sessionId') ??
+    url.searchParams.get('session_id') ??
+    url.searchParams.get('sid');
+
+  return fromQuery || null;
+}
+
+function normaliseSelectedIds(raw: SessionRow['selected_ids']): string[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    return raw
+      .map(String)
+      .map((s) => s.trim())
+      .filter(Boolean);
   }
 
-  if (req.method === 'POST') {
-    try {
-      const body = await req.json().catch(() => null);
-      if (body && typeof body.sessionId === 'string' && body.sessionId.trim() !== '') {
-        return getSessionById(supabase, body.sessionId.trim());
-      }
-    } catch {
-      // ignore JSON errors
+  // Fallback if it ever gets stored as a comma-separated string
+  return String(raw)
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+// Tell Next.js not to cache this route
+export const dynamic = 'force-dynamic';
+
+export async function GET(req: NextRequest) {
+  try {
+    const sessionId = getSessionId(req);
+
+    if (!sessionId) {
+      return NextResponse.json(
+        { ok: false, error: 'Missing sessionId' },
+        { status: 400 },
+      );
     }
-  }
 
-  const { data, error } = await supabase
-    .from('sessions')
-    .select('*')
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    // 1. Load the session
+    const { data: session, error: sessionError } = await supabaseAdmin
+      .from('sessions')
+      .select('*')
+      .eq('id', sessionId)
+      .single();
 
-  if (error || !data) {
-    throw new Error('No sessionId provided and no existing session found');
-  }
+    if (sessionError) {
+      console.error('next-item sessionError', sessionError);
+      return NextResponse.json(
+        { ok: false, error: 'Failed to load session' },
+        { status: 500 },
+      );
+    }
 
-  return data as SessionRow;
-}
+    if (!session) {
+      return NextResponse.json(
+        { ok: false, error: 'Session not found' },
+        { status: 404 },
+      );
+    }
 
-// ---- item + asset helpers ----
+    const year =
+      (session.year ||
+        (session.grade ? `Y${session.grade}` : '') ||
+        'Y7')
+        .toString()
+        .trim();
 
-async function getCandidateItemsForSession(
-  supabase: any,
-  session: SessionRow
-): Promise<ItemRow[]> {
-  let year = (session.year || '').trim();
-  const programme = (session.programme || 'UK').trim() || 'UK';
+    // We *store* programme but deliberately don't filter on it yet.
+    // This avoids any mismatch while you only have UK content.
+    const programme =
+      (session.programme || 'UK').toString().trim() || 'UK';
 
-  if (!year && session.grade && Number.isFinite(session.grade)) {
-    year = `Y${session.grade}`;
-  }
+    const selectedIds = normaliseSelectedIds(
+      (session as SessionRow).selected_ids,
+    );
 
-  const query = supabase
-    .from('items')
-    .select('id, year, domain, stem, type, options, correct, programme')
-    .eq('programme', programme);
+    // 2. Candidate items: by year only
+    const { data: items, error: itemsError } = await supabaseAdmin
+      .from('items')
+      .select(
+        'id, year, programme, domain, stem, type, options, correct',
+      )
+      .eq('year', year);
 
-  if (year) {
-    query.eq('year', year);
-  }
+    if (itemsError) {
+      console.error('next-item itemsError', itemsError);
+      return NextResponse.json(
+        { ok: false, error: 'Failed to load items' },
+        { status: 500 },
+      );
+    }
 
-  query.order('year', { ascending: true }).order('id', { ascending: true });
+    if (!items || items.length === 0) {
+      // Genuine “no content for this year” case
+      return NextResponse.json({
+        ok: true,
+        done: true,
+        reason: 'no_items_for_session',
+        sessionId,
+        year,
+        programme,
+        itemsCount: 0,
+      });
+    }
 
-  const { data, error } = await query;
+    // 3. If we've already asked enough questions, we’re done
+    if (selectedIds.length >= QUESTIONS_PER_SESSION) {
+      await supabaseAdmin
+        .from('sessions')
+        .update({
+          item_index: selectedIds.length,
+          selected_ids: selectedIds,
+        })
+        .eq('id', sessionId);
 
-  if (error) {
-    throw new Error(`Failed to load items: ${error.message}`);
-  }
+      return NextResponse.json({
+        ok: true,
+        done: true,
+        reason: 'question_limit_reached',
+        sessionId,
+        year,
+        programme,
+        totalAnswered: selectedIds.length,
+        totalAvailable: items.length,
+      });
+    }
 
-  return (data ?? []) as ItemRow[];
-}
+    // 4. Pick the next unused item (simple sequential strategy)
+    const used = new Set(selectedIds);
+    const remaining = items.filter((it) => !used.has(it.id));
 
-async function getAssetForItem(
-  supabase: any,
-  itemId: string
-): Promise<AssetRow | null> {
-  const { data, error } = await supabase
-    .from('assets')
-    .select(
-      'item_id, video_title, video_id, share_url, download_url, player_url, status'
-    )
-    .eq('item_id', itemId)
-    .maybeSingle();
+    if (remaining.length === 0) {
+      // All items for this year have been used – also “done”
+      await supabaseAdmin
+        .from('sessions')
+        .update({
+          item_index: selectedIds.length,
+          selected_ids: selectedIds,
+        })
+        .eq('id', sessionId);
 
-  if (error) {
-    console.error('asset lookup error', error);
-    return null;
-  }
+      return NextResponse.json({
+        ok: true,
+        done: true,
+        reason: 'no_unused_items_remaining',
+        sessionId,
+        year,
+        programme,
+        totalAnswered: selectedIds.length,
+        totalAvailable: items.length,
+      });
+    }
 
-  return (data as AssetRow) ?? null;
-}
+    const nextItem = remaining[0];
+    const updatedSelected = [...selectedIds, nextItem.id];
 
-// ---- main handler ----
+    // 5. Update progress on the session
+    await supabaseAdmin
+      .from('sessions')
+      .update({
+        item_index: updatedSelected.length,
+        selected_ids: updatedSelected,
+      })
+      .eq('id', sessionId);
 
-async function handleNextItem(req: Request) {
-  const supabase = getSupabaseServiceClient();
+    // 6. Optional asset lookup for this item
+    const { data: assetRows, error: assetError } = await supabaseAdmin
+      .from('assets')
+      .select('*')
+      .eq('item_id', nextItem.id)
+      .limit(1);
 
-  const session = await resolveSessionForRequest(supabase, req);
-  const items = await getCandidateItemsForSession(supabase, session);
+    if (assetError) {
+      // Non-fatal – just log it
+      console.warn('next-item assetError (non-fatal)', assetError);
+    }
 
-  if (!items || items.length === 0) {
-    // absolutely no items matching this session's filters
+    const asset =
+      assetRows && assetRows.length > 0 ? assetRows[0] : null;
+
+    // 7. Return the next item
     return NextResponse.json({
       ok: true,
-      done: true,
-      reason: 'no_items_for_session',
+      done: false,
+      sessionId,
+      year,
+      programme,
+      itemIndex: updatedSelected.length - 1,
+      totalAnswered: updatedSelected.length,
+      totalAvailable: items.length,
+      item: nextItem,
+      asset,
     });
-  }
-
-  const total = items.length;
-
-  // normalise / wrap index so it is ALWAYS in [0, total-1]
-  let currentIndex =
-    typeof session.item_index === 'number' && Number.isFinite(session.item_index)
-      ? session.item_index
-      : 0;
-
-  if (currentIndex < 0) currentIndex = 0;
-  if (currentIndex >= total) {
-    currentIndex = 0; // wrap back to first item if pointer is off the end
-  }
-
-  const item = items[currentIndex];
-  const asset = await getAssetForItem(supabase, item.id);
-
-  // advance pointer (wrap naturally via modulo next time)
-  const newIndex = currentIndex + 1;
-
-  const { error: updateError } = await supabase
-    .from('sessions')
-    .update({ item_index: newIndex })
-    .eq('id', session.id);
-
-  if (updateError) {
-    console.error('Failed to update session.item_index', updateError);
-  }
-
-  return NextResponse.json({
-    ok: true,
-    done: false, // IMPORTANT: never "complete" while we still have items
-    sessionId: session.id,
-    index: currentIndex,
-    totalItems: total,
-    item: {
-      id: item.id,
-      year: item.year,
-      domain: item.domain,
-      stem: item.stem,
-      type: item.type,
-      options: item.options,
-      programme: item.programme,
-      // no 'correct' sent to the student
-    },
-    asset: asset
-      ? {
-          item_id: asset.item_id,
-          video_title: asset.video_title,
-          video_id: asset.video_id,
-          share_url: asset.share_url,
-          download_url: asset.download_url,
-          player_url: asset.player_url,
-          status: asset.status,
-        }
-      : null,
-  });
-}
-
-export async function GET(req: Request) {
-  try {
-    return await handleNextItem(req);
   } catch (err: any) {
-    console.error('/api/next-item GET error', err);
+    console.error('next-item unexpected error', err);
     return NextResponse.json(
-      { ok: false, error: err?.message ?? String(err) },
-      { status: 400 }
-    );
-  }
-}
-
-export async function POST(req: Request) {
-  try {
-    return await handleNextItem(req);
-  } catch (err: any) {
-    console.error('/api/next-item POST error', err);
-    return NextResponse.json(
-      { ok: false, error: err?.message ?? String(err) },
-      { status: 400 }
+      { ok: false, error: err?.message || String(err) },
+      { status: 500 },
     );
   }
 }
