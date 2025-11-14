@@ -215,7 +215,6 @@ function prepareItems(rows: any[]) {
 }
 
 function prepareAssets(rows: any[], validItemIds: Set<string>) {
-  // Use a map so that we end up with AT MOST ONE row per item_id.
   const byItemId = new Map<string, any>();
   const duplicateAssetIds = new Set<string>();
   let skippedMissingId = 0;
@@ -236,7 +235,6 @@ function prepareAssets(rows: any[], validItemIds: Set<string>) {
       continue;
     }
 
-    // Build the asset row
     const duration_seconds = parseNumericOrNull(getStr(row, 'duration_seconds', 'duration'));
     const _has_vid = parseBoolOrNull(getStr(row, '_has_vid')) ?? false;
     const _has_share = parseBoolOrNull(getStr(row, '_has_share')) ?? false;
@@ -277,7 +275,6 @@ function prepareAssets(rows: any[], validItemIds: Set<string>) {
     };
 
     if (byItemId.has(itemId)) {
-      // We overwrite, but record that this item_id appeared more than once.
       duplicateAssetIds.add(itemId);
     }
 
@@ -294,6 +291,8 @@ function prepareAssets(rows: any[], validItemIds: Set<string>) {
   };
 }
 
+// NOTE: we now only store programme, grade, subject for blueprints.
+// Counts are parsed if you want to inspect them later, but NOT sent to Supabase.
 function prepareBlueprints(rows: any[]) {
   const blueprints: any[] = [];
 
@@ -302,21 +301,12 @@ function prepareBlueprints(rows: any[]) {
     const grade = parseIntOrZero(getStr(row, 'grade', 'Grade', 'year', 'Year'));
     const subject = getStr(row, 'subject', 'domain', 'strand') || 'General';
 
-    const base_count = parseIntOrZero(getStr(row, 'base_count'));
-    const easy_count = parseIntOrZero(getStr(row, 'easy_count'));
-    const core_count = parseIntOrZero(getStr(row, 'core_count'));
-    const hard_count = parseIntOrZero(getStr(row, 'hard_count'));
-
     if (!grade) continue;
 
     blueprints.push({
       programme,
       grade,
       subject,
-      base_count,
-      easy_count,
-      core_count,
-      hard_count,
     });
   }
 
@@ -376,7 +366,7 @@ async function runSeed() {
     .neq('id', '00000000-0000-0000-0000-000000000000');
   await supabase.from('items').delete().neq('id', '');
 
-  // 4) Insert items (no duplicates at this point)
+  // 4) Insert items
   const { error: itemsError } = await supabase
     .from('items')
     .insert(items);
@@ -398,7 +388,7 @@ async function runSeed() {
     );
   }
 
-  // 5) Insert assets – now guaranteed ONE row per item_id.
+  // 5) Insert assets
   const { error: assetsError } = await supabase
     .from('assets')
     .insert(assets);
@@ -420,7 +410,7 @@ async function runSeed() {
     );
   }
 
-  // 6) Insert blueprints
+  // 6) Insert blueprints (programme, grade, subject only)
   const { error: blueprintsError } = await supabase
     .from('blueprints')
     .insert(blueprints);
