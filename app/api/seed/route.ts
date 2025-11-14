@@ -105,40 +105,37 @@ function prepareItems(rows: any[]) {
   const items: any[] = [];
   const seenIds = new Set<string>();
   const duplicateIds = new Set<string>();
-  const skippedNoId: string[] = [];
-  const skippedNoStem: string[] = [];
+  let skippedNoIdCount = 0;
+  let skippedNoStemCount = 0;
 
   for (const row of rows) {
-    // ID
     const rawId =
       getStr(row, 'id', 'item_id', 'Item_ID', 'itemId') ||
       getStr(row, 'ID');
 
     if (!rawId) {
-      skippedNoId.push(JSON.stringify(row));
+      skippedNoIdCount++;
       continue;
     }
 
     const id = rawId.trim();
     if (!id) {
-      skippedNoId.push(JSON.stringify(row));
+      skippedNoIdCount++;
       continue;
     }
 
     if (seenIds.has(id)) {
       duplicateIds.add(id);
-      continue; // skip duplicate
-    }
-
-    // Stem
-    const stem =
-      getStr(row, 'display_question', 'stimulus_text', 'stem', 'text', 'prompt', 'question_html');
-    if (!stem) {
-      skippedNoStem.push(id);
       continue;
     }
 
-    // Year
+    const stem =
+      getStr(row, 'display_question', 'stimulus_text', 'stem', 'text', 'prompt', 'question_html');
+    if (!stem) {
+      skippedNoStemCount++;
+      continue;
+    }
+
     let year = getStr(row, 'year', 'year_label', 'Year') || '';
 
     if (!year) {
@@ -177,7 +174,7 @@ function prepareItems(rows: any[]) {
             options = parsed.map((o: any) => String(o));
           }
         } catch {
-          // ignore JSON parse error and fall through
+          // ignore
         }
       }
 
@@ -212,28 +209,29 @@ function prepareItems(rows: any[]) {
   return {
     items,
     duplicateIds: Array.from(duplicateIds),
-    skippedNoIdCount: skippedNoId.length,
-    skippedNoStemCount: skippedNoStem.length,
+    skippedNoIdCount,
+    skippedNoStemCount,
   };
 }
 
 function prepareAssets(rows: any[], validItemIds: Set<string>) {
   const assets: any[] = [];
-  const seenAssetIds = new Set<string>(); // item_id is PK
-  const duplicateAssetIds = new Set<string>();
+  let skippedMissingId = 0;
+  let skippedUnknownItem = 0;
 
   for (const row of rows) {
     const itemId =
       getStr(row, 'item_id', 'id', 'Item_ID') ||
       '';
 
-    if (!itemId || !validItemIds.has(itemId)) {
-      continue; // skip missing / unknown item_id
+    if (!itemId) {
+      skippedMissingId++;
+      continue;
     }
 
-    if (seenAssetIds.has(itemId)) {
-      duplicateAssetIds.add(itemId);
-      continue; // skip duplicate asset rows
+    if (!validItemIds.has(itemId)) {
+      skippedUnknownItem++;
+      continue;
     }
 
     const duration_seconds = parseNumericOrNull(getStr(row, 'duration_seconds', 'duration'));
@@ -274,13 +272,12 @@ function prepareAssets(rows: any[], validItemIds: Set<string>) {
       notes: getStr(row, 'notes'),
       player_url: getStr(row, 'player_url'),
     });
-
-    seenAssetIds.add(itemId);
   }
 
   return {
     assets,
-    duplicateAssetIds: Array.from(duplicateAssetIds),
+    skippedMissingId,
+    skippedUnknownItem,
   };
 }
 
@@ -338,7 +335,7 @@ async function runSeed() {
     fetchCsvFromEnv('SHEETS_BLUEPRINTS_CSV'),
   ]);
 
-  // 2) Prepare rows (with de-duplication)
+  // 2) Prepare rows
   const {
     items,
     duplicateIds,
@@ -349,7 +346,8 @@ async function runSeed() {
   const validItemIdSet = new Set(items.map((i) => i.id));
   const {
     assets,
-    duplicateAssetIds,
+    skippedMissingId,
+    skippedUnknownItem,
   } = prepareAssets(assetsRows, validItemIdSet);
 
   const blueprints = prepareBlueprints(blueprintsRows);
@@ -364,8 +362,12 @@ async function runSeed() {
     .neq('id', '00000000-0000-0000-0000-000000000000');
   await supabase.from('items').delete().neq('id', '');
 
-  // 4) Insert items
-  const { error: itemsError } = await supabase.from('items').insert(items);
+  // 4) Upsert items (onConflict: id) – even if there were duplicates in the CSV,
+  //    Postgres resolves them.
+  const { error: itemsError } = await supabase
+    .from('items')
+    .upsert(items, { onConflict: 'id' });
+
   if (itemsError) {
     return NextResponse.json(
       {
@@ -383,25 +385,32 @@ async function runSeed() {
     );
   }
 
-  // 5) Insert assets
-  const { error: assetsError } = await supabase.from('assets').insert(assets);
+  // 5) Upsert assets (onConflict: item_id) – this is the big change.
+  const { error: assetsError } = await supabase
+    .from('assets')
+    .upsert(assets, { onConflict: 'item_id' });
+
   if (assetsError) {
     return NextResponse.json(
       {
         ok: false,
         error: `Insert into assets failed: ${assetsError.message}`,
-        duplicateAssetIds,
         debug: {
           assetsPrepared: assets.length,
           assetsCsvRows: assetsRows.length,
+          skippedMissingId,
+          skippedUnknownItem,
         },
       },
       { status: 500 }
     );
   }
 
-  // 6) Insert blueprints
-  const { error: blueprintsError } = await supabase.from('blueprints').insert(blueprints);
+  // 6) Insert blueprints (simple insert; PK is generated UUID)
+  const { error: blueprintsError } = await supabase
+    .from('blueprints')
+    .insert(blueprints);
+
   if (blueprintsError) {
     return NextResponse.json(
       {
@@ -423,12 +432,13 @@ async function runSeed() {
     itemsInserted: items.length,
     assetsInserted: assets.length,
     blueprintsInserted: blueprints.length,
-    duplicatesSkipped: {
-      items: duplicateIds.length,
-      assets: duplicateAssetIds.length,
-    },
+    duplicatesSkipped: duplicateIds.length,
     skippedNoIdCount,
     skippedNoStemCount,
+    assetsSkipped: {
+      missingItemId: skippedMissingId,
+      unknownItemId: skippedUnknownItem,
+    },
   });
 }
 
@@ -448,7 +458,7 @@ export async function POST() {
   }
 }
 
-// Allow GET for manual testing if needed
+// Optional: allow GET to trigger the same logic (for manual testing)
 export async function GET() {
   return POST();
 }
