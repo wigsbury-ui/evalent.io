@@ -10,7 +10,6 @@ type SessionRow = {
   year?: string | null;        // e.g. "Y7"
   grade?: number | null;       // optional
   item_index?: number | null;  // progress pointer
-  // ... any other fields you have are ignored
 };
 
 type ItemRow = {
@@ -34,7 +33,9 @@ type AssetRow = {
   status: string | null;
 };
 
-function getSupabaseServiceClient() {
+// -------- Supabase client --------
+
+function getSupabaseServiceClient(): any {
   const url = process.env.SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -42,10 +43,13 @@ function getSupabaseServiceClient() {
     throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
   }
 
+  // We don’t constrain the generic types here – let your project’s
+  // Supabase typing handle it and treat it as `any` in this file.
   return createClient(url, serviceKey);
 }
 
-// try to read sessionId from query string or JSON body
+// -------- helpers --------
+
 async function getSessionId(req: Request): Promise<string> {
   const { searchParams } = new URL(req.url);
   const fromQuery = searchParams.get('sessionId');
@@ -58,14 +62,14 @@ async function getSessionId(req: Request): Promise<string> {
         return body.sessionId.trim();
       }
     } catch {
-      // ignore JSON errors
+      // ignore JSON parse issues
     }
   }
 
   throw new Error('Missing sessionId');
 }
 
-async function getSession(supabase: ReturnType<typeof createClient>, sessionId: string) {
+async function getSession(supabase: any, sessionId: string): Promise<SessionRow> {
   const { data, error } = await supabase
     .from('sessions')
     .select('*')
@@ -80,32 +84,26 @@ async function getSession(supabase: ReturnType<typeof createClient>, sessionId: 
 }
 
 async function getCandidateItemsForSession(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   session: SessionRow
 ): Promise<ItemRow[]> {
-  // Prefer explicit year on the session (e.g. "Y7")
   let year = (session.year || '').trim();
   const programme = (session.programme || 'UK').trim() || 'UK';
 
-  if (!year) {
-    // fall back to grade if present, e.g. grade=7 → "Y7"
-    if (session.grade && Number.isFinite(session.grade)) {
-      year = `Y${session.grade}`;
-    }
+  if (!year && session.grade && Number.isFinite(session.grade)) {
+    year = `Y${session.grade}`;
   }
 
   const query = supabase
     .from('items')
-    .select(
-      'id, year, domain, stem, type, options, correct, programme',
-    )
+    .select('id, year, domain, stem, type, options, correct, programme')
     .eq('programme', programme);
 
   if (year) {
     query.eq('year', year);
   }
 
-  // deterministic order so item_index is stable
+  // deterministic ordering
   query.order('year', { ascending: true }).order('id', { ascending: true });
 
   const { data, error } = await query.returns<ItemRow[]>();
@@ -118,24 +116,27 @@ async function getCandidateItemsForSession(
 }
 
 async function getAssetForItem(
-  supabase: ReturnType<typeof createClient>,
+  supabase: any,
   itemId: string
 ): Promise<AssetRow | null> {
   const { data, error } = await supabase
     .from('assets')
     .select(
-      'item_id, video_title, video_id, share_url, download_url, player_url, status',
+      'item_id, video_title, video_id, share_url, download_url, player_url, status'
     )
     .eq('item_id', itemId)
     .maybeSingle<AssetRow>();
 
   if (error) {
-    // treat asset lookup errors as non-fatal; just return null
+    // treat asset lookup errors as non-fatal
+    console.error('asset lookup error', error);
     return null;
   }
 
   return data ?? null;
 }
+
+// -------- main handler --------
 
 async function handleNextItem(req: Request) {
   const supabase = getSupabaseServiceClient();
@@ -145,7 +146,7 @@ async function handleNextItem(req: Request) {
   const items = await getCandidateItemsForSession(supabase, session);
 
   if (!items || items.length === 0) {
-    // No items at all for this session's filters
+    // No items for this session’s filters
     return NextResponse.json({
       ok: true,
       done: true,
@@ -156,7 +157,7 @@ async function handleNextItem(req: Request) {
   const currentIndex = session.item_index ?? 0;
 
   if (currentIndex >= items.length) {
-    // Reached the end of the list for this session
+    // Reached the end
     return NextResponse.json({
       ok: true,
       done: true,
@@ -166,17 +167,16 @@ async function handleNextItem(req: Request) {
 
   const item = items[currentIndex];
 
-  // Fetch optional asset (video) for this item
+  // Optional asset (video)
   const asset = await getAssetForItem(supabase, item.id);
 
-  // Advance the pointer on the session
+  // Advance the pointer; failure here shouldn’t block question delivery
   const { error: updateError } = await supabase
     .from('sessions')
     .update({ item_index: currentIndex + 1 })
     .eq('id', session.id);
 
   if (updateError) {
-    // not fatal for returning the item, but we should surface it
     console.error('Failed to update session.item_index', updateError);
   }
 
@@ -194,7 +194,7 @@ async function handleNextItem(req: Request) {
       type: item.type,
       options: item.options,
       programme: item.programme,
-      // we never send "correct" to the student UI
+      // NOTE: we deliberately do NOT send `correct` to the student UI
     },
     asset: asset
       ? {
@@ -210,6 +210,8 @@ async function handleNextItem(req: Request) {
   });
 }
 
+// -------- Next.js route exports --------
+
 export async function GET(req: Request) {
   try {
     return await handleNextItem(req);
@@ -217,7 +219,7 @@ export async function GET(req: Request) {
     console.error('/api/next-item GET error', err);
     return NextResponse.json(
       { ok: false, error: err?.message ?? String(err) },
-      { status: 400 },
+      { status: 400 }
     );
   }
 }
@@ -229,7 +231,7 @@ export async function POST(req: Request) {
     console.error('/api/next-item POST error', err);
     return NextResponse.json(
       { ok: false, error: err?.message ?? String(err) },
-      { status: 400 },
+      { status: 400 }
     );
   }
 }
