@@ -414,3 +414,8 @@ export async function POST() {
     );
   }
 }
+// Add this at the bottom of route.ts, after the POST handler
+export async function GET() {
+  // For safety, just reuse the POST logic so GET works too
+  return POST();
+}
