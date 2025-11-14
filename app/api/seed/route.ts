@@ -291,22 +291,20 @@ function prepareAssets(rows: any[], validItemIds: Set<string>) {
   };
 }
 
-// NOTE: we now only store programme, grade, subject for blueprints.
-// Counts are parsed if you want to inspect them later, but NOT sent to Supabase.
+// *** BLUEPRINTS: only programme + grade to match your actual table ***
 function prepareBlueprints(rows: any[]) {
   const blueprints: any[] = [];
 
   for (const row of rows) {
     const programme = getStr(row, 'programme', 'Program') || 'UK';
     const grade = parseIntOrZero(getStr(row, 'grade', 'Grade', 'year', 'Year'));
-    const subject = getStr(row, 'subject', 'domain', 'strand') || 'General';
 
     if (!grade) continue;
 
+    // Only include columns that definitely exist on the table
     blueprints.push({
       programme,
       grade,
-      subject,
     });
   }
 
@@ -410,7 +408,7 @@ async function runSeed() {
     );
   }
 
-  // 6) Insert blueprints (programme, grade, subject only)
+  // 6) Insert blueprints (programme + grade only)
   const { error: blueprintsError } = await supabase
     .from('blueprints')
     .insert(blueprints);
