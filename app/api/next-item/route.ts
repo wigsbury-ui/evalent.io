@@ -1,97 +1,235 @@
-// app/api/next-item/route.ts
-import { NextRequest, NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabaseClient';
-import { supabaseAdmin } from '@/lib/supabaseAdmin';
+import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 
-export async function GET(req: NextRequest) {
-  const url = new URL(req.url);
+export const runtime = 'nodejs';
 
-  // Accept both new and legacy query names
-  const sessionId =
-    url.searchParams.get('session_id') || url.searchParams.get('sid');
+type SessionRow = {
+  id: string;
+  school_id?: string | null;
+  programme?: string | null;
+  year?: string | null;        // e.g. "Y7"
+  grade?: number | null;       // optional
+  item_index?: number | null;  // progress pointer
+  // ... any other fields you have are ignored
+};
 
-  if (!sessionId) {
-    return new NextResponse('session_id (or sid) query param is required', {
-      status: 400,
-    });
+type ItemRow = {
+  id: string;
+  year: string;
+  domain: string | null;
+  stem: string;
+  type: 'mcq' | 'short';
+  options: string[] | null;
+  correct: string | null;
+  programme: string | null;
+};
+
+type AssetRow = {
+  item_id: string;
+  video_title: string | null;
+  video_id: string | null;
+  share_url: string | null;
+  download_url: string | null;
+  player_url: string | null;
+  status: string | null;
+};
+
+function getSupabaseServiceClient() {
+  const url = process.env.SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !serviceKey) {
+    throw new Error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY');
   }
 
-  // 1) Load session to get year + current index
-  const { data: session, error: sessionError } = await supabase
+  return createClient(url, serviceKey);
+}
+
+// try to read sessionId from query string or JSON body
+async function getSessionId(req: Request): Promise<string> {
+  const { searchParams } = new URL(req.url);
+  const fromQuery = searchParams.get('sessionId');
+  if (fromQuery) return fromQuery;
+
+  if (req.method === 'POST') {
+    try {
+      const body = await req.json().catch(() => null);
+      if (body && typeof body.sessionId === 'string' && body.sessionId.trim() !== '') {
+        return body.sessionId.trim();
+      }
+    } catch {
+      // ignore JSON errors
+    }
+  }
+
+  throw new Error('Missing sessionId');
+}
+
+async function getSession(supabase: ReturnType<typeof createClient>, sessionId: string) {
+  const { data, error } = await supabase
     .from('sessions')
-    .select('id, year, item_index')
+    .select('*')
     .eq('id', sessionId)
-    .maybeSingle();
+    .single<SessionRow>();
 
-  if (sessionError) {
-    return new NextResponse(sessionError.message, { status: 500 });
-  }
-  if (!session) {
-    return new NextResponse('Session not found', { status: 404 });
+  if (error || !data) {
+    throw new Error(`Session not found for id=${sessionId}`);
   }
 
-  const index = session.item_index ?? 0;
+  return data;
+}
 
-  // 2) Pick ONE item for this year at the current index
-  const { data: items, error: itemError } = await supabase
+async function getCandidateItemsForSession(
+  supabase: ReturnType<typeof createClient>,
+  session: SessionRow
+): Promise<ItemRow[]> {
+  // Prefer explicit year on the session (e.g. "Y7")
+  let year = (session.year || '').trim();
+  const programme = (session.programme || 'UK').trim() || 'UK';
+
+  if (!year) {
+    // fall back to grade if present, e.g. grade=7 → "Y7"
+    if (session.grade && Number.isFinite(session.grade)) {
+      year = `Y${session.grade}`;
+    }
+  }
+
+  const query = supabase
     .from('items')
-    .select('id, stem, type, options, correct')
-    .eq('year', session.year)
-    .not('stem', 'is', null)
-    .order('id', { ascending: true })
-    .range(index, index); // a single row
+    .select(
+      'id, year, domain, stem, type, options, correct, programme',
+    )
+    .eq('programme', programme);
 
-  if (itemError) {
-    return new NextResponse(itemError.message, { status: 500 });
+  if (year) {
+    query.eq('year', year);
   }
 
-  // No more items -> we're done
-  if (!items || !items.length) {
-    return NextResponse.json({
-      ok: true,
-      item: null,
-      asset: null,
-      done: true,
-    });
+  // deterministic order so item_index is stable
+  query.order('year', { ascending: true }).order('id', { ascending: true });
+
+  const { data, error } = await query.returns<ItemRow[]>();
+
+  if (error) {
+    throw new Error(`Failed to load items: ${error.message}`);
   }
 
-  const row = items[0];
+  return data ?? [];
+}
 
-  // 3) Normalise options + type
-  const rawOptions = (row as any).options;
-  const options: string[] = Array.isArray(rawOptions)
-    ? rawOptions.map((o) => String(o))
-    : [];
-
-  const baseType = (row.type as string | null) || (options.length >= 2 ? 'mcq' : 'short');
-  const type: 'mcq' | 'short' =
-    baseType.toLowerCase() === 'mcq' || options.length >= 2 ? 'mcq' : 'short';
-
-  // 4) Optional asset (video) for this item
-  const { data: asset } = await supabase
+async function getAssetForItem(
+  supabase: ReturnType<typeof createClient>,
+  itemId: string
+): Promise<AssetRow | null> {
+  const { data, error } = await supabase
     .from('assets')
     .select(
-      'item_id, video_title, video_id, share_url, download_url, player_url'
+      'item_id, video_title, video_id, share_url, download_url, player_url, status',
     )
-    .eq('item_id', row.id)
-    .maybeSingle();
+    .eq('item_id', itemId)
+    .maybeSingle<AssetRow>();
 
-  // 5) Bump item_index so next call moves on
-  await supabaseAdmin
+  if (error) {
+    // treat asset lookup errors as non-fatal; just return null
+    return null;
+  }
+
+  return data ?? null;
+}
+
+async function handleNextItem(req: Request) {
+  const supabase = getSupabaseServiceClient();
+  const sessionId = await getSessionId(req);
+  const session = await getSession(supabase, sessionId);
+
+  const items = await getCandidateItemsForSession(supabase, session);
+
+  if (!items || items.length === 0) {
+    // No items at all for this session's filters
+    return NextResponse.json({
+      ok: true,
+      done: true,
+      reason: 'no_items_for_session',
+    });
+  }
+
+  const currentIndex = session.item_index ?? 0;
+
+  if (currentIndex >= items.length) {
+    // Reached the end of the list for this session
+    return NextResponse.json({
+      ok: true,
+      done: true,
+      totalItems: items.length,
+    });
+  }
+
+  const item = items[currentIndex];
+
+  // Fetch optional asset (video) for this item
+  const asset = await getAssetForItem(supabase, item.id);
+
+  // Advance the pointer on the session
+  const { error: updateError } = await supabase
     .from('sessions')
-    .update({ item_index: index + 1 })
+    .update({ item_index: currentIndex + 1 })
     .eq('id', session.id);
 
-  // 6) Return item + asset to the client
+  if (updateError) {
+    // not fatal for returning the item, but we should surface it
+    console.error('Failed to update session.item_index', updateError);
+  }
+
   return NextResponse.json({
     ok: true,
     done: false,
+    sessionId: session.id,
+    index: currentIndex,
+    totalItems: items.length,
     item: {
-      id: row.id,
-      stem: row.stem,
-      type,
-      options,
+      id: item.id,
+      year: item.year,
+      domain: item.domain,
+      stem: item.stem,
+      type: item.type,
+      options: item.options,
+      programme: item.programme,
+      // we never send "correct" to the student UI
     },
-    asset: asset || null,
+    asset: asset
+      ? {
+          item_id: asset.item_id,
+          video_title: asset.video_title,
+          video_id: asset.video_id,
+          share_url: asset.share_url,
+          download_url: asset.download_url,
+          player_url: asset.player_url,
+          status: asset.status,
+        }
+      : null,
   });
+}
+
+export async function GET(req: Request) {
+  try {
+    return await handleNextItem(req);
+  } catch (err: any) {
+    console.error('/api/next-item GET error', err);
+    return NextResponse.json(
+      { ok: false, error: err?.message ?? String(err) },
+      { status: 400 },
+    );
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    return await handleNextItem(req);
+  } catch (err: any) {
+    console.error('/api/next-item POST error', err);
+    return NextResponse.json(
+      { ok: false, error: err?.message ?? String(err) },
+      { status: 400 },
+    );
+  }
 }
