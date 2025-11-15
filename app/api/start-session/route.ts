@@ -1,70 +1,83 @@
 // app/api/start-session/route.ts
+
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
+const START_PASSCODE =
+  process.env.NEXT_PUBLIC_START_PASSCODE ||
+  process.env.START_PASSCODE ||
+  'letmein';
+
 export const dynamic = 'force-dynamic';
 
-type StartSessionBody = {
-  studentName: string;
-  year: string;       // e.g. "Y4"
-  passcode: string;
+type StartBody = {
+  candidate_name?: string;
+  studentName?: string;
+  year?: string;
+  passcode?: string;
 };
 
 export async function POST(req: NextRequest) {
+  let body: StartBody | null = null;
+
   try {
-    const body = (await req.json()) as Partial<StartSessionBody>;
-    const studentName = body.studentName?.trim();
-    const year = body.year?.trim();
-    const passcode = body.passcode?.trim();
+    body = (await req.json()) as StartBody;
+  } catch {
+    // If parsing fails, we'll treat it as "missing fields"
+  }
 
-    if (!studentName || !year || !passcode) {
-      return NextResponse.json(
-        { ok: false, error: 'Missing studentName, year, or passcode' },
-        { status: 400 }
-      );
-    }
+  const candidateName =
+    body?.candidate_name?.trim() ||
+    body?.studentName?.trim() ||
+    '';
 
-    const schoolId = process.env.DEFAULT_SCHOOL_ID;
-    if (!schoolId) {
-      return NextResponse.json(
-        { ok: false, error: 'DEFAULT_SCHOOL_ID is not configured on the server' },
-        { status: 500 }
-      );
-    }
+  const year = body?.year?.trim() || '';
+  const passcode = body?.passcode?.trim() || '';
 
-    // Insert a new row into the sessions table.
-    // Adjust column names if yours differ, but keep the shape of the returned JSON:
-    // { ok: true, session: { id: ... } }
-    const { data, error } = await supabaseAdmin
-      .from('sessions')
-      .insert({
-        student_name: studentName,
-        year,              // assuming a "year" column storing "Y3", "Y4", etc.
-        passcode,
-        school_id: schoolId,
-        status: 'in_progress',
-      })
-      .select('*')
-      .single();
-
-    if (error || !data) {
-      console.error('start-session insert error', error);
-      return NextResponse.json(
-        { ok: false, error: 'Failed to create session in database' },
-        { status: 500 }
-      );
-    }
-
-    // THIS is what your frontend expects: data.session.id
-    return NextResponse.json({
-      ok: true,
-      session: data,
-    });
-  } catch (err: any) {
-    console.error('start-session unexpected error', err);
+  if (!candidateName || !year || !passcode) {
     return NextResponse.json(
-      { ok: false, error: 'Unexpected error starting session' },
-      { status: 500 }
+      {
+        ok: false,
+        error: 'Missing studentName, year, or passcode',
+      },
+      { status: 400 },
     );
   }
+
+  if (START_PASSCODE && passcode !== START_PASSCODE) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: 'Invalid passcode',
+      },
+      { status: 403 },
+    );
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('sessions')
+    .insert({
+      candidate_name: candidateName,
+      year,
+      item_index: 0,
+    })
+    .select('*')
+    .single();
+
+  if (error || !data) {
+    console.error('start-session insert error', error);
+    return NextResponse.json(
+      {
+        ok: false,
+        error: error?.message || 'Failed to create session',
+      },
+      { status: 500 },
+    );
+  }
+
+  return NextResponse.json({
+    ok: true,
+    sessionId: data.id,
+    session: data,
+  });
 }
