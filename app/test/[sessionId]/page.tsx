@@ -1,121 +1,183 @@
-'use client';
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+"use client";
 
-type Item = {
-  id: string;
-  stem: string;
-  type: 'mcq'|'short';
-  options?: string[];
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+
+type NextItemResponse = {
+  ok: boolean;
+  error?: string;
+  done?: boolean;
+  item?: any;
 };
 
-type Asset = {
-  item_id: string;
-  video_title?: string;
-  video_id?: string;
-  share_url?: string;
-  download_url?: string;
-  video_thumbnail?: string;
-  player_url?: string;
-};
+export default function TestPage() {
+  const params = useParams();
+  const sessionId = (params?.sessionId as string) || "";
 
-function vimeoPlayerUrlFromShare(share?: string): string | null {
-  if (!share) return null;
-  const m = share.match(/vimeo\.com\/(?:video\/)?(\d+)/);
-  if (m && m[1]) return `https://player.vimeo.com/video/${m[1]}`;
-  return null;
-}
-
-export default function TestPage({ params }: { params: { sessionId: string } }) {
-  const sessionId = params.sessionId;
-  const [item, setItem] = useState<Item | null>(null);
-  const [asset, setAsset] = useState<Asset | null>(null);
-  const [value, setValue] = useState('');
-  const [done, setDone] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
+  const [done, setDone] = useState(false);
+  const [item, setItem] = useState<any | null>(null);
+  const [answer, setAnswer] = useState<string>("");
 
   async function loadNext() {
+    if (!sessionId) {
+      setError("Missing sessionId in URL.");
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
     setError(null);
-    const url = `/api/next-item?session_id=${sessionId}&_=${Date.now()}`;
-    const res = await fetch(url, { method: 'GET' });
-    if (!res.ok) { setError(await res.text()); return; }
-    const data = await res.json();
-    if (!data.item) { setDone(true); return; }
-    setItem(data.item);
-    setAsset(data.asset || null);
-    setValue('');
+
+    try {
+      const res = await fetch(
+        `/api/next-item?sessionId=${encodeURIComponent(sessionId)}`,
+        {
+          method: "GET",
+          headers: {
+            "Accept": "application/json",
+          },
+        }
+      );
+
+      const data: NextItemResponse = await res.json();
+
+      if (!res.ok || data.ok === false) {
+        // Could be "Missing sessionId" or something else
+        setError(data.error || "Error loading next question.");
+        setItem(null);
+        setDone(!!data.done);
+        setLoading(false);
+        return;
+      }
+
+      if (data.done || !data.item) {
+        setDone(true);
+        setItem(null);
+        setLoading(false);
+        return;
+      }
+
+      setItem(data.item);
+      setAnswer("");
+      setDone(false);
+      setLoading(false);
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.message || "Unexpected error loading question.");
+      setLoading(false);
+    }
   }
 
-  async function submit() {
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
     if (!item) return;
-    const url = `/api/submit?session_id=${sessionId}&item_id=${item.id}&response=${encodeURIComponent(value)}&_=${Date.now()}`;
-    const res = await fetch(url, { method: 'GET' });
-    if (!res.ok) { setError(await res.text()); return; }
+
+    try {
+      const res = await fetch(
+        `/api/submit?sessionId=${encodeURIComponent(sessionId)}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            itemId: item.id || item.item_id || item.itemId,
+            answer,
+          }),
+        }
+      );
+      // We don't care about response contents here; just go to next
+      await res.json().catch(() => {});
+    } catch (err) {
+      console.error(err);
+      // Soft-fail: still try to go to next question
+    }
+
     await loadNext();
   }
 
-  async function finish() {
-    const res = await fetch(`/api/finish`, {
-      method: 'POST',
-      headers: { 'Content-Type':'application/json' },
-      body: JSON.stringify({ session_id: sessionId })
-    })
-    if (!res.ok) { setError(await res.text()); return; }
-    router.push(`/thanks?session=${sessionId}`);
-  }
-
-  useEffect(() => { loadNext(); }, []);
-
-  if (done) {
-    return (
-      <main>
-        <div className="card">
-          <h2>All questions complete</h2>
-          <button onClick={finish}>Submit Test</button>
-        </div>
-      </main>
-    )
-  }
-
-  const playerSrc = asset?.player_url || vimeoPlayerUrlFromShare(asset?.share_url) || null;
+  useEffect(() => {
+    loadNext();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId]);
 
   return (
-    <main>
-      <div className="card">
-        {error && <p style={{color:'crimson'}}>{error}</p>}
-        {!item && <p>Loading…</p>}
-        {item && (
+    <main className="min-h-screen flex items-center justify-center">
+      <div className="max-w-4xl w-full mx-4 border rounded-xl p-8 shadow-sm">
+        {error && (
+          <p className="mb-4 text-red-600 text-sm">
+            {typeof error === "string" ? error : JSON.stringify(error)}
+          </p>
+        )}
+
+        {!error && loading && <p>Loading…</p>}
+
+        {!loading && done && (
           <div>
-            {playerSrc && (
-              <div style={{marginBottom:12, position:'relative', paddingBottom:'56.25%', height:0, overflow:'hidden', borderRadius:12}}>
-                <iframe
-                  src={playerSrc}
-                  allow="autoplay; fullscreen; picture-in-picture"
-                  allowFullScreen
-                  style={{position:'absolute', top:0, left:0, width:'100%', height:'100%', border:0}}
-                  title={asset?.video_title || 'Question Video'}
-                />
-              </div>
+            <h1 className="text-2xl font-semibold mb-4">
+              All questions complete
+            </h1>
+            <p className="text-sm text-gray-600">
+              You can now close this window.
+            </p>
+          </div>
+        )}
+
+        {!loading && !done && item && (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <h1 className="text-2xl font-semibold mb-4">
+              Question
+            </h1>
+
+            {/* Very generic rendering – just to prove the pipe works */}
+            {item.stem_html ? (
+              <div
+                className="prose max-w-none border rounded p-4"
+                dangerouslySetInnerHTML={{ __html: item.stem_html }}
+              />
+            ) : (
+              <pre className="border rounded p-4 text-sm bg-gray-50">
+                {JSON.stringify(item, null, 2)}
+              </pre>
             )}
-            <div style={{marginBottom:12}}>{item.stem}</div>
-            {item.type === 'mcq' ? (
-              <div>
-                {(item.options || []).map((opt, i) => (
-                  <label key={i} style={{display:'block', marginBottom:8}}>
-                    <input type="radio" name="opt" value={opt} checked={value===opt} onChange={e=>setValue(e.target.value)} /> {opt}
+
+            {/* If options exist, show them as radio buttons; otherwise a text box */}
+            {Array.isArray(item.options) && item.options.length > 0 ? (
+              <div className="space-y-2">
+                {item.options.map((opt: string, idx: number) => (
+                  <label
+                    key={idx}
+                    className="flex items-center gap-2 text-sm"
+                  >
+                    <input
+                      type="radio"
+                      name="answer"
+                      value={opt}
+                      checked={answer === opt}
+                      onChange={(e) => setAnswer(e.target.value)}
+                    />
+                    <span>{opt}</span>
                   </label>
                 ))}
               </div>
             ) : (
-              <textarea rows={4} value={value} onChange={e=>setValue(e.target.value)} />
+              <textarea
+                className="w-full border rounded px-3 py-2 min-h-[120px]"
+                value={answer}
+                onChange={(e) => setAnswer(e.target.value)}
+                placeholder="Type your answer here…"
+              />
             )}
-            <div style={{marginTop:12}}>
-              <button onClick={submit} disabled={!value}>Submit answer</button>
-            </div>
-          </div>
+
+            <button
+              type="submit"
+              className="border rounded px-4 py-2 bg-black text-white"
+            >
+              Submit Answer
+            </button>
+          </form>
         )}
       </div>
     </main>
-  )
+  );
 }
