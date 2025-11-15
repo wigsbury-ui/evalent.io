@@ -2,54 +2,69 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '@/lib/supabaseAdmin';
 
-const SESSION_COOKIE = 'evalent_session_id';
+export const dynamic = 'force-dynamic';
+
+type StartSessionBody = {
+  studentName: string;
+  year: string;       // e.g. "Y4"
+  passcode: string;
+};
 
 export async function POST(req: NextRequest) {
-  const supabase: any = supabaseAdmin;
-
-  // Optional: allow programme/grade in body, but don’t depend on them
-  let body: any = {};
   try {
-    body = await req.json();
-  } catch {
-    body = {};
-  }
+    const body = (await req.json()) as Partial<StartSessionBody>;
+    const studentName = body.studentName?.trim();
+    const year = body.year?.trim();
+    const passcode = body.passcode?.trim();
 
-  const schoolId = process.env.DEFAULT_SCHOOL_ID || null;
+    if (!studentName || !year || !passcode) {
+      return NextResponse.json(
+        { ok: false, error: 'Missing studentName, year, or passcode' },
+        { status: 400 }
+      );
+    }
 
-  const insertPayload: any = {
-    item_index: 0,          // *** THIS IS THE IMPORTANT PART ***
-  };
+    const schoolId = process.env.DEFAULT_SCHOOL_ID;
+    if (!schoolId) {
+      return NextResponse.json(
+        { ok: false, error: 'DEFAULT_SCHOOL_ID is not configured on the server' },
+        { status: 500 }
+      );
+    }
 
-  if (schoolId) insertPayload.school_id = schoolId;
-  if (body.programme) insertPayload.programme = body.programme;
-  if (body.grade) insertPayload.grade = body.grade;
+    // Insert a new row into the sessions table.
+    // Adjust column names if yours differ, but keep the shape of the returned JSON:
+    // { ok: true, session: { id: ... } }
+    const { data, error } = await supabaseAdmin
+      .from('sessions')
+      .insert({
+        student_name: studentName,
+        year,              // assuming a "year" column storing "Y3", "Y4", etc.
+        passcode,
+        school_id: schoolId,
+        status: 'in_progress',
+      })
+      .select('*')
+      .single();
 
-  const { data, error } = await supabase
-    .from('sessions')
-    .insert(insertPayload)
-    .select('id, item_index')
-    .single();
+    if (error || !data) {
+      console.error('start-session insert error', error);
+      return NextResponse.json(
+        { ok: false, error: 'Failed to create session in database' },
+        { status: 500 }
+      );
+    }
 
-  if (error || !data) {
+    // THIS is what your frontend expects: data.session.id
+    return NextResponse.json({
+      ok: true,
+      session: data,
+    });
+  } catch (err: any) {
+    console.error('start-session unexpected error', err);
     return NextResponse.json(
-      { ok: false, error: error?.message || 'Failed to create session' },
+      { ok: false, error: 'Unexpected error starting session' },
       { status: 500 }
     );
   }
-
-  const res = NextResponse.json({
-    ok: true,
-    sessionId: data.id,
-  });
-
-  // Set a cookie so /api/next-item can find the session automatically
-  res.cookies.set(SESSION_COOKIE, data.id, {
-    httpOnly: true,
-    sameSite: 'lax',
-    path: '/',
-    maxAge: 60 * 60, // 1 hour
-  });
-
-  return res;
 }
