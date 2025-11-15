@@ -19,6 +19,8 @@ export default function TestPage() {
   const [done, setDone] = useState(false);
   const [item, setItem] = useState<any | null>(null);
   const [answer, setAnswer] = useState<string>("");
+  const [questionNumber, setQuestionNumber] = useState<number>(1);
+  const [showDebug, setShowDebug] = useState(false);
 
   async function loadNext() {
     if (!sessionId) {
@@ -36,7 +38,7 @@ export default function TestPage() {
         {
           method: "GET",
           headers: {
-            "Accept": "application/json",
+            Accept: "application/json",
           },
         }
       );
@@ -44,7 +46,6 @@ export default function TestPage() {
       const data: NextItemResponse = await res.json();
 
       if (!res.ok || data.ok === false) {
-        // Could be "Missing sessionId" or something else
         setError(data.error || "Error loading next question.");
         setItem(null);
         setDone(!!data.done);
@@ -63,6 +64,7 @@ export default function TestPage() {
       setAnswer("");
       setDone(false);
       setLoading(false);
+      setQuestionNumber((prev) => prev + (prev === 1 && !item ? 0 : 1)); // crude but fine
     } catch (err: any) {
       console.error(err);
       setError(err?.message || "Unexpected error loading question.");
@@ -86,20 +88,35 @@ export default function TestPage() {
           }),
         }
       );
-      // We don't care about response contents here; just go to next
       await res.json().catch(() => {});
     } catch (err) {
       console.error(err);
-      // Soft-fail: still try to go to next question
+      // soft-fail, we still try to go to the next question
     }
 
     await loadNext();
   }
 
   useEffect(() => {
+    // reset counter when session changes
+    setQuestionNumber(1);
     loadNext();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
+
+  // Choose a sensible stem text for display
+  const stemText =
+    (item &&
+      (item.stimulus_text ||
+        item.stem_text ||
+        item.stem ||
+        item.prompt ||
+        "")) ||
+    "";
+
+  // Options array (if present)
+  const options: string[] =
+    (item && Array.isArray(item.options) && item.options) || [];
 
   return (
     <main className="min-h-screen flex items-center justify-center">
@@ -124,30 +141,43 @@ export default function TestPage() {
         )}
 
         {!loading && !done && item && (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <h1 className="text-2xl font-semibold mb-4">
-              Question
-            </h1>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="flex items-baseline justify-between gap-4">
+              <h1 className="text-2xl font-semibold">
+                Question {questionNumber}
+              </h1>
 
-            {/* Very generic rendering – just to prove the pipe works */}
-            {item.stem_html ? (
-              <div
-                className="prose max-w-none border rounded p-4"
-                dangerouslySetInnerHTML={{ __html: item.stem_html }}
-              />
-            ) : (
-              <pre className="border rounded p-4 text-sm bg-gray-50">
+              <button
+                type="button"
+                onClick={() => setShowDebug((v) => !v)}
+                className="text-xs underline text-gray-500"
+              >
+                {showDebug ? "Hide debug" : "Show debug"}
+              </button>
+            </div>
+
+            {showDebug && (
+              <pre className="border rounded p-3 text-xs bg-gray-50 max-h-48 overflow-auto">
                 {JSON.stringify(item, null, 2)}
               </pre>
             )}
 
-            {/* If options exist, show them as radio buttons; otherwise a text box */}
-            {Array.isArray(item.options) && item.options.length > 0 ? (
+            <div className="border rounded p-4 bg-gray-50">
+              {stemText ? (
+                <p className="text-lg">{stemText}</p>
+              ) : (
+                <p className="text-lg italic text-gray-500">
+                  (No stem text found for this item)
+                </p>
+              )}
+            </div>
+
+            {options.length > 0 ? (
               <div className="space-y-2">
-                {item.options.map((opt: string, idx: number) => (
+                {options.map((opt, idx) => (
                   <label
                     key={idx}
-                    className="flex items-center gap-2 text-sm"
+                    className="flex items-center gap-2 text-base"
                   >
                     <input
                       type="radio"
@@ -155,6 +185,7 @@ export default function TestPage() {
                       value={opt}
                       checked={answer === opt}
                       onChange={(e) => setAnswer(e.target.value)}
+                      required
                     />
                     <span>{opt}</span>
                   </label>
@@ -166,6 +197,7 @@ export default function TestPage() {
                 value={answer}
                 onChange={(e) => setAnswer(e.target.value)}
                 placeholder="Type your answer here…"
+                required
               />
             )}
 
