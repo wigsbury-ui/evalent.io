@@ -1,25 +1,32 @@
+// app/layout.tsx
 import './globals.css';
+import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 export const metadata = {
-  title: 'Evalent Pro Pack',
-  description: 'Admissions testing platform',
+  title: 'Evalent',
+  description: 'Admissions testing',
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
-      <body>
-        <div style={{maxWidth: 900, margin: '0 auto', padding: 24}}>
-          <header style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
-            <h1>Evalent</h1>
-            <nav style={{display:'flex', gap:12}}>
-              <a href="/">Start</a>
-              <a href="/admin">Admin</a>
+      <body className="min-h-screen bg-[#fafafa] text-black">
+        <header className="w-full border-b bg-white">
+          <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+            <div className="text-3xl font-bold tracking-tight">Evalent</div>
+            <nav className="flex items-center gap-6 text-lg">
+              <Link href="/" className="hover:underline">
+                Start
+              </Link>
+              <Link href="/admin" className="hover:underline">
+                Admin
+              </Link>
             </nav>
-          </header>
-          {children}
-        </div>
+          </div>
+        </header>
+
+        <main className="max-w-6xl mx-auto px-4 py-8">{children}</main>
       </body>
     </html>
   );
