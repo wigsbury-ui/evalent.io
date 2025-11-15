@@ -31,11 +31,7 @@ export default function StartPage() {
     try {
       const res = await fetch('/api/start-session', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        // send BOTH candidate_name and studentName so any backend
-        // variant we’ve ever used will be happy
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           candidate_name: nameTrimmed,
           studentName: nameTrimmed,
@@ -48,9 +44,7 @@ export default function StartPage() {
       let json: any = {};
       try {
         json = raw ? JSON.parse(raw) : {};
-      } catch {
-        // leave json as {}
-      }
+      } catch {}
 
       if (!res.ok || json?.ok === false) {
         const message =
