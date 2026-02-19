@@ -1,174 +1,154 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
-import * as jose from "jose";
+import { verifyDecisionToken } from "@/lib/email";
 
 /**
- * Decision Handler
+ * Decision Recording API
  *
- * Assessors click decision buttons in their email.
- * Each button is a signed URL:
- *   GET /api/decision?token=<JWT>&decision=<value>
+ * GET /api/decision?token=xxx&decision=admit|admit_with_support|waitlist|reject|more_info
  *
- * The JWT contains submission_id + assessor_email + expiry.
+ * Called when an assessor clicks a decision button in the report email.
+ * The token is a signed JWT containing submission_id and assessor info.
+ * Records the decision in the decisions table and shows a confirmation page.
  */
+
+const VALID_DECISIONS = [
+  "admit",
+  "admit_with_support",
+  "waitlist",
+  "reject",
+  "more_info",
+] as const;
+
+type Decision = (typeof VALID_DECISIONS)[number];
+
+const DECISION_LABELS: Record<Decision, string> = {
+  admit: "✓ Admit",
+  admit_with_support: "✓ Admit with Support",
+  waitlist: "⏸ Waitlist",
+  reject: "✗ Reject",
+  more_info: "? Request More Information",
+};
+
+const DECISION_COLORS: Record<Decision, string> = {
+  admit: "#16a34a",
+  admit_with_support: "#2563eb",
+  waitlist: "#d97706",
+  reject: "#dc2626",
+  more_info: "#64748b",
+};
+
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const token = searchParams.get("token");
-  const decision = searchParams.get("decision");
+  const token = req.nextUrl.searchParams.get("token");
+  const decision = req.nextUrl.searchParams.get("decision") as Decision;
 
   if (!token || !decision) {
-    return new NextResponse(renderHTML("error", "Missing token or decision"), {
-      status: 400,
-      headers: { "Content-Type": "text/html" },
-    });
+    return renderPage("Error", "Missing token or decision parameter.", "#dc2626");
   }
 
-  const validDecisions = [
-    "admit",
-    "admit_with_support",
-    "waitlist",
-    "reject",
-    "request_info",
-  ];
-
-  if (!validDecisions.includes(decision)) {
-    return new NextResponse(renderHTML("error", "Invalid decision value"), {
-      status: 400,
-      headers: { "Content-Type": "text/html" },
-    });
+  if (!VALID_DECISIONS.includes(decision)) {
+    return renderPage("Error", `Invalid decision: ${decision}`, "#dc2626");
   }
 
   try {
-    // Verify JWT
-    const secret = new TextEncoder().encode(
-      process.env.JWT_SIGNING_SECRET || "evalent-default-secret"
-    );
-
-    const { payload } = await jose.jwtVerify(token, secret);
-    const submissionId = payload.submission_id as string;
-    const assessorEmail = payload.assessor_email as string;
-
-    if (!submissionId || !assessorEmail) {
-      throw new Error("Invalid token payload");
-    }
+    const payload = await verifyDecisionToken(token);
+    const { sub: submissionId, email, student_name, grade, school_id } = payload;
 
     const supabase = createServerClient();
 
-    // Record the decision
-    const { error } = await supabase.from("decisions").insert({
-      submission_id: submissionId,
-      assessor_email: assessorEmail,
-      decision: decision,
-      decided_at: new Date().toISOString(),
-    });
+    // Check for existing decision
+    const { data: existing } = await supabase
+      .from("decisions")
+      .select("id, decision, decided_at")
+      .eq("submission_id", submissionId)
+      .single();
 
-    if (error) throw error;
+    if (existing) {
+      const prevLabel = DECISION_LABELS[existing.decision as Decision] || existing.decision;
 
-    // Log in audit trail
-    await supabase.from("audit_log").insert({
-      actor_email: assessorEmail,
-      action: "assessor_decision",
-      entity_type: "submission",
-      entity_id: submissionId,
-      details: { decision },
-    });
+      await supabase
+        .from("decisions")
+        .update({
+          decision,
+          decided_at: new Date().toISOString(),
+          decided_by: email,
+        })
+        .eq("id", existing.id);
 
-    const decisionLabel =
-      {
-        admit: "Admit",
-        admit_with_support: "Admit with Support",
-        waitlist: "Waitlist",
-        reject: "Reject",
-        request_info: "Request More Info",
-      }[decision] || decision;
-
-    return new NextResponse(renderHTML("success", decisionLabel), {
-      status: 200,
-      headers: { "Content-Type": "text/html" },
-    });
-  } catch (err: any) {
-    if (err.code === "ERR_JWT_EXPIRED") {
-      return new NextResponse(
-        renderHTML("error", "This decision link has expired. Please contact your school administrator."),
-        { status: 401, headers: { "Content-Type": "text/html" } }
+      return renderPage(
+        "Decision Updated",
+        `Your decision for <b>${student_name}</b> (Grade ${grade}) has been updated from "${prevLabel}" to:`,
+        DECISION_COLORS[decision],
+        DECISION_LABELS[decision]
       );
     }
 
-    console.error("[DECISION] Error:", err);
-    return new NextResponse(
-      renderHTML("error", "Something went wrong. Please try again or contact support."),
-      { status: 500, headers: { "Content-Type": "text/html" } }
+    // Insert new decision
+    const { error: insertErr } = await supabase.from("decisions").insert({
+      submission_id: submissionId,
+      school_id: school_id || null,
+      decision,
+      decided_by: email,
+      decided_at: new Date().toISOString(),
+    });
+
+    if (insertErr) {
+      console.error("[DECISION] Insert error:", insertErr);
+      return renderPage("Error", `Failed to record decision: ${insertErr.message}`, "#dc2626");
+    }
+
+    // Update submission status
+    await supabase
+      .from("submissions")
+      .update({ processing_status: "decided" })
+      .eq("id", submissionId);
+
+    return renderPage(
+      "Decision Recorded",
+      `Your decision for <b>${student_name}</b> (Grade ${grade}) has been recorded:`,
+      DECISION_COLORS[decision],
+      DECISION_LABELS[decision]
     );
+  } catch (err) {
+    console.error("[DECISION] Error:", err);
+    const message = err instanceof Error && err.message.includes("exp")
+      ? "This decision link has expired. Please contact the school administrator."
+      : `Error: ${err instanceof Error ? err.message : String(err)}`;
+    return renderPage("Error", message, "#dc2626");
   }
 }
 
-function renderHTML(type: "success" | "error", message: string): string {
-  const isSuccess = type === "success";
-  return `<!DOCTYPE html>
+function renderPage(title: string, message: string, color: string, decisionLabel?: string): NextResponse {
+  const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${isSuccess ? "Decision Recorded" : "Error"} | Evalent</title>
+  <title>Evalent — ${title}</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #f9fafb;
-      color: #111827;
-    }
-    .card {
-      background: white;
-      border-radius: 12px;
-      padding: 48px;
-      max-width: 480px;
-      text-align: center;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-    }
-    .icon {
-      width: 64px;
-      height: 64px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0 auto 24px;
-      font-size: 28px;
-    }
-    .icon.success { background: #dcfce7; }
-    .icon.error { background: #fee2e2; }
-    h1 { font-size: 24px; font-weight: 700; margin-bottom: 12px; }
-    p { color: #6b7280; font-size: 15px; line-height: 1.6; }
-    .decision { 
-      display: inline-block;
-      background: #f0fdf4;
-      color: #166534;
-      padding: 4px 16px;
-      border-radius: 20px;
-      font-weight: 600;
-      margin-top: 16px;
-      font-size: 14px;
-    }
-    .brand { color: #9ca3af; font-size: 12px; margin-top: 32px; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #f1f5f9; min-height: 100vh; display: flex; align-items: center; justify-content: center; }
+    .card { background: white; border-radius: 12px; padding: 48px; max-width: 480px; width: 100%; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.07); }
+    .icon { font-size: 48px; margin-bottom: 16px; }
+    h1 { font-size: 24px; color: #1a365d; margin-bottom: 12px; }
+    .message { font-size: 15px; color: #475569; line-height: 1.6; margin-bottom: 20px; }
+    .decision-badge { display: inline-block; padding: 12px 28px; background: ${color}; color: white; border-radius: 8px; font-size: 18px; font-weight: 700; margin: 8px 0 20px; }
+    .footer { font-size: 12px; color: #94a3b8; margin-top: 20px; }
+    a { color: #2563eb; text-decoration: none; }
   </style>
 </head>
 <body>
   <div class="card">
-    <div class="icon ${type}">
-      ${isSuccess ? "✓" : "✕"}
-    </div>
-    <h1>${isSuccess ? "Decision Recorded" : "Error"}</h1>
-    <p>${isSuccess
-      ? "Your admissions decision has been recorded successfully. The school administrator has been notified."
-      : message
-    }</p>
-    ${isSuccess ? `<div class="decision">${message}</div>` : ""}
-    <p class="brand">Evalent — Admissions Intelligence</p>
+    <div class="icon">${title.includes("Error") ? "⚠️" : "✅"}</div>
+    <h1>${title}</h1>
+    <p class="message">${message}</p>
+    ${decisionLabel ? `<div class="decision-badge">${decisionLabel}</div>` : ""}
+    <p class="footer">Powered by <a href="https://evalent.io">Evalent</a><br>You can close this window now.</p>
   </div>
 </body>
 </html>`;
+
+  return new NextResponse(html, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
 }
