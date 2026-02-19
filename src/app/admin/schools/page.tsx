@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Card,
@@ -5,24 +8,53 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Plus, School, ExternalLink } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  School,
+  Plus,
+  Users,
+  FileText,
+  Globe,
+} from "lucide-react";
 
-// Placeholder — will be replaced with Supabase query
-const schools: any[] = [];
+interface SchoolData {
+  id: string;
+  name: string;
+  slug: string;
+  curriculum: string;
+  locale: string;
+  contact_email: string;
+  is_active: boolean;
+  student_count: number;
+  submission_count: number;
+  user_count: number;
+  created_at: string;
+}
 
 export default function SchoolsPage() {
+  const [schools, setSchools] = useState<SchoolData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/admin/schools")
+      .then((r) => r.json())
+      .then((data) => {
+        setSchools(Array.isArray(data) ? data : []);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900">
             Schools
           </h1>
           <p className="mt-1 text-gray-500">
-            Manage schools using the Evalent platform.
+            Manage schools and their configurations.
           </p>
         </div>
         <Link href="/admin/schools/new">
@@ -33,22 +65,22 @@ export default function SchoolsPage() {
         </Link>
       </div>
 
-      {/* School List */}
-      {schools.length === 0 ? (
+      {loading ? (
+        <div className="flex items-center justify-center py-20">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-evalent-600 border-t-transparent" />
+        </div>
+      ) : schools.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <School className="h-16 w-16 text-gray-300" />
-            <h3 className="mt-4 text-lg font-semibold text-gray-900">
-              No schools yet
-            </h3>
-            <p className="mt-2 max-w-sm text-center text-sm text-gray-500">
-              Add your first school to start configuring admissions assessments
-              and generating reports.
+            <School className="h-12 w-12 text-gray-300" />
+            <p className="mt-3 text-sm text-gray-500">No schools yet</p>
+            <p className="mt-1 text-xs text-gray-400">
+              Add your first school to get started
             </p>
-            <Link href="/admin/schools/new" className="mt-6">
-              <Button>
+            <Link href="/admin/schools/new" className="mt-4">
+              <Button size="sm">
                 <Plus className="mr-2 h-4 w-4" />
-                Add First School
+                Add School
               </Button>
             </Link>
           </CardContent>
@@ -56,27 +88,47 @@ export default function SchoolsPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {schools.map((school) => (
-            <Link key={school.id} href={`/admin/schools/${school.id}`}>
-              <Card className="cursor-pointer transition-shadow hover:shadow-md">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
+            <Card key={school.id} className="transition-shadow hover:shadow-md">
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between">
+                  <div>
                     <CardTitle className="text-base">{school.name}</CardTitle>
-                    <Badge
-                      variant={school.is_active ? "success" : "secondary"}
-                    >
-                      {school.is_active ? "Active" : "Suspended"}
-                    </Badge>
+                    <p className="mt-0.5 text-xs text-gray-400">{school.slug}</p>
                   </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2 text-sm text-gray-500">
-                    <p>Curriculum: {school.curriculum}</p>
-                    <p>Contact: {school.contact_email}</p>
-                    <p>Students: {school._count?.students || 0}</p>
+                  <Badge
+                    variant={school.is_active ? "success" : "secondary"}
+                  >
+                    {school.is_active ? "Active" : "Inactive"}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-4 text-sm text-gray-600">
+                    <div className="flex items-center gap-1.5">
+                      <Globe className="h-3.5 w-3.5 text-gray-400" />
+                      {school.curriculum}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <Users className="h-3.5 w-3.5 text-gray-400" />
+                      {school.student_count} students
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <FileText className="h-3.5 w-3.5 text-gray-400" />
+                      {school.submission_count} reports
+                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            </Link>
+                  <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+                    <p className="text-xs text-gray-400 flex-1">
+                      {school.user_count} admin{school.user_count !== 1 ? "s" : ""}
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      {school.contact_email}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           ))}
         </div>
       )}

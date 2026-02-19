@@ -5,29 +5,19 @@ import { useRouter } from "next/navigation";
 import {
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
-  CardDescription,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import Link from "next/link";
-
-const JOTFORM_IDS: Record<number, string> = {
-  3: "260320999939472",
-  4: "260471223169050",
-  5: "260473002939456",
-  6: "260471812050447",
-  7: "260471812050447",
-  8: "260483151046047",
-  9: "260483906227461",
-  10: "260484588498478",
-};
 
 export default function NewSchoolPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
   const [form, setForm] = useState({
     name: "",
     slug: "",
@@ -35,277 +25,254 @@ export default function NewSchoolPage() {
     locale: "en-GB",
     contact_email: "",
     timezone: "UTC",
-    // Grade configs — default thresholds
-    grades: [3, 4, 5, 6, 7, 8, 9, 10].map((g) => ({
-      grade: g,
-      enabled: true,
-      assessor_email: "",
-      english_threshold: 55,
-      maths_threshold: 55,
-      reasoning_threshold: 55,
-    })),
+    admin_name: "",
+    admin_email: "",
+    admin_password: "",
+    grades: [3, 4, 5, 6, 7, 8, 9, 10] as number[],
   });
 
-  const updateField = (field: string, value: string) => {
-    setForm((prev) => {
-      const updated = { ...prev, [field]: value };
-      // Auto-generate slug from name
-      if (field === "name") {
-        updated.slug = value
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+
+    // Auto-generate slug from name
+    if (name === "name") {
+      setForm((prev) => ({
+        ...prev,
+        slug: value
           .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-")
-          .replace(/^-|-$/g, "");
-      }
-      return updated;
-    });
+          .replace(/[^a-z0-9\s-]/g, "")
+          .replace(/\s+/g, "-")
+          .substring(0, 30),
+      }));
+    }
+  };
+
+  const toggleGrade = (grade: number) => {
+    setForm((prev) => ({
+      ...prev,
+      grades: prev.grades.includes(grade)
+        ? prev.grades.filter((g) => g !== grade)
+        : [...prev.grades, grade].sort(),
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setSaving(true);
+    setError("");
 
     try {
-      const res = await fetch("/api/schools", {
+      const res = await fetch("/api/admin/schools", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
 
-      if (res.ok) {
-        const { id } = await res.json();
-        router.push(`/admin/schools/${id}`);
-      } else {
-        const error = await res.json();
-        alert(error.message || "Failed to create school");
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to create school");
       }
-    } catch (err) {
-      alert("Network error — please try again");
-    } finally {
-      setLoading(false);
+
+      router.push("/admin/schools");
+    } catch (err: any) {
+      setError(err.message);
+      setSaving(false);
     }
   };
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center gap-4">
-        <Link
-          href="/admin/schools"
-          className="flex h-10 w-10 items-center justify-center rounded-lg border border-gray-200 text-gray-500 transition-colors hover:bg-gray-50"
-        >
-          <ArrowLeft className="h-5 w-5" />
+        <Link href="/admin/schools">
+          <Button variant="ghost" size="sm">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back
+          </Button>
         </Link>
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900">
             Add School
           </h1>
           <p className="mt-1 text-gray-500">
-            Onboard a new school to the Evalent platform.
+            Create a new school and its admin account.
           </p>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6 max-w-2xl">
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
         {/* School Details */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">School Details</CardTitle>
-            <CardDescription>
-              Basic information about the school.
-            </CardDescription>
+            <CardDescription>Basic school information</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                  School Name
-                </label>
-                <Input
-                  required
-                  value={form.name}
-                  onChange={(e) => updateField("name", e.target.value)}
-                  placeholder="e.g. Dubai International Academy"
-                />
-              </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                  Slug
-                </label>
-                <Input
-                  required
-                  value={form.slug}
-                  onChange={(e) => updateField("slug", e.target.value)}
-                  placeholder="auto-generated"
-                />
-              </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                School Name *
+              </label>
+              <input
+                name="name"
+                value={form.name}
+                onChange={handleChange}
+                required
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-evalent-500 focus:outline-none focus:ring-1 focus:ring-evalent-500"
+                placeholder="e.g. Dubai International Academy"
+              />
             </div>
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Slug
+              </label>
+              <input
+                name="slug"
+                value={form.slug}
+                onChange={handleChange}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-evalent-500 focus:outline-none focus:ring-1 focus:ring-evalent-500"
+                placeholder="auto-generated"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                  Curriculum
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Curriculum *
                 </label>
                 <select
-                  className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-evalent-500"
+                  name="curriculum"
                   value={form.curriculum}
-                  onChange={(e) => updateField("curriculum", e.target.value)}
+                  onChange={handleChange}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-evalent-500 focus:outline-none focus:ring-1 focus:ring-evalent-500"
                 >
                   <option value="IB">IB</option>
-                  <option value="UK">British</option>
-                  <option value="US">American</option>
+                  <option value="UK">UK (National Curriculum)</option>
+                  <option value="US">US (Common Core)</option>
                 </select>
               </div>
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Locale
                 </label>
                 <select
-                  className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-evalent-500"
+                  name="locale"
                   value={form.locale}
-                  onChange={(e) => updateField("locale", e.target.value)}
+                  onChange={handleChange}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-evalent-500 focus:outline-none focus:ring-1 focus:ring-evalent-500"
                 >
-                  <option value="en-GB">English (UK)</option>
-                  <option value="en-US">English (US)</option>
+                  <option value="en-GB">British English (en-GB)</option>
+                  <option value="en-US">American English (en-US)</option>
                 </select>
               </div>
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                  Contact Email
-                </label>
-                <Input
-                  type="email"
-                  required
-                  value={form.contact_email}
-                  onChange={(e) =>
-                    updateField("contact_email", e.target.value)
-                  }
-                  placeholder="admissions@school.edu"
-                />
-              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Contact Email *
+              </label>
+              <input
+                name="contact_email"
+                type="email"
+                value={form.contact_email}
+                onChange={handleChange}
+                required
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-evalent-500 focus:outline-none focus:ring-1 focus:ring-evalent-500"
+                placeholder="admissions@school.edu"
+              />
             </div>
           </CardContent>
         </Card>
 
-        {/* Grade Configuration */}
+        {/* Grade Selection */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Grade Configuration</CardTitle>
+            <CardTitle className="text-lg">Active Grades</CardTitle>
             <CardDescription>
-              Default thresholds per grade. These can be adjusted later by the
-              School Admin.
+              Select which grades this school will assess
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="py-3 pr-4 text-left font-medium text-gray-500">
-                      Grade
-                    </th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500">
-                      Form ID
-                    </th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500">
-                      English %
-                    </th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500">
-                      Maths %
-                    </th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500">
-                      Reasoning %
-                    </th>
-                    <th className="px-4 py-3 text-left font-medium text-gray-500">
-                      Assessor Email
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {form.grades.map((gc, idx) => (
-                    <tr
-                      key={gc.grade}
-                      className="border-b border-gray-100"
-                    >
-                      <td className="py-3 pr-4 font-medium text-gray-900">
-                        G{gc.grade}
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs text-gray-400">
-                        {JOTFORM_IDS[gc.grade]}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Input
-                          type="number"
-                          min={0}
-                          max={100}
-                          className="w-20"
-                          value={gc.english_threshold}
-                          onChange={(e) => {
-                            const grades = [...form.grades];
-                            grades[idx].english_threshold = Number(
-                              e.target.value
-                            );
-                            setForm((prev) => ({ ...prev, grades }));
-                          }}
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <Input
-                          type="number"
-                          min={0}
-                          max={100}
-                          className="w-20"
-                          value={gc.maths_threshold}
-                          onChange={(e) => {
-                            const grades = [...form.grades];
-                            grades[idx].maths_threshold = Number(
-                              e.target.value
-                            );
-                            setForm((prev) => ({ ...prev, grades }));
-                          }}
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <Input
-                          type="number"
-                          min={0}
-                          max={100}
-                          className="w-20"
-                          value={gc.reasoning_threshold}
-                          onChange={(e) => {
-                            const grades = [...form.grades];
-                            grades[idx].reasoning_threshold = Number(
-                              e.target.value
-                            );
-                            setForm((prev) => ({ ...prev, grades }));
-                          }}
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <Input
-                          type="email"
-                          className="w-48"
-                          placeholder="assessor@school.edu"
-                          value={gc.assessor_email}
-                          onChange={(e) => {
-                            const grades = [...form.grades];
-                            grades[idx].assessor_email = e.target.value;
-                            setForm((prev) => ({ ...prev, grades }));
-                          }}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="flex flex-wrap gap-2">
+              {[3, 4, 5, 6, 7, 8, 9, 10].map((grade) => (
+                <button
+                  key={grade}
+                  type="button"
+                  onClick={() => toggleGrade(grade)}
+                  className={`rounded-lg border px-4 py-2 text-sm font-medium transition-colors ${
+                    form.grades.includes(grade)
+                      ? "border-evalent-500 bg-evalent-50 text-evalent-700"
+                      : "border-gray-200 bg-white text-gray-500 hover:border-gray-300"
+                  }`}
+                >
+                  Grade {grade}
+                </button>
+              ))}
             </div>
           </CardContent>
         </Card>
 
-        {/* Submit */}
+        {/* School Admin Account */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">School Admin Account</CardTitle>
+            <CardDescription>
+              Create a login for the school administrator
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Admin Name
+              </label>
+              <input
+                name="admin_name"
+                value={form.admin_name}
+                onChange={handleChange}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-evalent-500 focus:outline-none focus:ring-1 focus:ring-evalent-500"
+                placeholder="e.g. Sarah Johnson"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Admin Email
+              </label>
+              <input
+                name="admin_email"
+                type="email"
+                value={form.admin_email}
+                onChange={handleChange}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-evalent-500 focus:outline-none focus:ring-1 focus:ring-evalent-500"
+                placeholder="admin@school.edu"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Password
+              </label>
+              <input
+                name="admin_password"
+                type="password"
+                value={form.admin_password}
+                onChange={handleChange}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-evalent-500 focus:outline-none focus:ring-1 focus:ring-evalent-500"
+                placeholder="Min 8 characters"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="flex justify-end gap-3">
           <Link href="/admin/schools">
             <Button variant="outline">Cancel</Button>
           </Link>
-          <Button type="submit" loading={loading}>
+          <Button type="submit" disabled={saving}>
+            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Create School
           </Button>
         </div>

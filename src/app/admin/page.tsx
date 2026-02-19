@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import {
   Card,
   CardContent,
@@ -10,111 +13,119 @@ import {
   School,
   Users,
   FileText,
-  Activity,
-  CheckCircle2,
   Clock,
+  CheckCircle2,
   AlertTriangle,
 } from "lucide-react";
 
-// In production these come from Supabase — using placeholder data for now
-const stats = [
-  {
-    label: "Active Schools",
-    value: "0",
-    change: "—",
-    icon: School,
-    color: "text-blue-600",
-    bg: "bg-blue-50",
-  },
-  {
-    label: "Total Students",
-    value: "0",
-    change: "—",
-    icon: Users,
-    color: "text-evalent-600",
-    bg: "bg-evalent-50",
-  },
-  {
-    label: "Reports Generated",
-    value: "0",
-    change: "—",
-    icon: FileText,
-    color: "text-violet-600",
-    bg: "bg-violet-50",
-  },
-  {
-    label: "Pending Decisions",
-    value: "0",
-    change: "—",
-    icon: Clock,
-    color: "text-amber-600",
-    bg: "bg-amber-50",
-  },
-];
+interface PlatformStats {
+  schools: number;
+  students: number;
+  submissions: number;
+  decisions: number;
+  recentSubmissions: Array<{
+    id: string;
+    student_name: string;
+    grade: number;
+    processing_status: string;
+    created_at: string;
+  }>;
+  services: Array<{ name: string; status: string }>;
+}
 
 export default function AdminDashboard() {
+  const [stats, setStats] = useState<PlatformStats | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/admin/dashboard")
+      .then((r) => r.json())
+      .then((d) => {
+        setStats(d);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-evalent-600 border-t-transparent" />
+      </div>
+    );
+  }
+
+  const statCards = [
+    { label: "Active Schools", value: stats?.schools ?? 0, icon: School, color: "text-blue-600", bg: "bg-blue-50" },
+    { label: "Total Students", value: stats?.students ?? 0, icon: Users, color: "text-evalent-600", bg: "bg-evalent-50" },
+    { label: "Reports Generated", value: stats?.submissions ?? 0, icon: FileText, color: "text-violet-600", bg: "bg-violet-50" },
+    { label: "Decisions Made", value: stats?.decisions ?? 0, icon: CheckCircle2, color: "text-green-600", bg: "bg-green-50" },
+  ];
+
+  const services = stats?.services || [
+    { name: "Supabase Database", status: "configured" },
+    { name: "Jotform API", status: "configured" },
+    { name: "Claude API (Sonnet)", status: "configured" },
+    { name: "Resend Email", status: "configured" },
+    { name: "Vimeo", status: "configured" },
+  ];
+
   return (
     <div className="space-y-8">
-      {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">
-          Dashboard
-        </h1>
-        <p className="mt-1 text-gray-500">
-          Evalent platform overview and system health.
-        </p>
+        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Dashboard</h1>
+        <p className="mt-1 text-gray-500">Evalent platform overview and system health.</p>
       </div>
 
-      {/* Stats Grid */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats.map((stat) => (
+        {statCards.map((stat) => (
           <Card key={stat.label}>
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500">
-                    {stat.label}
-                  </p>
-                  <p className="mt-1 text-3xl font-bold text-gray-900">
-                    {stat.value}
-                  </p>
+                  <p className="text-sm font-medium text-gray-500">{stat.label}</p>
+                  <p className="mt-1 text-3xl font-bold text-gray-900">{stat.value}</p>
                 </div>
-                <div
-                  className={`flex h-12 w-12 items-center justify-center rounded-lg ${stat.bg}`}
-                >
+                <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${stat.bg}`}>
                   <stat.icon className={`h-6 w-6 ${stat.color}`} />
                 </div>
               </div>
-              <p className="mt-2 text-xs text-gray-400">{stat.change}</p>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* Recent Activity + System Status */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Recent Reports */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Recent Reports</CardTitle>
-            <CardDescription>
-              Latest generated admissions reports
-            </CardDescription>
+            <CardTitle className="text-lg">Recent Submissions</CardTitle>
+            <CardDescription>Latest assessment submissions</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col items-center justify-center py-12 text-center">
-              <FileText className="h-12 w-12 text-gray-300" />
-              <p className="mt-3 text-sm text-gray-500">
-                No reports generated yet
-              </p>
-              <p className="mt-1 text-xs text-gray-400">
-                Reports will appear here once schools begin assessments
-              </p>
-            </div>
+            {stats?.recentSubmissions?.length ? (
+              <div className="space-y-3">
+                {stats.recentSubmissions.map((sub) => (
+                  <div key={sub.id} className="flex items-center justify-between rounded-lg border border-gray-100 px-4 py-3">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">{sub.student_name}</p>
+                      <p className="text-xs text-gray-400">Grade {sub.grade}</p>
+                    </div>
+                    <Badge variant={sub.processing_status === "complete" ? "success" : "secondary"}>
+                      {sub.processing_status}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <FileText className="h-12 w-12 text-gray-300" />
+                <p className="mt-3 text-sm text-gray-500">No submissions yet</p>
+                <p className="mt-1 text-xs text-gray-400">Submissions will appear here once students begin assessments</p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* System Health */}
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">System Status</CardTitle>
@@ -122,36 +133,13 @@ export default function AdminDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {[
-                { name: "Supabase Database", status: "configured" },
-                { name: "Jotform API", status: "configured" },
-                { name: "Claude API (Sonnet)", status: "configured" },
-                { name: "Resend Email", status: "configured" },
-                { name: "Vimeo", status: "configured" },
-              ].map((service) => (
-                <div
-                  key={service.name}
-                  className="flex items-center justify-between rounded-lg border border-gray-100 px-4 py-3"
-                >
-                  <span className="text-sm font-medium text-gray-700">
-                    {service.name}
-                  </span>
-                  {service.status === "configured" ? (
-                    <Badge variant="success">
-                      <CheckCircle2 className="mr-1 h-3 w-3" />
-                      Connected
-                    </Badge>
-                  ) : service.status === "awaiting_key" ? (
-                    <Badge variant="warning">
-                      <Clock className="mr-1 h-3 w-3" />
-                      Awaiting Key
-                    </Badge>
-                  ) : (
-                    <Badge variant="secondary">
-                      <AlertTriangle className="mr-1 h-3 w-3" />
-                      Setup Required
-                    </Badge>
-                  )}
+              {services.map((service) => (
+                <div key={service.name} className="flex items-center justify-between rounded-lg border border-gray-100 px-4 py-3">
+                  <span className="text-sm font-medium text-gray-700">{service.name}</span>
+                  <Badge variant="success">
+                    <CheckCircle2 className="mr-1 h-3 w-3" />
+                    Connected
+                  </Badge>
                 </div>
               ))}
             </div>
@@ -159,43 +147,29 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      {/* Pipeline Monitor */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Processing Pipeline</CardTitle>
-          <CardDescription>
-            Real-time status of assessment processing
-          </CardDescription>
+          <CardDescription>Real-time status of assessment processing</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
             <div className="flex items-center gap-3">
-              {[
-                "Submitted",
-                "Scoring",
-                "AI Eval",
-                "PDF Gen",
-                "Email",
-                "Complete",
-              ].map((step, i) => (
+              {["Submitted", "Scoring", "AI Eval", "PDF Gen", "Email", "Complete"].map((step, i) => (
                 <div key={step} className="flex items-center gap-3">
                   <div className="flex flex-col items-center">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full border-2 border-gray-200 text-xs font-medium text-gray-400">
                       {i + 1}
                     </div>
-                    <span className="mt-1.5 text-xs text-gray-400">
-                      {step}
-                    </span>
+                    <span className="mt-1.5 text-xs text-gray-400">{step}</span>
                   </div>
-                  {i < 5 && (
-                    <div className="h-0.5 w-8 bg-gray-200" />
-                  )}
+                  {i < 5 && <div className="h-0.5 w-8 bg-gray-200" />}
                 </div>
               ))}
             </div>
           </div>
           <p className="text-center text-sm text-gray-400">
-            No submissions in pipeline
+            {stats?.submissions ? `${stats.submissions} submissions processed` : "No submissions in pipeline"}
           </p>
         </CardContent>
       </Card>
