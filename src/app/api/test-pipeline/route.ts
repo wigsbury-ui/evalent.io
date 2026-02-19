@@ -101,6 +101,7 @@ export async function POST(req: NextRequest) {
           first_name: "Neil",
           last_name: "Tomalin",
           grade_applied: 10,
+          registered_by: schoolId,
         })
         .select("id")
         .single();
@@ -268,7 +269,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error("[TEST] Error:", err);
     return NextResponse.json(
-      { error: "Test failed", details: String(err) },
+      { error: "Test failed", details: err instanceof Error ? err.message : JSON.stringify(err) },
       { status: 500 }
     );
   }
