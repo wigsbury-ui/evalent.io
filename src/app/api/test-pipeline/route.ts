@@ -101,7 +101,6 @@ export async function POST(req: NextRequest) {
           first_name: "Neil",
           last_name: "Tomalin",
           grade_applied: 10,
-          registered_by: "test-pipeline",
         })
         .select("id")
         .single();
