@@ -1,17 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
-import type { AnswerKey, DomainType } from "@/types";
+import {
+  scoreMCQs,
+  evaluateWriting,
+  generateNarrative,
+  generateReasoningNarrativePrompt,
+  generateMindsetNarrativePrompt,
+  calculateRecommendation,
+  extractWritingResponses,
+} from "@/lib/scoring";
+import type { WritingTask } from "@/lib/scoring";
 
 /**
- * Scoring Engine
- *
- * Pipeline step 2: Score MCQ responses against answer keys,
- * then trigger AI evaluation for writing tasks.
+ * Scoring Pipeline API
  *
  * POST /api/score
  * Body: { submission_id: string }
+ *
+ * Pipeline:
+ *   1. Fetch submission + raw answers from Supabase
+ *   2. Fetch answer keys for the grade
+ *   3. Score MCQs (deterministic)
+ *   4. Extract writing responses
+ *   5. AI-evaluate each writing task (Claude API)
+ *   6. Generate reasoning + mindset narratives (Claude API)
+ *   7. Calculate recommendation band
+ *   8. Update submission with all scores + narratives
  */
 export async function POST(req: NextRequest) {
+  const startTime = Date.now();
+
   try {
     const { submission_id } = await req.json();
     if (!submission_id) {
@@ -23,7 +41,7 @@ export async function POST(req: NextRequest) {
 
     const supabase = createServerClient();
 
-    // --- 1. Fetch submission + raw answers ---
+    // ─── 1. Fetch submission ───────────────────────────────────────
     const { data: submission, error: subError } = await supabase
       .from("submissions")
       .select("*")
@@ -37,181 +55,276 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Update status to scoring
+    // Update status
     await supabase
       .from("submissions")
       .update({ processing_status: "scoring" })
       .eq("id", submission_id);
 
-    // --- 2. Fetch answer keys for this grade ---
+    console.log(
+      `[SCORING] Starting pipeline for submission ${submission_id} (grade ${submission.grade})`
+    );
+
+    // ─── 2. Fetch answer keys ──────────────────────────────────────
     const { data: answerKeys, error: keyError } = await supabase
       .from("answer_keys")
       .select("*")
       .eq("grade", submission.grade)
-      .eq("question_type", "MCQ")
       .order("question_number");
 
     if (keyError) throw keyError;
+    if (!answerKeys || answerKeys.length === 0) {
+      throw new Error(`No answer keys found for grade ${submission.grade}`);
+    }
 
-    // --- 3. Score MCQs by domain ---
-    const rawAnswers = submission.raw_answers as Record<string, any>;
-    const studentAnswers = extractStudentAnswers(rawAnswers);
-
-    const domainScores = scoreMCQs(studentAnswers, answerKeys || []);
-
-    // --- 4. Extract writing responses ---
-    const writingResponses = extractWritingResponses(
-      rawAnswers,
-      answerKeys || []
+    console.log(
+      `[SCORING] Found ${answerKeys.length} answer keys for grade ${submission.grade}`
     );
 
-    // --- 5. Update submission with MCQ scores ---
-    const updateData: Record<string, any> = {
-      english_mcq_score: domainScores.english?.correct || 0,
-      english_mcq_total: domainScores.english?.total || 0,
-      english_mcq_pct: domainScores.english?.pct || 0,
-      maths_mcq_score: domainScores.mathematics?.correct || 0,
-      maths_mcq_total: domainScores.mathematics?.total || 0,
-      maths_mcq_pct: domainScores.mathematics?.pct || 0,
-      reasoning_score: domainScores.reasoning?.correct || 0,
-      reasoning_total: domainScores.reasoning?.total || 0,
-      reasoning_pct: domainScores.reasoning?.pct || 0,
-      mindset_score: domainScores.mindset?.score || 0,
-      // Writing responses stored for AI evaluation
-      english_writing_response: writingResponses.english || null,
-      maths_writing_response: writingResponses.mathematics || null,
-      values_writing_response: writingResponses.values || null,
-      creativity_writing_response: writingResponses.creativity || null,
-      processing_status: "ai_evaluation",
-    };
+    // ─── 3. Score MCQs ────────────────────────────────────────────
+    const rawAnswers = submission.raw_answers as Record<string, any>;
+    const mcqResults = scoreMCQs(rawAnswers, answerKeys);
 
+    console.log(`[SCORING] MCQ scores:`, {
+      english: `${mcqResults.english.correct}/${mcqResults.english.total} (${mcqResults.english.pct}%)`,
+      maths: `${mcqResults.mathematics.correct}/${mcqResults.mathematics.total} (${mcqResults.mathematics.pct}%)`,
+      reasoning: `${mcqResults.reasoning.correct}/${mcqResults.reasoning.total} (${mcqResults.reasoning.pct}%)`,
+      mindset: `${mcqResults.mindset.correct}/${mcqResults.mindset.total} (score: ${mcqResults.mindset.score})`,
+    });
+
+    // ─── 4. Extract writing responses ──────────────────────────────
+    const writingResponses = extractWritingResponses(rawAnswers, answerKeys);
+
+    console.log(
+      `[SCORING] Found ${writingResponses.length} writing responses:`,
+      writingResponses.map((w) => w.domain)
+    );
+
+    // ─── 5. Update with MCQ scores, set status to AI evaluation ───
     await supabase
       .from("submissions")
-      .update(updateData)
+      .update({
+        english_mcq_score: mcqResults.english.correct,
+        english_mcq_total: mcqResults.english.total,
+        english_mcq_pct: mcqResults.english.pct,
+        maths_mcq_score: mcqResults.mathematics.correct,
+        maths_mcq_total: mcqResults.mathematics.total,
+        maths_mcq_pct: mcqResults.mathematics.pct,
+        reasoning_score: mcqResults.reasoning.correct,
+        reasoning_total: mcqResults.reasoning.total,
+        reasoning_pct: mcqResults.reasoning.pct,
+        mindset_score: mcqResults.mindset.score || 0,
+        processing_status: "ai_evaluation",
+      })
       .eq("id", submission_id);
 
-    // --- 6. Trigger AI evaluation for writing tasks ---
-    // This will call the Claude API (requires ANTHROPIC_API_KEY)
-    // TODO: Implement in Phase 2
-    console.log(
-      `[SCORING] MCQ scoring complete for ${submission_id}. Triggering AI evaluation...`
+    // ─── 6. AI Writing Evaluation ─────────────────────────────────
+    const locale = "en-GB"; // Default; would come from school config
+    const grade = submission.grade;
+
+    const writingEvals: Record<string, any> = {};
+
+    for (const wr of writingResponses) {
+      const task: WritingTask = {
+        domain: wr.domain,
+        prompt_text: wr.prompt_text,
+        student_response: wr.student_response,
+        grade,
+        locale: locale as "en-GB" | "en-US",
+      };
+
+      console.log(`[SCORING] Evaluating ${wr.domain} writing...`);
+      const evaluation = await evaluateWriting(task);
+      writingEvals[wr.domain] = evaluation;
+
+      console.log(
+        `[SCORING] ${wr.domain} writing: ${evaluation.band} (${evaluation.score}/4)`
+      );
+    }
+
+    // ─── 7. Generate reasoning + mindset narratives ───────────────
+    let englishThreshold = 55;
+    let mathsThreshold = 55;
+    let reasoningThreshold = 55;
+
+    if (submission.school_id) {
+      const { data: gradeConfig } = await supabase
+        .from("grade_configs")
+        .select("*")
+        .eq("school_id", submission.school_id)
+        .eq("grade", grade)
+        .single();
+
+      if (gradeConfig) {
+        englishThreshold = gradeConfig.english_threshold || 55;
+        mathsThreshold = gradeConfig.maths_threshold || 55;
+        reasoningThreshold = gradeConfig.reasoning_threshold || 55;
+      }
+    }
+
+    console.log(`[SCORING] Generating reasoning narrative...`);
+    const reasoningPrompt = generateReasoningNarrativePrompt(
+      mcqResults.reasoning.pct,
+      reasoningThreshold,
+      grade,
+      mcqResults.reasoning.correct,
+      mcqResults.reasoning.total,
+      locale
     );
+    const reasoningNarrative = await generateNarrative(
+      reasoningPrompt.system,
+      reasoningPrompt.user
+    );
+
+    console.log(`[SCORING] Generating mindset narrative...`);
+    const mindsetPrompt = generateMindsetNarrativePrompt(
+      mcqResults.mindset.score || 0,
+      grade,
+      locale
+    );
+    const mindsetNarrative = await generateNarrative(
+      mindsetPrompt.system,
+      mindsetPrompt.user
+    );
+
+    // ─── 8. Calculate recommendation band ─────────────────────────
+    const recommendation = calculateRecommendation({
+      english_mcq_pct: mcqResults.english.pct,
+      english_writing_score: writingEvals.english?.score ?? null,
+      maths_mcq_pct: mcqResults.mathematics.pct,
+      maths_writing_score: writingEvals.mathematics?.score ?? null,
+      reasoning_pct: mcqResults.reasoning.pct,
+      mindset_score: mcqResults.mindset.score || 0,
+      english_threshold: englishThreshold,
+      maths_threshold: mathsThreshold,
+      reasoning_threshold: reasoningThreshold,
+    });
+
+    console.log(
+      `[SCORING] Recommendation: ${recommendation.recommendation_band} (overall: ${recommendation.overall_academic_pct}%)`
+    );
+
+    // ─── 9. Save all results ──────────────────────────────────────
+    const updatePayload: Record<string, any> = {
+      english_mcq_score: mcqResults.english.correct,
+      english_mcq_total: mcqResults.english.total,
+      english_mcq_pct: mcqResults.english.pct,
+      maths_mcq_score: mcqResults.mathematics.correct,
+      maths_mcq_total: mcqResults.mathematics.total,
+      maths_mcq_pct: mcqResults.mathematics.pct,
+      reasoning_score: mcqResults.reasoning.correct,
+      reasoning_total: mcqResults.reasoning.total,
+      reasoning_pct: mcqResults.reasoning.pct,
+      mindset_score: mcqResults.mindset.score || 0,
+
+      english_writing_response:
+        writingResponses.find((w) => w.domain === "english")?.student_response || null,
+      maths_writing_response:
+        writingResponses.find((w) => w.domain === "mathematics")?.student_response || null,
+      values_writing_response:
+        writingResponses.find((w) => w.domain === "values")?.student_response || null,
+      creativity_writing_response:
+        writingResponses.find((w) => w.domain === "creativity")?.student_response || null,
+
+      english_writing_band: writingEvals.english?.band || null,
+      english_writing_score: writingEvals.english?.score ?? null,
+      english_writing_narrative: writingEvals.english
+        ? `${writingEvals.english.content_narrative} ${writingEvals.english.writing_narrative}`
+        : null,
+      english_combined: recommendation.english.combined_pct,
+
+      maths_writing_band: writingEvals.mathematics?.band || null,
+      maths_writing_score: writingEvals.mathematics?.score ?? null,
+      maths_writing_narrative: writingEvals.mathematics
+        ? `${writingEvals.mathematics.content_narrative} ${writingEvals.mathematics.writing_narrative}`
+        : null,
+      maths_combined: recommendation.mathematics.combined_pct,
+
+      reasoning_narrative: reasoningNarrative,
+      mindset_narrative: mindsetNarrative,
+
+      values_writing_band: writingEvals.values?.band || null,
+      values_writing_score: writingEvals.values?.score ?? null,
+      values_narrative: writingEvals.values
+        ? `${writingEvals.values.content_narrative} ${writingEvals.values.writing_narrative}`
+        : null,
+
+      creativity_writing_band: writingEvals.creativity?.band || null,
+      creativity_writing_score: writingEvals.creativity?.score ?? null,
+      creativity_narrative: writingEvals.creativity
+        ? `${writingEvals.creativity.content_narrative} ${writingEvals.creativity.writing_narrative}`
+        : null,
+
+      overall_academic_pct: recommendation.overall_academic_pct,
+      recommendation_band: recommendation.recommendation_band,
+
+      processing_status: "generating_report",
+    };
+
+    const { error: updateError } = await supabase
+      .from("submissions")
+      .update(updatePayload)
+      .eq("id", submission_id);
+
+    if (updateError) throw updateError;
+
+    if (submission.student_id) {
+      await supabase
+        .from("students")
+        .update({ status: "scored" })
+        .eq("id", submission.student_id);
+    }
+
+    const duration = Date.now() - startTime;
+    console.log(`[SCORING] Pipeline complete for ${submission_id} in ${duration}ms`);
 
     return NextResponse.json({
       message: "Scoring complete",
       submission_id,
-      scores: domainScores,
+      duration_ms: duration,
+      scores: {
+        english: {
+          mcq: `${mcqResults.english.correct}/${mcqResults.english.total} (${mcqResults.english.pct}%)`,
+          writing: writingEvals.english
+            ? `${writingEvals.english.band} (${writingEvals.english.score}/4)`
+            : "N/A",
+          combined: `${recommendation.english.combined_pct}%`,
+        },
+        mathematics: {
+          mcq: `${mcqResults.mathematics.correct}/${mcqResults.mathematics.total} (${mcqResults.mathematics.pct}%)`,
+          writing: writingEvals.mathematics
+            ? `${writingEvals.mathematics.band} (${writingEvals.mathematics.score}/4)`
+            : "N/A",
+          combined: `${recommendation.mathematics.combined_pct}%`,
+        },
+        reasoning: `${mcqResults.reasoning.correct}/${mcqResults.reasoning.total} (${mcqResults.reasoning.pct}%)`,
+        mindset: mcqResults.mindset.score,
+      },
+      recommendation: recommendation.recommendation_band,
+      overall_academic_pct: recommendation.overall_academic_pct,
     });
   } catch (err) {
-    console.error("[SCORING] Error:", err);
+    console.error("[SCORING] Pipeline error:", err);
+
+    try {
+      const body = await req.clone().json();
+      if (body?.submission_id) {
+        const supabase = createServerClient();
+        await supabase
+          .from("submissions")
+          .update({
+            processing_status: "error",
+            error_log: err instanceof Error ? err.message : String(err),
+          })
+          .eq("id", body.submission_id);
+      }
+    } catch {
+      // Ignore
+    }
+
     return NextResponse.json(
-      { error: "Scoring failed" },
+      { error: "Scoring pipeline failed", details: String(err) },
       { status: 500 }
     );
   }
-}
-
-/**
- * Extract student's MCQ answers from Jotform raw data.
- * Maps Jotform question IDs to answer letters (A, B, C, D).
- */
-function extractStudentAnswers(
-  raw: Record<string, any>
-): Map<number, string> {
-  const answers = new Map<number, string>();
-
-  // Jotform answers are keyed by question ID
-  // We need to map them to our sequential question numbers
-  // This mapping depends on the form structure
-  let questionIndex = 1;
-
-  for (const [qid, answer] of Object.entries(raw)) {
-    const ans = answer as any;
-    if (ans?.type === "control_radio" || ans?.type === "control_dropdown") {
-      const selected = ans?.answer || "";
-      // Extract the letter from the answer (e.g., "A) Some text" → "A")
-      const letterMatch = selected.match(/^([A-D])/i);
-      if (letterMatch) {
-        answers.set(questionIndex, letterMatch[1].toUpperCase());
-      }
-      questionIndex++;
-    }
-  }
-
-  return answers;
-}
-
-/**
- * Score MCQ answers against the answer key, grouped by domain.
- */
-function scoreMCQs(
-  studentAnswers: Map<number, string>,
-  answerKeys: AnswerKey[]
-): Record<string, { correct: number; total: number; pct: number; score?: number }> {
-  const domains: Record<
-    string,
-    { correct: number; total: number; pct: number }
-  > = {};
-
-  for (const key of answerKeys) {
-    const domain = key.domain;
-    if (!domains[domain]) {
-      domains[domain] = { correct: 0, total: 0, pct: 0 };
-    }
-
-    domains[domain].total++;
-
-    const studentAnswer = studentAnswers.get(key.question_number);
-    if (
-      studentAnswer &&
-      key.correct_answer &&
-      studentAnswer.toUpperCase() === key.correct_answer.toUpperCase()
-    ) {
-      domains[domain].correct++;
-    }
-  }
-
-  // Calculate percentages
-  for (const domain of Object.keys(domains)) {
-    const d = domains[domain];
-    d.pct = d.total > 0 ? Math.round((d.correct / d.total) * 1000) / 10 : 0;
-  }
-
-  return domains;
-}
-
-/**
- * Extract writing task responses from Jotform raw data.
- */
-function extractWritingResponses(
-  raw: Record<string, any>,
-  answerKeys: AnswerKey[]
-): Record<string, string> {
-  const responses: Record<string, string> = {};
-
-  for (const [qid, answer] of Object.entries(raw)) {
-    const ans = answer as any;
-    if (
-      ans?.type === "control_textarea" ||
-      ans?.type === "control_textbox"
-    ) {
-      const text = ans?.answer || "";
-      if (text.length > 50) {
-        // Long text responses are likely writing tasks
-        // We'll need to match these to domains based on question order
-        // For now, store by type
-        if (!responses.english && text.length > 50) {
-          responses.english = text;
-        } else if (!responses.mathematics) {
-          responses.mathematics = text;
-        } else if (!responses.values) {
-          responses.values = text;
-        } else if (!responses.creativity) {
-          responses.creativity = text;
-        }
-      }
-    }
-  }
-
-  return responses;
 }
