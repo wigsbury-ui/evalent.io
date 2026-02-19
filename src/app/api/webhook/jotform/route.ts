@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
 
     // Fallback: match by student_name + school + grade
     if (!student && prefilled.student_name && school_id) {
-      const nameParts = prefilled.student_name.trim().split(/\s+/);
+      const nameParts = String(prefilled.student_name).trim().split(/\s+/);
       const firstName = nameParts[0];
       const lastName = nameParts.slice(1).join(" ");
 
