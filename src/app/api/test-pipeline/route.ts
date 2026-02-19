@@ -82,7 +82,16 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Step 3: Ensure test student exists
+    // Step 3: Find an existing user for registered_by FK
+    const { data: anyUser } = await supabase
+      .from("users")
+      .select("id")
+      .limit(1)
+      .single();
+
+    const registeredBy = anyUser?.id || null;
+
+    // Step 4: Ensure test student exists
     let studentId: string;
     const { data: existingStudent } = await supabase
       .from("students")
@@ -101,7 +110,7 @@ export async function POST(req: NextRequest) {
           first_name: "Neil",
           last_name: "Tomalin",
           grade_applied: 10,
-          registered_by: schoolId,
+          registered_by: registeredBy,
         })
         .select("id")
         .single();
