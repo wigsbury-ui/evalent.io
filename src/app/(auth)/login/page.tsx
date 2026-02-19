@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const callbackUrl = searchParams.get("callbackUrl") || "/admin";
@@ -38,7 +38,6 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen">
-      {/* Left panel — branding */}
       <div className="hidden w-1/2 flex-col justify-between bg-gradient-to-br from-evalent-700 via-evalent-600 to-emerald-500 p-12 lg:flex">
         <div>
           <div className="flex items-center gap-3">
@@ -50,11 +49,7 @@ export default function LoginPage() {
         </div>
         <div className="space-y-4">
           <h1 className="text-4xl font-bold leading-tight text-white">
-            Admissions
-            <br />
-            Intelligence
-            <br />
-            Platform
+            Admissions<br />Intelligence<br />Platform
           </h1>
           <p className="max-w-md text-lg text-white/80">
             AI-powered assessment scoring, professional report generation, and
@@ -65,27 +60,20 @@ export default function LoginPage() {
           © {new Date().getFullYear()} Evalent. All rights reserved.
         </p>
       </div>
-
-      {/* Right panel — login form */}
       <div className="flex flex-1 items-center justify-center px-6 py-12">
         <div className="w-full max-w-md space-y-8">
-          {/* Mobile logo */}
           <div className="flex items-center gap-3 lg:hidden">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-evalent-600">
               <span className="text-xl font-bold text-white">E</span>
             </div>
-            <span className="text-xl font-semibold text-gray-900">
-              Evalent
-            </span>
+            <span className="text-xl font-semibold text-gray-900">Evalent</span>
           </div>
-
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Welcome back</h2>
             <p className="mt-2 text-sm text-gray-500">
               Sign in to your Evalent admin account
             </p>
           </div>
-
           <Card>
             <CardContent className="pt-6">
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -94,7 +82,6 @@ export default function LoginPage() {
                     {error}
                   </div>
                 )}
-
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-gray-700">
                     Email address
@@ -108,7 +95,6 @@ export default function LoginPage() {
                     placeholder="admin@school.edu"
                   />
                 </div>
-
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-gray-700">
                     Password
@@ -122,24 +108,25 @@ export default function LoginPage() {
                     placeholder="••••••••"
                   />
                 </div>
-
-                <Button
-                  type="submit"
-                  className="w-full"
-                  size="lg"
-                  loading={loading}
-                >
-                  Sign in
+                <Button type="submit" className="w-full" size="lg" disabled={loading}>
+                  {loading ? "Signing in..." : "Sign in"}
                 </Button>
               </form>
             </CardContent>
           </Card>
-
           <p className="text-center text-xs text-gray-400">
             Contact your platform administrator if you need access.
           </p>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Loading...</div>}>
+      <LoginForm />
+    </Suspense>
   );
 }
