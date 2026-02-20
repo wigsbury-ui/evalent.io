@@ -13,7 +13,6 @@ import {
   GraduationCap,
   Save,
   Check,
-  Mail,
   SlidersHorizontal,
   ChevronDown,
   ChevronRight,
@@ -296,7 +295,7 @@ export default function GradeConfigPage() {
             Assessment Thresholds
           </h1>
           <p className="mt-1 text-gray-500">
-            Configure pass thresholds and assessor emails for each grade.
+            Configure pass thresholds for each grade.
           </p>
         </div>
         <Card>
@@ -345,24 +344,6 @@ export default function GradeConfigPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Assessor email */}
-          <div>
-            <label className="mb-1.5 flex items-center gap-1.5 text-sm font-medium text-gray-700">
-              <Mail className="h-4 w-4" />
-              Default Assessor Email
-            </label>
-            <input
-              type="email"
-              value={globalAssessorEmail}
-              onChange={(e) => setGlobalAssessorEmail(e.target.value)}
-              placeholder="assessor@school.edu"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-evalent-500 focus:outline-none focus:ring-1 focus:ring-evalent-500"
-            />
-            <p className="mt-1 text-xs text-gray-400">
-              Reports will be emailed to this address when scoring completes.
-            </p>
-          </div>
-
           {/* Threshold sliders */}
           <div className="grid gap-6 sm:grid-cols-3">
             <ThresholdSlider
@@ -502,29 +483,6 @@ export default function GradeConfigPage() {
                 {/* Expanded detail panel */}
                 {isExpanded && (
                   <div className="border-t border-gray-100 px-4 pb-4 pt-3">
-                    {/* Assessor email for this grade */}
-                    <div className="mb-4">
-                      <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-gray-600">
-                        <Mail className="h-3.5 w-3.5" />
-                        Assessor Email
-                        {!isCustom && (
-                          <span className="text-gray-400 font-normal">
-                            (inherits global)
-                          </span>
-                        )}
-                      </label>
-                      <input
-                        type="email"
-                        value={isCustom ? overrides.email : globalAssessorEmail}
-                        onChange={(e) =>
-                          updateOverride(config.grade, "email", e.target.value)
-                        }
-                        disabled={!isCustom}
-                        placeholder={globalAssessorEmail || "assessor@school.edu"}
-                        className="w-full rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-evalent-500 focus:outline-none focus:ring-1 focus:ring-evalent-500 disabled:bg-gray-50 disabled:text-gray-400"
-                      />
-                    </div>
-
                     {/* Threshold sliders for this grade */}
                     <div className="grid gap-5 sm:grid-cols-3">
                       <ThresholdSlider

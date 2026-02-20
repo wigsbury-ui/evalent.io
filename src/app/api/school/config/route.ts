@@ -28,7 +28,15 @@ export async function PATCH(req: NextRequest) {
     );
   }
 
-  const { curriculum, grade_naming, locale, timezone } = body;
+  const {
+    curriculum,
+    grade_naming,
+    locale,
+    timezone,
+    default_assessor_email,
+    default_assessor_first_name,
+    default_assessor_last_name,
+  } = body;
 
   // Validate grade_naming
   if (grade_naming && !["grade", "year"].includes(grade_naming)) {
@@ -55,6 +63,12 @@ export async function PATCH(req: NextRequest) {
   if (grade_naming) updates.grade_naming = grade_naming;
   if (locale) updates.locale = locale;
   if (timezone) updates.timezone = timezone;
+  if (default_assessor_email !== undefined)
+    updates.default_assessor_email = default_assessor_email;
+  if (default_assessor_first_name !== undefined)
+    updates.default_assessor_first_name = default_assessor_first_name;
+  if (default_assessor_last_name !== undefined)
+    updates.default_assessor_last_name = default_assessor_last_name;
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json(

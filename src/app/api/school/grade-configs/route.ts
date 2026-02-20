@@ -48,6 +48,8 @@ export async function PATCH(req: NextRequest) {
     maths_threshold?: number;
     reasoning_threshold?: number;
     assessor_email?: string;
+    assessor_first_name?: string;
+    assessor_last_name?: string;
   }> = body.updates;
 
   if (!Array.isArray(updates) || updates.length === 0) {
@@ -85,6 +87,10 @@ export async function PATCH(req: NextRequest) {
       fields.reasoning_threshold = Math.min(100, Math.max(0, update.reasoning_threshold));
     if (update.assessor_email !== undefined)
       fields.assessor_email = update.assessor_email;
+    if (update.assessor_first_name !== undefined)
+      fields.assessor_first_name = update.assessor_first_name;
+    if (update.assessor_last_name !== undefined)
+      fields.assessor_last_name = update.assessor_last_name;
 
     const { data, error } = await supabase
       .from("grade_configs")

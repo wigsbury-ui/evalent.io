@@ -47,6 +47,7 @@ export async function GET(req: NextRequest) {
         )
         .eq("school_id", schoolId)
         .order("created_at", { ascending: false }),
+
       supabase
         .from("submissions")
         .select(
@@ -54,12 +55,16 @@ export async function GET(req: NextRequest) {
         )
         .eq("school_id", schoolId)
         .order("created_at", { ascending: false }),
+
       supabase
         .from("decisions")
         .select("id, submission_id, decision, decided_at"),
+
       supabase
         .from("schools")
-        .select("id, name, slug, curriculum, locale, contact_email, timezone, is_active, subscription_plan")
+        .select(
+          "id, name, slug, curriculum, locale, contact_email, timezone, is_active, subscription_plan, grade_naming, default_assessor_email, default_assessor_first_name, default_assessor_last_name"
+        )
         .eq("id", schoolId)
         .single(),
     ]);
@@ -87,14 +92,12 @@ export async function GET(req: NextRequest) {
   const pipeline = students.map((s) => {
     const sub = submissionByStudent[s.id];
     const dec = sub ? decisionBySub[sub.id] : null;
-
     let status = "registered";
     if (dec) status = "decided";
     else if (sub?.report_sent_at) status = "report_sent";
     else if (sub?.processing_status === "complete") status = "complete";
     else if (sub?.processing_status === "error") status = "error";
     else if (sub) status = sub.processing_status || "submitted";
-
     return {
       ...s,
       submission: sub || null,
@@ -113,7 +116,8 @@ export async function GET(req: NextRequest) {
     decisions_made: decisions.length,
     in_pipeline: submissions.filter(
       (s) =>
-        s.processing_status !== "complete" && s.processing_status !== "error"
+        s.processing_status !== "complete" &&
+        s.processing_status !== "error"
     ).length,
   };
 
