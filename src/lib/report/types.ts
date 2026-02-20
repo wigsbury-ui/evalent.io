@@ -1,8 +1,11 @@
 /**
- * Evalent Report Data Types
+ * Evalent Report Data Types — v3
  *
  * Defines the data structure passed to the PDF generator.
  * All data comes from the scored submission in Supabase.
+ *
+ * v3 additions: construct breakdowns, executive summary,
+ * strengths / development areas, radar chart data.
  */
 
 export interface ReportInput {
@@ -14,7 +17,7 @@ export interface ReportInput {
   student_name: string;
   student_ref: string;
   grade_applied: number;
-  programme?: string | null;   // e.g. "IB", "UK", "US" — used for grade label
+  programme?: string | null; // e.g. "IB", "UK", "US" — used for grade label
   test_date: string;
   report_date: string;
 
@@ -22,6 +25,13 @@ export interface ReportInput {
   overall_academic_pct: number;
   recommendation_band: string;
   recommendation_narrative?: string;
+
+  // ─── NEW: Executive summary (AI-generated, 2–3 sentences) ────
+  executive_summary?: string;
+
+  // ─── NEW: Strengths & Development areas ──────────────────────
+  strengths?: string[];
+  development_areas?: string[];
 
   // English
   english: DomainReport;
@@ -37,6 +47,7 @@ export interface ReportInput {
     threshold: number;
     delta: number;
     narrative: string;
+    construct_breakdown?: ConstructScore[];
   };
 
   // Mindset
@@ -64,6 +75,8 @@ export interface DomainReport {
   threshold: number;
   delta: number;
   comment: string;
+  // ─── NEW: construct-level MCQ breakdown ──────────────────────
+  construct_breakdown?: ConstructScore[];
 }
 
 export interface WritingLens {
@@ -71,4 +84,13 @@ export interface WritingLens {
   score: number;
   narrative: string;
   response: string;
+}
+
+// ─── NEW types ─────────────────────────────────────────────────
+
+export interface ConstructScore {
+  construct: string;
+  correct: number;
+  total: number;
+  pct: number;
 }
