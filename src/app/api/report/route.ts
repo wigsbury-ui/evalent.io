@@ -7,10 +7,10 @@ import type { ReportInput } from "@/lib/report";
  * Report Generation API
  *
  * GET /api/report?submission_id=xxx
- *   Returns the HTML report (can be printed to PDF in browser)
+ * Returns the HTML report (can be printed to PDF in browser)
  *
  * GET /api/report?submission_id=xxx&format=json
- *   Returns the report data as JSON
+ * Returns the report data as JSON
  */
 export async function GET(req: NextRequest) {
   try {
@@ -40,6 +40,16 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Extract programme from raw_answers metadata
+    let programme: string | null = null;
+    const rawAnswers = submission.raw_answers || {};
+    for (const k of Object.keys(rawAnswers)) {
+      if (k.includes("meta_programme")) {
+        programme = String(rawAnswers[k]);
+        break;
+      }
+    }
+
     // Fetch student
     let studentName = "Unknown Student";
     let studentRef = "";
@@ -49,10 +59,18 @@ export async function GET(req: NextRequest) {
         .select("first_name, last_name, student_ref")
         .eq("id", submission.student_id)
         .single();
-
       if (student) {
         studentName = `${student.first_name} ${student.last_name}`;
         studentRef = student.student_ref || "";
+      }
+    }
+
+    // Override student name from raw_answers if available
+    for (const k of Object.keys(rawAnswers)) {
+      if (k.includes("student_name")) {
+        const nameFromPayload = String(rawAnswers[k]).trim();
+        if (nameFromPayload) studentName = nameFromPayload;
+        break;
       }
     }
 
@@ -64,7 +82,6 @@ export async function GET(req: NextRequest) {
         .select("name")
         .eq("id", submission.school_id)
         .single();
-
       if (school) schoolName = school.name;
     }
 
@@ -72,7 +89,6 @@ export async function GET(req: NextRequest) {
     let englishThreshold = 55;
     let mathsThreshold = 55;
     let reasoningThreshold = 55;
-
     if (submission.school_id) {
       const { data: config } = await supabase
         .from("grade_configs")
@@ -80,7 +96,6 @@ export async function GET(req: NextRequest) {
         .eq("school_id", submission.school_id)
         .eq("grade", submission.grade)
         .single();
-
       if (config) {
         englishThreshold = config.english_threshold || 55;
         mathsThreshold = config.maths_threshold || 55;
@@ -94,6 +109,7 @@ export async function GET(req: NextRequest) {
       student_name: studentName,
       student_ref: studentRef,
       grade_applied: submission.grade || 10,
+      programme,
       test_date: formatDate(submission.submitted_at),
       report_date: formatDate(new Date().toISOString()),
       overall_academic_pct: submission.overall_academic_pct || 0,
@@ -108,9 +124,12 @@ export async function GET(req: NextRequest) {
         writing_score: submission.english_writing_score ?? null,
         writing_narrative: submission.english_writing_narrative || null,
         writing_response: submission.english_writing_response || null,
-        combined_pct: submission.english_combined || submission.english_mcq_pct || 0,
+        combined_pct:
+          submission.english_combined || submission.english_mcq_pct || 0,
         threshold: englishThreshold,
-        delta: (submission.english_combined || submission.english_mcq_pct || 0) - englishThreshold,
+        delta:
+          (submission.english_combined || submission.english_mcq_pct || 0) -
+          englishThreshold,
         comment: "",
       },
 
@@ -122,9 +141,12 @@ export async function GET(req: NextRequest) {
         writing_score: submission.maths_writing_score ?? null,
         writing_narrative: submission.maths_writing_narrative || null,
         writing_response: submission.maths_writing_response || null,
-        combined_pct: submission.maths_combined || submission.maths_mcq_pct || 0,
+        combined_pct:
+          submission.maths_combined || submission.maths_mcq_pct || 0,
         threshold: mathsThreshold,
-        delta: (submission.maths_combined || submission.maths_mcq_pct || 0) - mathsThreshold,
+        delta:
+          (submission.maths_combined || submission.maths_mcq_pct || 0) -
+          mathsThreshold,
         comment: "",
       },
 
@@ -142,23 +164,25 @@ export async function GET(req: NextRequest) {
         narrative: submission.mindset_narrative || "",
       },
 
-      values: submission.values_writing_score !== null
-        ? {
-            band: submission.values_writing_band || "Developing",
-            score: submission.values_writing_score || 0,
-            narrative: submission.values_narrative || "",
-            response: submission.values_writing_response || "",
-          }
-        : undefined,
+      values:
+        submission.values_writing_score !== null
+          ? {
+              band: submission.values_writing_band || "Developing",
+              score: submission.values_writing_score || 0,
+              narrative: submission.values_narrative || "",
+              response: submission.values_writing_response || "",
+            }
+          : undefined,
 
-      creativity: submission.creativity_writing_score !== null
-        ? {
-            band: submission.creativity_writing_band || "Developing",
-            score: submission.creativity_writing_score || 0,
-            narrative: submission.creativity_narrative || "",
-            response: submission.creativity_writing_response || "",
-          }
-        : undefined,
+      creativity:
+        submission.creativity_writing_score !== null
+          ? {
+              band: submission.creativity_writing_band || "Developing",
+              score: submission.creativity_writing_score || 0,
+              narrative: submission.creativity_narrative || "",
+              response: submission.creativity_writing_response || "",
+            }
+          : undefined,
     };
 
     if (format === "json") {
@@ -167,7 +191,6 @@ export async function GET(req: NextRequest) {
 
     // Generate HTML report
     const html = generateReportHTML(reportData);
-
     return new NextResponse(html, {
       headers: {
         "Content-Type": "text/html; charset=utf-8",
