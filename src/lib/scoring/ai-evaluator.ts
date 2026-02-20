@@ -31,8 +31,8 @@ export interface WritingTask {
 }
 
 const CLAUDE_MODEL = "claude-sonnet-4-20250514";
-const MAX_RETRIES = 3;
-const RETRY_DELAYS = [2000, 5000, 10000]; // ms between retries
+const MAX_RETRIES = 2;
+const RETRY_DELAYS = [1000, 3000]; // ms — keep short for Vercel serverless timeout
 
 /**
  * Fetch with retry on transient errors (429 rate limit, 529 overloaded, 500 server error).

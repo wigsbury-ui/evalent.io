@@ -1,0 +1,10 @@
+{
+  "functions": {
+    "src/app/api/score/route.ts": {
+      "maxDuration": 120
+    },
+    "src/app/api/send-report/route.ts": {
+      "maxDuration": 30
+    }
+  }
+}
