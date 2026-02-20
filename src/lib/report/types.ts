@@ -14,8 +14,9 @@ export interface ReportInput {
   student_name: string;
   student_ref: string;
   grade_applied: number;
-  test_date: string;       // formatted date
-  report_date: string;     // formatted date
+  programme?: string | null;   // e.g. "IB", "UK", "US" — used for grade label
+  test_date: string;
+  report_date: string;
 
   // Overall
   overall_academic_pct: number;
@@ -40,7 +41,7 @@ export interface ReportInput {
 
   // Mindset
   mindset: {
-    score: number;        // 0-4
+    score: number;
     narrative: string;
   };
 

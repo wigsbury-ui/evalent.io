@@ -6,6 +6,7 @@
  */
 
 import type { ReportInput } from "./types";
+import { gradeLabel } from "@/lib/utils/grade-label";
 
 // ─── Color theme ──────────────────────────────────────────────────
 const COLORS = {
@@ -190,7 +191,7 @@ function page1_Cover(data: ReportInput): string {
     ${pageHeader(data)}
     <div class="cover-title">${data.school_name} Admissions Evaluation for ${data.student_name}</div>
     <div class="cover-subtitle">
-      Student reference: ${data.student_ref} &nbsp; Grade applied for: ${data.grade_applied} &nbsp;
+      Student reference: ${data.student_ref} &nbsp; ${gradeLabel(data.grade_applied, data.programme)} applied for &nbsp;
       Test date: ${data.test_date} &nbsp; Report date: ${data.report_date}
     </div>
     <div class="recommendation-label">EVALENT RECOMMENDATION:</div>
