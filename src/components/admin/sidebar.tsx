@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 import {
   LayoutDashboard,
   School,
@@ -29,13 +30,14 @@ export function AdminSidebar() {
     <aside className="flex h-screen w-64 flex-col border-r border-gray-200 bg-white">
       {/* Logo */}
       <div className="flex h-16 items-center gap-3 border-b border-gray-200 px-6">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-evalent-600">
-          <span className="text-lg font-bold text-white">E</span>
-        </div>
-        <div>
-          <p className="text-sm font-semibold text-gray-900">Evalent</p>
-          <p className="text-xs text-gray-500">Super Admin</p>
-        </div>
+        <Image
+          src="/evalent-logo-dark.png"
+          alt="Evalent"
+          width={120}
+          height={32}
+          className="h-8 w-auto"
+          priority
+        />
       </div>
 
       {/* Navigation */}
@@ -59,7 +61,7 @@ export function AdminSidebar() {
               <item.icon
                 className={cn(
                   "h-5 w-5",
-                  isActive ? "text-evalent-600" : "text-gray-400"
+                  isActive ? "text-evalent-700" : "text-gray-400"
                 )}
               />
               {item.label}

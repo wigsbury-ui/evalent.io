@@ -10,24 +10,25 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Evalent brand palette
+        // Evalent brand palette — aligned with evalent.io marketing site
+        // Primary: deep blue (#002ec1), Accent: bright blue (#2ea3f2)
         evalent: {
-          50: "#f0fdf6",
-          100: "#dcfce9",
-          200: "#bbf7d4",
-          300: "#86efb0",
-          400: "#4ade83",
-          500: "#22c55e",  // Primary green
-          600: "#16a34a",
-          700: "#15803d",
-          800: "#166534",
-          900: "#14532d",
-          950: "#052e16",
+          50: "#eff4ff",
+          100: "#dbe6fe",
+          200: "#bfd3fe",
+          300: "#93b4fd",
+          400: "#6090fa",
+          500: "#2ea3f2",   // Marketing site nav link blue
+          600: "#0d52dd",   // Marketing site CTA hover
+          700: "#002ec1",   // Marketing site primary CTA blue
+          800: "#0a2699",
+          900: "#0d2278",
+          950: "#0a1652",
         },
         brand: {
           navy: "#0f172a",
           slate: "#1e293b",
-          accent: "#3b82f6",
+          accent: "#2ea3f2",
         },
         status: {
           pending: "#f59e0b",
@@ -39,9 +40,9 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ["var(--font-geist-sans)", "system-ui", "sans-serif"],
+        sans: ['"Open Sans"', "var(--font-geist-sans)", "system-ui", "sans-serif"],
         mono: ["var(--font-geist-mono)", "monospace"],
-        display: ["var(--font-display)", "Georgia", "serif"],
+        display: ['"Figtree"', "var(--font-display)", "Georgia", "serif"],
       },
       borderRadius: {
         lg: "var(--radius)",

@@ -6,15 +6,15 @@
   :root {
     --radius: 0.625rem;
 
-    /* Evalent semantic tokens */
+    /* Evalent semantic tokens — blue brand */
     --color-bg: 0 0% 100%;
     --color-fg: 222.2 84% 4.9%;
     --color-muted: 210 40% 96.1%;
     --color-muted-fg: 215.4 16.3% 46.9%;
     --color-border: 214.3 31.8% 91.4%;
-    --color-ring: 142.1 76.2% 36.3%;
-    --color-primary: 142.1 76.2% 36.3%;
-    --color-primary-fg: 355.7 100% 97.3%;
+    --color-ring: 221 100% 38%;
+    --color-primary: 221 100% 38%;
+    --color-primary-fg: 0 0% 100%;
     --color-destructive: 0 84.2% 60.2%;
     --color-destructive-fg: 0 0% 98%;
     --color-card: 0 0% 100%;
@@ -36,7 +36,7 @@
 
 @layer components {
   .evalent-gradient {
-    @apply bg-gradient-to-br from-evalent-600 via-evalent-500 to-emerald-400;
+    @apply bg-gradient-to-br from-evalent-900 via-evalent-700 to-evalent-500;
   }
 
   .evalent-card {
@@ -47,10 +47,22 @@
     @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
   }
 
-  .status-pending { @apply bg-amber-100 text-amber-800; }
-  .status-scoring { @apply bg-violet-100 text-violet-800; }
-  .status-generating { @apply bg-blue-100 text-blue-800; }
-  .status-sending { @apply bg-cyan-100 text-cyan-800; }
-  .status-complete { @apply bg-green-100 text-green-800; }
-  .status-error { @apply bg-red-100 text-red-800; }
+  .status-pending {
+    @apply bg-amber-100 text-amber-800;
+  }
+  .status-scoring {
+    @apply bg-violet-100 text-violet-800;
+  }
+  .status-generating {
+    @apply bg-blue-100 text-blue-800;
+  }
+  .status-sending {
+    @apply bg-cyan-100 text-cyan-800;
+  }
+  .status-complete {
+    @apply bg-green-100 text-green-800;
+  }
+  .status-error {
+    @apply bg-red-100 text-red-800;
+  }
 }
