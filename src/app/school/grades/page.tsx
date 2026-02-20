@@ -174,7 +174,7 @@ export default function GradeConfigPage() {
   const toggleCustom = useCallback(
     (grade: number) => {
       setCustomGrades((prev) => {
-        const next = new Set(prev);
+        const next = new Set(Array.from(prev));
         if (next.has(grade)) {
           next.delete(grade);
           // Reset this grade to global defaults
@@ -189,7 +189,11 @@ export default function GradeConfigPage() {
           }));
         } else {
           next.add(grade);
-          setExpandedGrades((prev) => new Set([...prev, grade]));
+          setExpandedGrades((prev) => {
+            const n = new Set(Array.from(prev));
+            n.add(grade);
+            return n;
+          });
         }
         return next;
       });
@@ -200,7 +204,7 @@ export default function GradeConfigPage() {
   // Toggle expanded
   const toggleExpanded = (grade: number) => {
     setExpandedGrades((prev) => {
-      const next = new Set(prev);
+      const next = new Set(Array.from(prev));
       if (next.has(grade)) next.delete(grade);
       else next.add(grade);
       return next;
