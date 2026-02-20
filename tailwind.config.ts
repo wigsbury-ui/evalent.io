@@ -40,9 +40,9 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ['"Open Sans"', "var(--font-geist-sans)", "system-ui", "sans-serif"],
-        mono: ["var(--font-geist-mono)", "monospace"],
-        display: ['"Figtree"', "var(--font-display)", "Georgia", "serif"],
+        sans: ["var(--font-sans)", "Figtree", "system-ui", "sans-serif"],
+        body: ["var(--font-body)", "Open Sans", "system-ui", "sans-serif"],
+        mono: ["var(--font-mono)", "monospace"],
       },
       borderRadius: {
         lg: "var(--radius)",
