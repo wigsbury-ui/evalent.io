@@ -1,6 +1,9 @@
 /**
- * Writing Response Extractor — v2
- * Uses Jotform field names to identify writing domains.
+ * Writing Response Extractor — v3 (WEBHOOK PAYLOAD FORMAT)
+ *
+ * raw_answers is flat: q235_G3_EN_LONG_TEXT -> "I like football..."
+ * Writing fields contain "LONG_TEXT" in the key name.
+ * Strip q{digits}_ prefix and match by naming convention.
  */
 
 import type { AnswerKey, DomainType } from "@/types";
@@ -12,54 +15,78 @@ export interface ExtractedWriting {
   question_number: number;
 }
 
+function extractFieldName(webhookKey: string): string | null {
+  var match = webhookKey.match(/^q\d+_(.+)$/);
+  return match ? match[1] : null;
+}
+
 export function extractWritingResponses(
   rawAnswers: Record<string, any>,
   answerKeys: AnswerKey[]
 ): ExtractedWriting[] {
-  const textareas: Array<{ qid: number; text: string; name: string; qText: string }> = [];
+  var writings: Array<{ fieldName: string; text: string }> = [];
+  var rawKeys = Object.keys(rawAnswers);
 
-  for (const [qidStr, value] of Object.entries(rawAnswers)) {
-    const ans = value as any;
-    const qid = parseInt(qidStr);
-    if (isNaN(qid) || !ans) continue;
-    if (ans.type === "control_textarea" && ans.answer && ans.answer.trim().length > 5) {
-      textareas.push({ qid, text: ans.answer.toString(), name: ans.name || "", qText: ans.text || "" });
+  for (var i = 0; i < rawKeys.length; i++) {
+    var rawKey = rawKeys[i];
+    var rawVal = rawAnswers[rawKey];
+    if (!rawVal || String(rawVal).trim().length < 10) continue;
+
+    var fieldName = extractFieldName(rawKey);
+    if (!fieldName) continue;
+
+    // Writing fields contain LONG_TEXT in the name
+    if (fieldName.indexOf("LONG_TEXT") !== -1) {
+      writings.push({ fieldName: fieldName, text: String(rawVal) });
     }
   }
 
-  textareas.sort((a, b) => a.qid - b.qid);
-  console.log(`[WRITING] Found ${textareas.length} textareas:`, textareas.map(t => t.name));
+  console.log("[WRITING_V3] Found " + writings.length + " writing fields: " +
+    writings.map(function(w) { return w.fieldName; }).join(", "));
 
-  const results: ExtractedWriting[] = [];
-  for (const ta of textareas) {
-    const domain = inferDomain(ta.name, ta.qText);
+  var results: ExtractedWriting[] = [];
+  for (var j = 0; j < writings.length; j++) {
+    var w = writings[j];
+    var domain = inferDomain(w.fieldName);
     if (!domain) continue;
 
-    const matchKey = answerKeys.find(
-      (k) => k.question_type !== "MCQ" && k.domain === domain
-    );
+    // Find matching answer key for prompt text
+    var matchKey: AnswerKey | undefined;
+    for (var k = 0; k < answerKeys.length; k++) {
+      if (answerKeys[k].question_type !== "MCQ" && answerKeys[k].domain === domain) {
+        matchKey = answerKeys[k];
+        break;
+      }
+    }
+
+    // Also try matching by label
+    if (!matchKey) {
+      for (var m = 0; m < answerKeys.length; m++) {
+        if (answerKeys[m].label === w.fieldName) {
+          matchKey = answerKeys[m];
+          break;
+        }
+      }
+    }
+
     results.push({
-      domain,
-      prompt_text: matchKey?.question_text || ta.qText || "",
-      student_response: ta.text,
-      question_number: matchKey?.question_number || 0,
+      domain: domain,
+      prompt_text: matchKey ? matchKey.question_text : "",
+      student_response: w.text,
+      question_number: matchKey ? matchKey.question_number : 0,
     });
-    console.log(`[WRITING] ${ta.name} → ${domain} (${ta.text.length} chars)`);
+    console.log("[WRITING_V3] " + w.fieldName + " -> " + domain + " (" + w.text.length + " chars)");
   }
+
   return results;
 }
 
-function inferDomain(name: string, text: string): DomainType | null {
-  const n = name.toLowerCase();
-  if (/_en_/i.test(name) || /english/i.test(n)) return "english";
-  if (/_ma_/i.test(name) || /math/i.test(n)) return "mathematics";
-  if (/_mind_/i.test(name) || /mindset/i.test(n)) return "mindset";
-  if (/_val_/i.test(name) || /values/i.test(n)) return "values";
-  if (/_crea_/i.test(name) || /creativ/i.test(n)) return "creativity";
-
-  const t = text.toLowerCase();
-  if (t.includes("favourite activity") || t.includes("favorite activity") || t.includes("paragraph")) return "english";
-  if (t.includes("mathematic") || t.includes("difficult")) return "mathematics";
-  if (t.includes("why you would like") || t.includes("school") || t.includes("mindset")) return "mindset";
+function inferDomain(fieldName: string): DomainType | null {
+  var n = fieldName.toUpperCase();
+  if (n.indexOf("_EN_") !== -1 || n.indexOf("ENGLISH") !== -1) return "english";
+  if (n.indexOf("_MA_") !== -1 || n.indexOf("MATH") !== -1) return "mathematics";
+  if (n.indexOf("_MIND_") !== -1 || n.indexOf("MINDSET") !== -1) return "mindset";
+  if (n.indexOf("_VAL_") !== -1 || n.indexOf("VALUES") !== -1) return "values";
+  if (n.indexOf("_CREA_") !== -1 || n.indexOf("CREATIV") !== -1) return "creativity";
   return null;
 }

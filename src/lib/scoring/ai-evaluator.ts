@@ -24,14 +24,15 @@ export interface WritingTask {
   locale: "en-GB" | "en-US";
 }
 
-// Use a known-good model string
-const CLAUDE_MODEL = "claude-3-5-sonnet-20241022";
+// Current valid model string
+const CLAUDE_MODEL = "claude-sonnet-4-20250514";
 
 function getSystemPrompt(grade: number, locale: string): string {
   const lang = locale === "en-US" ? "fluent American English" : "fluent British English";
   return `You are an experienced educational assessor evaluating extended writing for a Grade ${grade} admissions assessment. You evaluate both content and writing quality. You are warm but precise. Write in ${lang}. Calibrate to Grade ${grade} expectations.
 
 Rubric: Excellent (4), Good (3), Developing (2), Limited (1), No response (0).
+
 Return ONLY valid JSON.`;
 }
 
@@ -56,8 +57,12 @@ Return JSON:
 }
 
 export function generateReasoningNarrativePrompt(
-  score_pct: number, threshold: number, grade: number,
-  correct: number, total: number, locale: string
+  score_pct: number,
+  threshold: number,
+  grade: number,
+  correct: number,
+  total: number,
+  locale: string
 ): { system: string; user: string } {
   const lang = locale === "en-US" ? "American English" : "British English";
   return {
@@ -67,12 +72,19 @@ export function generateReasoningNarrativePrompt(
 }
 
 export function generateMindsetNarrativePrompt(
-  mindset_score: number, grade: number, locale: string
+  mindset_score: number,
+  grade: number,
+  locale: string
 ): { system: string; user: string } {
   const lang = locale === "en-US" ? "American English" : "British English";
-  const band = mindset_score >= 3.5 ? "strong growth orientation" :
-    mindset_score >= 2.5 ? "developing growth mindset" :
-    mindset_score >= 1.5 ? "may need targeted support" : "significant coaching needed";
+  const band =
+    mindset_score >= 3.5
+      ? "strong growth orientation"
+      : mindset_score >= 2.5
+        ? "developing growth mindset"
+        : mindset_score >= 1.5
+          ? "may need targeted support"
+          : "significant coaching needed";
   return {
     system: `You are an educational assessor interpreting a mindset score for Grade ${grade} using Carol Dweck's framework. Write in ${lang}. Supportive, never labelling. 2-3 sentences.`,
     user: `A Grade ${grade} student has mindset score ${mindset_score}/4.0 ("${band}"). Interpret supportively. Return ONLY the narrative text.`,
@@ -88,7 +100,9 @@ export async function evaluateWriting(task: WritingTask): Promise<WritingEvaluat
 
   if (!task.student_response || task.student_response.trim().length < 10) {
     return {
-      domain: task.domain, band: "Insufficient", score: 0,
+      domain: task.domain,
+      band: "Insufficient",
+      score: 0,
       content_narrative: "No substantive response provided.",
       writing_narrative: "Unable to evaluate — response was blank or insufficient.",
       threshold_comment: "Does not meet minimum requirements.",
@@ -173,8 +187,12 @@ export async function generateNarrative(system: string, user: string): Promise<s
 
 function normBand(raw: string): WritingBand {
   const m: Record<string, WritingBand> = {
-    excellent: "Excellent", good: "Good", developing: "Developing",
-    limited: "Emerging", emerging: "Emerging", insufficient: "Insufficient",
+    excellent: "Excellent",
+    good: "Good",
+    developing: "Developing",
+    limited: "Emerging",
+    emerging: "Emerging",
+    insufficient: "Insufficient",
   };
   return m[(raw || "").trim().toLowerCase()] || "Developing";
 }
@@ -182,7 +200,9 @@ function normBand(raw: string): WritingBand {
 function fallback(domain: DomainType, reason: string): WritingEvaluation {
   console.warn(`[AI_EVAL] Fallback for ${domain}: ${reason}`);
   return {
-    domain, band: "Developing", score: 2,
+    domain,
+    band: "Developing",
+    score: 2,
     content_narrative: "AI evaluation encountered an error. Manual review recommended.",
     writing_narrative: "AI evaluation encountered an error. Manual review recommended.",
     threshold_comment: "Score requires manual verification.",
