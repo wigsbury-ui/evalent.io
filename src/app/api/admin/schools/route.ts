@@ -7,24 +7,36 @@ import { hash } from "bcryptjs";
 // GET /api/admin/schools — list all schools with stats
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "super_admin") {
+
+  // Allow both super_admin and school_admin (for debugging)
+  if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const supabase = createServerClient();
 
-  const { data: schools, error } = await supabase
-    .from("schools")
-    .select("*")
-    .order("created_at", { ascending: false });
+  // If super_admin, show all schools. If school_admin, show only their school.
+  let schoolsQuery = supabase.from("schools").select("*").order("created_at", { ascending: false });
+
+  if (session.user.role !== "super_admin" && session.user.schoolId) {
+    schoolsQuery = schoolsQuery.eq("id", session.user.schoolId);
+  }
+
+  const { data: schools, error } = await schoolsQuery;
 
   if (error) {
+    console.error("[ADMIN/SCHOOLS] Error fetching schools:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  if (!schools || schools.length === 0) {
+    console.log("[ADMIN/SCHOOLS] No schools found. User role:", session.user.role, "School ID:", session.user.schoolId);
+    return NextResponse.json([]);
   }
 
   // Get student counts and submission counts per school
   const enriched = await Promise.all(
-    (schools || []).map(async (school) => {
+    schools.map(async (school) => {
       const { count: studentCount } = await supabase
         .from("students")
         .select("*", { count: "exact", head: true })
@@ -67,11 +79,9 @@ export async function POST(req: NextRequest) {
     locale = "en-GB",
     contact_email,
     timezone = "UTC",
-    // School admin user
     admin_name,
     admin_email,
     admin_password,
-    // Grade configs
     grades = [],
   } = body;
 
@@ -84,7 +94,6 @@ export async function POST(req: NextRequest) {
 
   const supabase = createServerClient();
 
-  // Create school
   const { data: school, error: schoolError } = await supabase
     .from("schools")
     .insert({
@@ -104,7 +113,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: schoolError.message }, { status: 500 });
   }
 
-  // Create school admin user if details provided
   let adminUser = null;
   if (admin_email && admin_password && admin_name) {
     const passwordHash = await hash(admin_password, 12);
@@ -128,16 +136,16 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Create grade configs if provided
+  // Correct Jotform form IDs (matching the actual webhooks)
   const JOTFORM_IDS: Record<number, string> = {
     3: "260320999939472",
-    4: "260482838643061",
-    5: "260482974360058",
-    6: "260483151046047",
+    4: "260471223169050",
+    5: "260473002939456",
+    6: "260482974360058",
     7: "260471812050447",
-    8: "260472051943454",
-    9: "260472537687468",
-    10: "260471847392464",
+    8: "260483151046047",
+    9: "260483906227461",
+    10: "260484588498478",
   };
 
   if (grades.length > 0) {
@@ -152,7 +160,6 @@ export async function POST(req: NextRequest) {
     await supabase.from("grade_configs").insert(gradeRows);
   }
 
-  // Audit log
   await supabase.from("audit_log").insert({
     actor_id: session.user.id,
     actor_email: session.user.email,

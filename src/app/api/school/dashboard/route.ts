@@ -6,11 +6,35 @@ import { authOptions } from "@/lib/auth";
 // GET /api/school/dashboard — returns live stats for the logged-in school
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session || !session.user.schoolId) {
+  if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const schoolId = session.user.schoolId;
+  let schoolId = session.user.schoolId;
+
+  // If super_admin with no schoolId, try to find the first active school
+  if (!schoolId && session.user.role === "super_admin") {
+    const supabase = createServerClient();
+    const { data: firstSchool } = await supabase
+      .from("schools")
+      .select("id")
+      .eq("is_active", true)
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .single();
+
+    if (firstSchool) {
+      schoolId = firstSchool.id;
+    }
+  }
+
+  if (!schoolId) {
+    return NextResponse.json(
+      { error: "No school associated with this account" },
+      { status: 403 }
+    );
+  }
+
   const supabase = createServerClient();
 
   // Parallel queries for speed
@@ -18,7 +42,9 @@ export async function GET(req: NextRequest) {
     await Promise.all([
       supabase
         .from("students")
-        .select("id, first_name, last_name, grade_applied, student_ref, jotform_link, created_at")
+        .select(
+          "id, first_name, last_name, grade_applied, student_ref, jotform_link, created_at"
+        )
         .eq("school_id", schoolId)
         .order("created_at", { ascending: false }),
       supabase
@@ -33,7 +59,7 @@ export async function GET(req: NextRequest) {
         .select("id, submission_id, decision, decided_at"),
       supabase
         .from("schools")
-        .select("id, name, slug, curriculum, locale")
+        .select("id, name, slug, curriculum, locale, contact_email, timezone, is_active, subscription_plan")
         .eq("id", schoolId)
         .single(),
     ]);
@@ -46,7 +72,9 @@ export async function GET(req: NextRequest) {
   // Build submission lookup by student_id
   const submissionByStudent: Record<string, any> = {};
   for (const sub of submissions) {
-    submissionByStudent[sub.student_id] = sub;
+    if (sub.student_id) {
+      submissionByStudent[sub.student_id] = sub;
+    }
   }
 
   // Build decision lookup by submission_id
@@ -63,7 +91,7 @@ export async function GET(req: NextRequest) {
     let status = "registered";
     if (dec) status = "decided";
     else if (sub?.report_sent_at) status = "report_sent";
-    else if (sub?.processing_status === "complete") status = "scored";
+    else if (sub?.processing_status === "complete") status = "complete";
     else if (sub?.processing_status === "error") status = "error";
     else if (sub) status = sub.processing_status || "submitted";
 
@@ -84,7 +112,8 @@ export async function GET(req: NextRequest) {
     ).length,
     decisions_made: decisions.length,
     in_pipeline: submissions.filter(
-      (s) => s.processing_status !== "complete" && s.processing_status !== "error"
+      (s) =>
+        s.processing_status !== "complete" && s.processing_status !== "error"
     ).length,
   };
 

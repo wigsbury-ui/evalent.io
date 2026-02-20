@@ -5,7 +5,7 @@ import { createServerClient } from "@/lib/supabase/server";
  * Jotform Webhook Handler
  *
  * This endpoint receives form submissions from Jotform.
- * Pipeline: receive → match student → score MCQs → AI eval writing → generate PDF → email
+ * Pipeline: receive → match student → create submission → trigger scoring
  *
  * The webhook URL to configure in Jotform:
  * https://app.evalent.io/api/webhook/jotform
@@ -30,8 +30,7 @@ export async function POST(req: NextRequest) {
     // --- 1. Extract metadata from prefilled fields (best-effort) ---
     const prefilled = extractMetadata(answers);
 
-    // --- 2. Look up school and grade from grade_configs using formID (primary method) ---
-    // This is the most reliable approach since each Jotform form maps to exactly one school+grade
+    // --- 2. Look up school and grade from grade_configs using formID ---
     const { data: gradeConfig } = await supabase
       .from("grade_configs")
       .select("school_id, grade, assessor_email")
@@ -40,7 +39,8 @@ export async function POST(req: NextRequest) {
 
     const school_id = gradeConfig?.school_id || prefilled.school_id;
     const grade = gradeConfig?.grade || prefilled.grade;
-    const assessor_email = gradeConfig?.assessor_email || prefilled.assessor_email;
+    const assessor_email =
+      gradeConfig?.assessor_email || prefilled.assessor_email;
 
     console.log(
       `[WEBHOOK] Received submission ${submissionID} for form ${formID}`,
@@ -54,17 +54,19 @@ export async function POST(req: NextRequest) {
     );
 
     if (!school_id) {
-      console.error(`[WEBHOOK] Cannot determine school_id for form ${formID}`);
+      console.error(
+        `[WEBHOOK] Cannot determine school_id for form ${formID}`
+      );
       return NextResponse.json(
         { error: "Unknown form — no grade_config found" },
         { status: 400 }
       );
     }
 
-    // --- 3. Match to student ---
+    // --- 3. Match to student (3 strategies) ---
     let student = null;
 
-    // Try matching by student_ref first
+    // Strategy 1: Match by student_ref (most reliable)
     if (prefilled.student_ref) {
       const { data } = await supabase
         .from("students")
@@ -72,9 +74,12 @@ export async function POST(req: NextRequest) {
         .eq("student_ref", prefilled.student_ref)
         .single();
       student = data;
+      if (student) {
+        console.log(`[WEBHOOK] Matched by student_ref: ${student.first_name} ${student.last_name}`);
+      }
     }
 
-    // Fallback: match by student_name + school + grade
+    // Strategy 2: Match by name + school + grade
     if (!student && prefilled.student_name && school_id) {
       const nameParts = String(prefilled.student_name).trim().split(/\s+/);
       const firstName = nameParts[0];
@@ -89,16 +94,44 @@ export async function POST(req: NextRequest) {
           .ilike("last_name", lastName)
           .maybeSingle();
         student = data;
+        if (student) {
+          console.log(`[WEBHOOK] Matched by name: ${student.first_name} ${student.last_name}`);
+        }
       }
     }
 
-    if (student) {
-      console.log(
-        `[WEBHOOK] Matched student: ${student.first_name} ${student.last_name} (${student.id})`
-      );
-    } else {
+    // Strategy 3: Match by school_id + grade → most recent unmatched student
+    if (!student && school_id && grade) {
+      // Find students in this school+grade who don't yet have a submission
+      const { data: candidates } = await supabase
+        .from("students")
+        .select("id, school_id, grade_applied, first_name, last_name")
+        .eq("school_id", school_id)
+        .eq("grade_applied", grade)
+        .order("created_at", { ascending: false });
+
+      if (candidates && candidates.length > 0) {
+        // Check which ones already have submissions
+        for (const candidate of candidates) {
+          const { count } = await supabase
+            .from("submissions")
+            .select("*", { count: "exact", head: true })
+            .eq("student_id", candidate.id);
+
+          if (!count || count === 0) {
+            student = candidate;
+            console.log(
+              `[WEBHOOK] Matched by school+grade fallback: ${student.first_name} ${student.last_name}`
+            );
+            break;
+          }
+        }
+      }
+    }
+
+    if (!student) {
       console.warn(
-        `[WEBHOOK] No student matched for ref=${prefilled.student_ref}, name=${prefilled.student_name}`
+        `[WEBHOOK] No student matched for ref=${prefilled.student_ref}, name=${prefilled.student_name}, school=${school_id}, grade=${grade}`
       );
     }
 
@@ -119,7 +152,6 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (insertError) {
-      // Duplicate submission check
       if (insertError.code === "23505") {
         return NextResponse.json(
           { message: "Submission already processed" },
@@ -127,14 +159,6 @@ export async function POST(req: NextRequest) {
         );
       }
       throw insertError;
-    }
-
-    // Update student status if matched
-    if (student) {
-      await supabase
-        .from("students")
-        .update({ status: "submitted" })
-        .eq("id", student.id);
     }
 
     console.log(
@@ -152,7 +176,7 @@ export async function POST(req: NextRequest) {
         console.error("[WEBHOOK] Failed to trigger scoring:", err)
       );
     } catch {
-      // Non-blocking — scoring will be retried
+      // Non-blocking
     }
 
     return NextResponse.json(
@@ -160,6 +184,9 @@ export async function POST(req: NextRequest) {
         message: "Submission received",
         submission_id: submission.id,
         student_matched: !!student,
+        student_name: student
+          ? `${student.first_name} ${student.last_name}`
+          : null,
         processing_status: "pending",
       },
       { status: 200 }
@@ -175,11 +202,6 @@ export async function POST(req: NextRequest) {
 
 /**
  * Extract metadata from Jotform answers.
- * Jotform webhook sends answers keyed by question ID.
- * Each answer has: { name, text, answer, prettyFormat, type, ... }
- *
- * We search by both `name` (field name) and `text` (field label) since
- * Jotform uses `name` for the HTML field name and `text` for the display label.
  */
 function extractMetadata(answers: Record<string, any>) {
   const meta: Record<string, string | number | null> = {
@@ -192,14 +214,12 @@ function extractMetadata(answers: Record<string, any>) {
 
   for (const [qid, answer] of Object.entries(answers)) {
     const ans = answer as any;
-    // Check both name and text (label) for matching
     const name = (ans?.name || "").toString().toLowerCase();
     const text = (ans?.text || "").toString().toLowerCase();
     const value = (ans?.answer || ans?.prettyFormat || "").toString().trim();
 
     if (!value) continue;
 
-    // Match by field name (most reliable) or label text
     if (
       name.includes("student_ref") ||
       name.includes("meta_student_ref") ||

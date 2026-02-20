@@ -18,20 +18,22 @@ import type { WritingTask } from "@/lib/scoring";
  * Body: { submission_id: string }
  *
  * Pipeline:
- *   1. Fetch submission + raw answers from Supabase
- *   2. Fetch answer keys for the grade
- *   3. Score MCQs (deterministic)
- *   4. Extract writing responses
- *   5. AI-evaluate each writing task (Claude API)
- *   6. Generate reasoning + mindset narratives (Claude API)
- *   7. Calculate recommendation band
- *   8. Update submission with all scores + narratives
+ * 1. Fetch submission + raw answers from Supabase
+ * 2. Fetch answer keys for the grade
+ * 3. Score MCQs (deterministic)
+ * 4. Extract writing responses
+ * 5. AI-evaluate each writing task (Claude API)
+ * 6. Generate reasoning + mindset narratives (Claude API)
+ * 7. Calculate recommendation band
+ * 8. Update submission with all scores + narratives
+ * 9. Auto-trigger report email to assessor
  */
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
 
   try {
     const { submission_id } = await req.json();
+
     if (!submission_id) {
       return NextResponse.json(
         { error: "submission_id required" },
@@ -65,7 +67,7 @@ export async function POST(req: NextRequest) {
       `[SCORING] Starting pipeline for submission ${submission_id} (grade ${submission.grade})`
     );
 
-    // ─── 2. Fetch answer keys ──────────────────────────────────────
+    // ─── 2. Fetch answer keys ────────────────────────────────────
     const { data: answerKeys, error: keyError } = await supabase
       .from("answer_keys")
       .select("*")
@@ -81,7 +83,7 @@ export async function POST(req: NextRequest) {
       `[SCORING] Found ${answerKeys.length} answer keys for grade ${submission.grade}`
     );
 
-    // ─── 3. Score MCQs ────────────────────────────────────────────
+    // ─── 3. Score MCQs ──────────────────────────────────────────
     const rawAnswers = submission.raw_answers as Record<string, any>;
     const mcqResults = scoreMCQs(rawAnswers, answerKeys);
 
@@ -92,7 +94,7 @@ export async function POST(req: NextRequest) {
       mindset: `${mcqResults.mindset.correct}/${mcqResults.mindset.total} (score: ${mcqResults.mindset.score})`,
     });
 
-    // ─── 4. Extract writing responses ──────────────────────────────
+    // ─── 4. Extract writing responses ────────────────────────────
     const writingResponses = extractWritingResponses(rawAnswers, answerKeys);
 
     console.log(
@@ -119,7 +121,7 @@ export async function POST(req: NextRequest) {
       .eq("id", submission_id);
 
     // ─── 6. AI Writing Evaluation ─────────────────────────────────
-    const locale = "en-GB"; // Default; would come from school config
+    const locale = "en-GB";
     const grade = submission.grade;
 
     const writingEvals: Record<string, any> = {};
@@ -136,16 +138,16 @@ export async function POST(req: NextRequest) {
       console.log(`[SCORING] Evaluating ${wr.domain} writing...`);
       const evaluation = await evaluateWriting(task);
       writingEvals[wr.domain] = evaluation;
-
       console.log(
         `[SCORING] ${wr.domain} writing: ${evaluation.band} (${evaluation.score}/4)`
       );
     }
 
-    // ─── 7. Generate reasoning + mindset narratives ───────────────
+    // ─── 7. Generate reasoning + mindset narratives ──────────────
     let englishThreshold = 55;
     let mathsThreshold = 55;
     let reasoningThreshold = 55;
+    let assessorEmail: string | null = null;
 
     if (submission.school_id) {
       const { data: gradeConfig } = await supabase
@@ -159,6 +161,7 @@ export async function POST(req: NextRequest) {
         englishThreshold = gradeConfig.english_threshold || 55;
         mathsThreshold = gradeConfig.maths_threshold || 55;
         reasoningThreshold = gradeConfig.reasoning_threshold || 55;
+        assessorEmail = gradeConfig.assessor_email || null;
       }
     }
 
@@ -204,7 +207,7 @@ export async function POST(req: NextRequest) {
       `[SCORING] Recommendation: ${recommendation.recommendation_band} (overall: ${recommendation.overall_academic_pct}%)`
     );
 
-    // ─── 9. Save all results ──────────────────────────────────────
+    // ─── 9. Save all results — set status to COMPLETE ────────────
     const updatePayload: Record<string, any> = {
       english_mcq_score: mcqResults.english.correct,
       english_mcq_total: mcqResults.english.total,
@@ -218,13 +221,17 @@ export async function POST(req: NextRequest) {
       mindset_score: mcqResults.mindset.score || 0,
 
       english_writing_response:
-        writingResponses.find((w) => w.domain === "english")?.student_response || null,
+        writingResponses.find((w) => w.domain === "english")
+          ?.student_response || null,
       maths_writing_response:
-        writingResponses.find((w) => w.domain === "mathematics")?.student_response || null,
+        writingResponses.find((w) => w.domain === "mathematics")
+          ?.student_response || null,
       values_writing_response:
-        writingResponses.find((w) => w.domain === "values")?.student_response || null,
+        writingResponses.find((w) => w.domain === "values")
+          ?.student_response || null,
       creativity_writing_response:
-        writingResponses.find((w) => w.domain === "creativity")?.student_response || null,
+        writingResponses.find((w) => w.domain === "creativity")
+          ?.student_response || null,
 
       english_writing_band: writingEvals.english?.band || null,
       english_writing_score: writingEvals.english?.score ?? null,
@@ -258,7 +265,8 @@ export async function POST(req: NextRequest) {
       overall_academic_pct: recommendation.overall_academic_pct,
       recommendation_band: recommendation.recommendation_band,
 
-      processing_status: "generating_report",
+      // KEY FIX: Set status to 'complete' instead of 'generating_report'
+      processing_status: "complete",
     };
 
     const { error: updateError } = await supabase
@@ -268,15 +276,32 @@ export async function POST(req: NextRequest) {
 
     if (updateError) throw updateError;
 
-    if (submission.student_id) {
-      await supabase
-        .from("students")
-        .update({ status: "scored" })
-        .eq("id", submission.student_id);
-    }
-
     const duration = Date.now() - startTime;
-    console.log(`[SCORING] Pipeline complete for ${submission_id} in ${duration}ms`);
+    console.log(
+      `[SCORING] Pipeline complete for ${submission_id} in ${duration}ms`
+    );
+
+    // ─── 10. Auto-trigger report email to assessor ────────────────
+    if (assessorEmail) {
+      console.log(
+        `[SCORING] Auto-sending report to assessor: ${assessorEmail}`
+      );
+      try {
+        const sendUrl = new URL("/api/send-report", req.url);
+        fetch(sendUrl.toString(), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            submission_id: submission_id,
+            assessor_email: assessorEmail,
+          }),
+        }).catch((err) =>
+          console.error("[SCORING] Failed to trigger send-report:", err)
+        );
+      } catch {
+        console.error("[SCORING] Non-blocking send-report trigger failed");
+      }
+    }
 
     return NextResponse.json({
       message: "Scoring complete",
@@ -302,6 +327,7 @@ export async function POST(req: NextRequest) {
       },
       recommendation: recommendation.recommendation_band,
       overall_academic_pct: recommendation.overall_academic_pct,
+      report_email_sent: !!assessorEmail,
     });
   } catch (err) {
     console.error("[SCORING] Pipeline error:", err);
