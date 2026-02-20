@@ -1,10 +1,10 @@
 /**
- * AI Writing Evaluation Engine — v2 (ASSESSOR TONE)
+ * AI Writing Evaluation Engine — v3 (ASSESSOR TONE + RETRY)
  *
  * AUDIENCE: School admissions assessors only. Never shared with students or parents.
  * VOICE: Third person, professional, precise. Refer to student by name.
  * CURRICULUM: Adapt language register to programme type (IB, British, American).
- * REFERENCE: Matches tone of G10 Neil Tomalin reference report.
+ * RETRY: Up to 3 attempts with exponential backoff on 429/529 errors.
  */
 
 import type { DomainType } from "@/types";
@@ -31,6 +31,41 @@ export interface WritingTask {
 }
 
 const CLAUDE_MODEL = "claude-sonnet-4-20250514";
+const MAX_RETRIES = 3;
+const RETRY_DELAYS = [2000, 5000, 10000]; // ms between retries
+
+/**
+ * Fetch with retry on transient errors (429 rate limit, 529 overloaded, 500 server error).
+ */
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  label: string
+): Promise<Response> {
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const res = await fetch(url, options);
+
+    if (res.ok) return res;
+
+    const status = res.status;
+    const isRetryable = status === 429 || status === 529 || status === 500 || status === 502 || status === 503;
+
+    if (isRetryable && attempt < MAX_RETRIES) {
+      const delay = RETRY_DELAYS[attempt] || 10000;
+      console.warn(
+        `[AI_EVAL] ${label}: API ${status}, retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})...`
+      );
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      continue;
+    }
+
+    // Non-retryable or exhausted retries
+    return res;
+  }
+
+  // Should not reach here, but TypeScript needs it
+  throw new Error(`[AI_EVAL] ${label}: exhausted all retries`);
+}
 
 /**
  * Map programme codes to curriculum context for prompt calibration.
@@ -176,24 +211,28 @@ export async function evaluateWriting(task: WritingTask): Promise<WritingEvaluat
 
   try {
     console.log(`[AI_EVAL] Calling ${CLAUDE_MODEL} for ${task.domain}...`);
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+    const res = await fetchWithRetry(
+      "https://api.anthropic.com/v1/messages",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: CLAUDE_MODEL,
+          max_tokens: 1024,
+          system: getSystemPrompt(task),
+          messages: [{ role: "user", content: getUserPrompt(task) }],
+        }),
       },
-      body: JSON.stringify({
-        model: CLAUDE_MODEL,
-        max_tokens: 1024,
-        system: getSystemPrompt(task),
-        messages: [{ role: "user", content: getUserPrompt(task) }],
-      }),
-    });
+      `writing-${task.domain}`
+    );
 
     if (!res.ok) {
       const errText = await res.text();
-      console.error(`[AI_EVAL] API ${res.status}: ${errText}`);
+      console.error(`[AI_EVAL] API ${res.status} (after retries): ${errText}`);
       return fallback(task.domain, `API ${res.status}`);
     }
 
@@ -221,24 +260,28 @@ export async function generateNarrative(system: string, user: string): Promise<s
   if (!apiKey) return "Narrative unavailable — API key not configured.";
 
   try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+    const res = await fetchWithRetry(
+      "https://api.anthropic.com/v1/messages",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: CLAUDE_MODEL,
+          max_tokens: 512,
+          system,
+          messages: [{ role: "user", content: user }],
+        }),
       },
-      body: JSON.stringify({
-        model: CLAUDE_MODEL,
-        max_tokens: 512,
-        system,
-        messages: [{ role: "user", content: user }],
-      }),
-    });
+      "narrative"
+    );
 
     if (!res.ok) {
       const errText = await res.text();
-      console.error(`[AI_EVAL] Narrative API ${res.status}: ${errText}`);
+      console.error(`[AI_EVAL] Narrative API ${res.status} (after retries): ${errText}`);
       return "Narrative generation encountered an error.";
     }
 
