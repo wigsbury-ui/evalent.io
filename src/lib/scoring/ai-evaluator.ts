@@ -1,6 +1,10 @@
 /**
- * AI Writing Evaluation Engine
- * Uses Claude API to evaluate extended writing responses.
+ * AI Writing Evaluation Engine — v2 (ASSESSOR TONE)
+ *
+ * AUDIENCE: School admissions assessors only. Never shared with students or parents.
+ * VOICE: Third person, professional, precise. Refer to student by name.
+ * CURRICULUM: Adapt language register to programme type (IB, British, American).
+ * REFERENCE: Matches tone of G10 Neil Tomalin reference report.
  */
 
 import type { DomainType } from "@/types";
@@ -22,26 +26,61 @@ export interface WritingTask {
   student_response: string;
   grade: number;
   locale: "en-GB" | "en-US";
+  student_name?: string;
+  programme?: string;
 }
 
-// Current valid model string
 const CLAUDE_MODEL = "claude-sonnet-4-20250514";
 
-function getSystemPrompt(grade: number, locale: string): string {
-  const lang = locale === "en-US" ? "fluent American English" : "fluent British English";
-  return `You are an experienced educational assessor evaluating extended writing for a Grade ${grade} admissions assessment. You evaluate both content and writing quality. You are warm but precise. Write in ${lang}. Calibrate to Grade ${grade} expectations.
+/**
+ * Map programme codes to curriculum context for prompt calibration.
+ */
+function getCurriculumContext(programme?: string): string {
+  const p = (programme || "").toUpperCase();
+  if (p === "IB" || p.includes("IB"))
+    return "an International Baccalaureate (IB) school. Use language consistent with IB pedagogy — learner profile attributes, approaches to learning, conceptual understanding, and inquiry-based expectations";
+  if (p === "US" || p.includes("AMERICAN") || p.includes("US"))
+    return "an American-curriculum school. Use language consistent with Common Core and US educational standards — grade-level benchmarks, ELA/Math standards, and college-readiness expectations";
+  if (p === "UK" || p.includes("BRITISH") || p.includes("UK") || p.includes("IGCSE"))
+    return "a British-curriculum school. Use language consistent with the English National Curriculum and Cambridge frameworks — key stage expectations, attainment targets, and GCSE/IGCSE readiness";
+  return "an international school. Use professionally neutral educational language appropriate for a selective admissions context";
+}
 
-Rubric: Excellent (4), Good (3), Developing (2), Limited (1), No response (0).
+function getSystemPrompt(task: WritingTask): string {
+  const lang = task.locale === "en-US" ? "American English" : "British English";
+  const curriculum = getCurriculumContext(task.programme);
+  const name = task.student_name || "the student";
 
-Return ONLY valid JSON.`;
+  return `You are an experienced admissions assessor writing a professional evaluation of extended writing for a Grade ${task.grade} applicant to ${curriculum}.
+
+AUDIENCE: This report is read ONLY by the school's admissions panel. It will NOT be shared with the student, their parents, or any external party. Write accordingly — be candid, precise, and professionally frank about both strengths and weaknesses.
+
+VOICE AND STYLE:
+- Write in ${lang} throughout.
+- Refer to the student in the third person as "${name}" or "the student" — NEVER use "you" or "your".
+- Maintain the tone of a senior examiner's commentary: warm but evaluative, supportive but honest.
+- Avoid superlatives, exclamation marks, and overly encouraging language. This is a professional assessment, not feedback to a child.
+- Ground observations in specific evidence from the writing sample.
+- Calibrate expectations precisely to Grade ${task.grade} — what is age-appropriate, what falls below, what exceeds.
+
+RUBRIC:
+- Excellent (4): Exceeds grade-level expectations across content and writing quality.
+- Good (3): Meets grade-level expectations with minor gaps.
+- Developing (2): Partially meets expectations; shows emerging competence with clear areas for growth.
+- Limited (1): Below grade-level expectations; significant support would be needed.
+- Insufficient (0): No substantive response or response unrelated to the prompt.
+
+Return ONLY valid JSON — no markdown, no commentary outside the JSON.`;
 }
 
 function getUserPrompt(task: WritingTask): string {
-  return `Evaluate this ${task.domain} extended writing from a Grade ${task.grade} applicant.
+  const name = task.student_name || "the student";
+  return `Evaluate this ${task.domain} extended writing from ${name}, a Grade ${task.grade} applicant.
 
-Prompt: "${task.prompt_text}"
+Prompt given to the student:
+"${task.prompt_text}"
 
-Response:
+Student's response:
 """
 ${task.student_response}
 """
@@ -50,9 +89,9 @@ Return JSON:
 {
   "band": "Excellent|Good|Developing|Limited",
   "score": 0-4,
-  "content_narrative": "2-3 sentences on content quality.",
-  "writing_narrative": "2-3 sentences on writing quality.",
-  "threshold_comment": "1 sentence on grade-level expectations."
+  "content_narrative": "2-3 sentences evaluating content quality — relevance to the prompt, depth of ideas, use of examples. Reference specific evidence from the response. Written for an assessor.",
+  "writing_narrative": "2-3 sentences evaluating writing quality — sentence control, vocabulary, grammar, organisation. Note specific patterns observed. Written for an assessor.",
+  "threshold_comment": "1 sentence on whether this response meets, exceeds, or falls below Grade ${task.grade} expectations for this domain."
 }`;
 }
 
@@ -62,32 +101,58 @@ export function generateReasoningNarrativePrompt(
   grade: number,
   correct: number,
   total: number,
-  locale: string
+  locale: string,
+  student_name?: string,
+  programme?: string
 ): { system: string; user: string } {
   const lang = locale === "en-US" ? "American English" : "British English";
+  const curriculum = getCurriculumContext(programme);
+  const name = student_name || "The student";
+
   return {
-    system: `You are an educational assessor writing a reasoning score interpretation for Grade ${grade}. Write in ${lang}. Be warm but precise. 3-4 sentences.`,
-    user: `A Grade ${grade} student scored ${correct}/${total} (${score_pct}%) on reasoning. Threshold is ${threshold}%. Interpret this score addressing whether it meets the threshold, what it implies about reasoning ability, and readiness. Return ONLY the narrative text.`,
+    system: `You are a senior admissions assessor writing a reasoning score interpretation for a Grade ${grade} applicant to ${curriculum}. Write in ${lang}.
+
+AUDIENCE: School admissions panel only — not shared with the student or parents.
+VOICE: Third person, professional. Refer to the student as "${name}". Be evaluative, not encouraging. Ground the interpretation in what the score implies about reasoning readiness.
+LENGTH: 3-4 sentences.`,
+
+    user: `${name}, a Grade ${grade} applicant, scored ${correct}/${total} (${score_pct}%) on the reasoning section. The school's threshold for this domain is ${threshold}%.
+
+Write a professional assessment interpreting this score. Address whether it meets the threshold, what it suggests about the student's logical reasoning and problem-solving readiness, and any implications for admissions. Return ONLY the narrative text — no JSON, no headers.`,
   };
 }
 
 export function generateMindsetNarrativePrompt(
   mindset_score: number,
   grade: number,
-  locale: string
+  locale: string,
+  student_name?: string,
+  programme?: string
 ): { system: string; user: string } {
   const lang = locale === "en-US" ? "American English" : "British English";
-  const band =
+  const curriculum = getCurriculumContext(programme);
+  const name = student_name || "The student";
+
+  const descriptor =
     mindset_score >= 3.5
       ? "strong growth orientation"
       : mindset_score >= 2.5
-        ? "developing growth mindset"
+        ? "developing growth mindset with some fixed-mindset tendencies"
         : mindset_score >= 1.5
-          ? "may need targeted support"
-          : "significant coaching needed";
+          ? "limited growth orientation; may benefit from targeted support"
+          : "significant fixed-mindset tendencies; structured coaching recommended";
+
   return {
-    system: `You are an educational assessor interpreting a mindset score for Grade ${grade} using Carol Dweck's framework. Write in ${lang}. Supportive, never labelling. 2-3 sentences.`,
-    user: `A Grade ${grade} student has mindset score ${mindset_score}/4.0 ("${band}"). Interpret supportively. Return ONLY the narrative text.`,
+    system: `You are a senior admissions assessor interpreting a mindset and learning readiness score for a Grade ${grade} applicant to ${curriculum}. Write in ${lang}.
+
+AUDIENCE: School admissions panel only — not shared with the student or parents.
+VOICE: Third person, professional. Refer to the student as "${name}". Draw on Carol Dweck's growth mindset framework but write as an assessor, not a coach. Be honest about what the score implies without being dismissive.
+CONTEXT: The mindset lens is complementary — it does not determine admission. It signals where coaching, mentoring, or structured support around learning habits may be needed.
+LENGTH: 3-4 sentences.`,
+
+    user: `${name}, a Grade ${grade} applicant, received a mindset / readiness score of ${mindset_score} out of 4.0, which indicates ${descriptor}.
+
+Write a professional assessment for the admissions panel. Interpret what this score suggests about the student's current approach to challenge, feedback, and persistence. Note any implications for pastoral or academic support if admitted. Return ONLY the narrative text — no JSON, no headers.`,
   };
 }
 
@@ -103,9 +168,9 @@ export async function evaluateWriting(task: WritingTask): Promise<WritingEvaluat
       domain: task.domain,
       band: "Insufficient",
       score: 0,
-      content_narrative: "No substantive response provided.",
-      writing_narrative: "Unable to evaluate — response was blank or insufficient.",
-      threshold_comment: "Does not meet minimum requirements.",
+      content_narrative: "No substantive response was provided for this task.",
+      writing_narrative: "Unable to evaluate writing quality — the response was blank or insufficient for assessment.",
+      threshold_comment: "Does not meet minimum requirements for Grade " + task.grade + " assessment.",
     };
   }
 
@@ -121,7 +186,7 @@ export async function evaluateWriting(task: WritingTask): Promise<WritingEvaluat
       body: JSON.stringify({
         model: CLAUDE_MODEL,
         max_tokens: 1024,
-        system: getSystemPrompt(task.grade, task.locale),
+        system: getSystemPrompt(task),
         messages: [{ role: "user", content: getUserPrompt(task) }],
       }),
     });
@@ -203,8 +268,8 @@ function fallback(domain: DomainType, reason: string): WritingEvaluation {
     domain,
     band: "Developing",
     score: 2,
-    content_narrative: "AI evaluation encountered an error. Manual review recommended.",
-    writing_narrative: "AI evaluation encountered an error. Manual review recommended.",
-    threshold_comment: "Score requires manual verification.",
+    content_narrative: "AI evaluation encountered an error. Manual review by the admissions panel is recommended.",
+    writing_narrative: "AI evaluation encountered an error. Manual review by the admissions panel is recommended.",
+    threshold_comment: "Score requires manual verification by the admissions team.",
   };
 }

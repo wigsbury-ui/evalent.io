@@ -12,28 +12,16 @@ import {
 import type { WritingTask } from "@/lib/scoring";
 
 /**
- * Scoring Pipeline API
+ * Scoring Pipeline API — v2 (assessor tone, curriculum-aware)
  *
  * POST /api/score
  * Body: { submission_id: string }
- *
- * Pipeline:
- * 1. Fetch submission + raw answers from Supabase
- * 2. Fetch answer keys for the grade
- * 3. Score MCQs (deterministic)
- * 4. Extract writing responses
- * 5. AI-evaluate each writing task (Claude API)
- * 6. Generate reasoning + mindset narratives (Claude API)
- * 7. Calculate recommendation band
- * 8. Update submission with all scores + narratives
- * 9. Auto-trigger report email to assessor
  */
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
 
   try {
     const { submission_id } = await req.json();
-
     if (!submission_id) {
       return NextResponse.json(
         { error: "submission_id required" },
@@ -57,7 +45,6 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Update status
     await supabase
       .from("submissions")
       .update({ processing_status: "scoring" })
@@ -94,15 +81,46 @@ export async function POST(req: NextRequest) {
       mindset: `${mcqResults.mindset.correct}/${mcqResults.mindset.total} (score: ${mcqResults.mindset.score})`,
     });
 
+    // ─── 3b. Extract metadata from webhook payload for AI tone ──
+    let studentName: string | null = null;
+    let programme: string | null = null;
+    let detectedLocale: "en-GB" | "en-US" = "en-GB";
+
+    const rawKeys = Object.keys(rawAnswers);
+    for (let i = 0; i < rawKeys.length; i++) {
+      const k = rawKeys[i];
+      const v = rawAnswers[k];
+      if (!v) continue;
+      if (k.includes("student_name") && !studentName) studentName = String(v);
+      if (k.includes("meta_programme") && !programme) programme = String(v);
+      if (k.includes("meta_language_locale")) {
+        detectedLocale = String(v).includes("US") ? "en-US" : "en-GB";
+      }
+    }
+
+    // Fallback: fetch student name from students table
+    if (!studentName && submission.student_id) {
+      const { data: student } = await supabase
+        .from("students")
+        .select("student_name")
+        .eq("id", submission.student_id)
+        .single();
+      if (student) studentName = student.student_name;
+    }
+
+    const locale = detectedLocale;
+    console.log(
+      `[SCORING] Metadata: name="${studentName}", programme="${programme}", locale="${locale}"`
+    );
+
     // ─── 4. Extract writing responses ────────────────────────────
     const writingResponses = extractWritingResponses(rawAnswers, answerKeys);
-
     console.log(
       `[SCORING] Found ${writingResponses.length} writing responses:`,
       writingResponses.map((w) => w.domain)
     );
 
-    // ─── 5. Update with MCQ scores, set status to AI evaluation ───
+    // ─── 5. Update with MCQ scores ──────────────────────────────
     await supabase
       .from("submissions")
       .update({
@@ -121,9 +139,7 @@ export async function POST(req: NextRequest) {
       .eq("id", submission_id);
 
     // ─── 6. AI Writing Evaluation ─────────────────────────────────
-    const locale = "en-GB";
     const grade = submission.grade;
-
     const writingEvals: Record<string, any> = {};
 
     for (const wr of writingResponses) {
@@ -132,7 +148,9 @@ export async function POST(req: NextRequest) {
         prompt_text: wr.prompt_text,
         student_response: wr.student_response,
         grade,
-        locale: locale as "en-GB" | "en-US",
+        locale,
+        student_name: studentName || undefined,
+        programme: programme || undefined,
       };
 
       console.log(`[SCORING] Evaluating ${wr.domain} writing...`);
@@ -172,7 +190,9 @@ export async function POST(req: NextRequest) {
       grade,
       mcqResults.reasoning.correct,
       mcqResults.reasoning.total,
-      locale
+      locale,
+      studentName || undefined,
+      programme || undefined
     );
     const reasoningNarrative = await generateNarrative(
       reasoningPrompt.system,
@@ -183,7 +203,9 @@ export async function POST(req: NextRequest) {
     const mindsetPrompt = generateMindsetNarrativePrompt(
       mcqResults.mindset.score || 0,
       grade,
-      locale
+      locale,
+      studentName || undefined,
+      programme || undefined
     );
     const mindsetNarrative = await generateNarrative(
       mindsetPrompt.system,
@@ -207,7 +229,7 @@ export async function POST(req: NextRequest) {
       `[SCORING] Recommendation: ${recommendation.recommendation_band} (overall: ${recommendation.overall_academic_pct}%)`
     );
 
-    // ─── 9. Save all results — set status to COMPLETE ────────────
+    // ─── 9. Save all results ──────────────────────────────────────
     const updatePayload: Record<string, any> = {
       english_mcq_score: mcqResults.english.correct,
       english_mcq_total: mcqResults.english.total,
@@ -264,8 +286,6 @@ export async function POST(req: NextRequest) {
 
       overall_academic_pct: recommendation.overall_academic_pct,
       recommendation_band: recommendation.recommendation_band,
-
-      // KEY FIX: Set status to 'complete' instead of 'generating_report'
       processing_status: "complete",
     };
 
@@ -281,7 +301,7 @@ export async function POST(req: NextRequest) {
       `[SCORING] Pipeline complete for ${submission_id} in ${duration}ms`
     );
 
-    // ─── 10. Auto-trigger report email to assessor ────────────────
+    // ─── 10. Auto-trigger report email ────────────────────────────
     if (assessorEmail) {
       console.log(
         `[SCORING] Auto-sending report to assessor: ${assessorEmail}`
@@ -331,7 +351,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     console.error("[SCORING] Pipeline error:", err);
-
     try {
       const body = await req.clone().json();
       if (body?.submission_id) {
@@ -347,7 +366,6 @@ export async function POST(req: NextRequest) {
     } catch {
       // Ignore
     }
-
     return NextResponse.json(
       { error: "Scoring pipeline failed", details: String(err) },
       { status: 500 }
