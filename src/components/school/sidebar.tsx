@@ -27,11 +27,11 @@ export function SchoolSidebar() {
   const [schoolName, setSchoolName] = useState("School Admin");
 
   useEffect(() => {
-    fetch("/api/school/dashboard")
+    fetch("/api/auth/session")
       .then((r) => r.json())
       .then((data) => {
-        if (data?.school?.name) {
-          setSchoolName(data.school.name);
+        if (data?.user?.schoolName) {
+          setSchoolName(data.user.schoolName);
         }
       })
       .catch(() => {});

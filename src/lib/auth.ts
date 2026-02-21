@@ -11,6 +11,7 @@ declare module "next-auth" {
       name: string;
       role: UserRole;
       schoolId: string | null;
+      schoolName: string | null;
     };
   }
   interface User {
@@ -19,6 +20,7 @@ declare module "next-auth" {
     name: string;
     role: UserRole;
     schoolId: string | null;
+    schoolName: string | null;
   }
 }
 
@@ -27,6 +29,7 @@ declare module "next-auth/jwt" {
     id: string;
     role: UserRole;
     schoolId: string | null;
+    schoolName: string | null;
   }
 }
 
@@ -45,17 +48,33 @@ export const authOptions: NextAuthOptions = {
 
         const { data: user, error } = await supabase
           .from("users")
-          .select("id, email, name, role, school_id, password_hash, is_active")
+          .select(
+            "id, email, name, role, school_id, password_hash, is_active"
+          )
           .eq("email", credentials.email.toLowerCase())
           .single();
 
         if (error || !user || !user.is_active) return null;
 
-        // For now, simple password check — we'll add bcrypt hashing
-        // TODO: Replace with bcrypt.compare once we add the dependency
         const { compare } = await import("bcryptjs");
-        const isValid = await compare(credentials.password, user.password_hash);
+        const isValid = await compare(
+          credentials.password,
+          user.password_hash
+        );
         if (!isValid) return null;
+
+        // Look up the school name if the user has a school_id
+        let schoolName: string | null = null;
+        if (user.school_id) {
+          const { data: school } = await supabase
+            .from("schools")
+            .select("name")
+            .eq("id", user.school_id)
+            .single();
+          if (school) {
+            schoolName = school.name;
+          }
+        }
 
         return {
           id: user.id,
@@ -63,6 +82,7 @@ export const authOptions: NextAuthOptions = {
           name: user.name,
           role: user.role as UserRole,
           schoolId: user.school_id,
+          schoolName,
         };
       },
     }),
@@ -73,6 +93,7 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id;
         token.role = user.role;
         token.schoolId = user.schoolId;
+        token.schoolName = user.schoolName;
       }
       return token;
     },
@@ -80,6 +101,7 @@ export const authOptions: NextAuthOptions = {
       session.user.id = token.id;
       session.user.role = token.role;
       session.user.schoolId = token.schoolId;
+      session.user.schoolName = token.schoolName;
       return session;
     },
   },
