@@ -110,7 +110,7 @@ function narrativeToParagraphs(text: string): string {
 
 // ─── 4-axis Radar (EN, MA, RE, Mindset) with threshold polygon ──
 function generateRadarChart(data: ReportInput): string {
-  var cx = 220, cy = 200, maxR = 160, levels = 4;
+  var cx = 240, cy = 200, maxR = 160, levels = 4;
   var mindsetPct = (data.mindset.score / 4) * 100;
 
   var axes = [
@@ -128,7 +128,7 @@ function generateRadarChart(data: ReportInput): string {
     return [cx + radius * Math.cos(angle), cy + radius * Math.sin(angle)];
   };
 
-  var svg = '<svg width="440" height="415" viewBox="0 0 440 415" xmlns="http://www.w3.org/2000/svg" style="font-family:\'Segoe UI\',Arial,sans-serif;">';
+  var svg = '<svg width="480" height="425" viewBox="0 0 480 425" xmlns="http://www.w3.org/2000/svg" style="font-family:\'Segoe UI\',Arial,sans-serif;">';
 
   // Background fill
   var bgPath = "";
@@ -212,11 +212,11 @@ function generateRadarChart(data: ReportInput): string {
   }
 
   // Legend
-  svg += '<line x1="110" y1="400" x2="140" y2="400" stroke="' + COLORS.accent + '" stroke-width="2.5"/>';
-  svg += '<circle cx="125" cy="400" r="3" fill="' + COLORS.accent + '"/>';
-  svg += '<text x="148" y="404" font-size="10" fill="' + COLORS.text + '">Student Score</text>';
-  svg += '<line x1="260" y1="400" x2="290" y2="400" stroke="' + COLORS.thresholdRed + '" stroke-width="1.5" stroke-dasharray="6,3"/>';
-  svg += '<text x="298" y="404" font-size="10" fill="' + COLORS.text + '">School Threshold</text>';
+  svg += '<line x1="120" y1="410" x2="150" y2="410" stroke="' + COLORS.accent + '" stroke-width="2.5"/>';
+  svg += '<circle cx="135" cy="410" r="3" fill="' + COLORS.accent + '"/>';
+  svg += '<text x="158" y="414" font-size="10" fill="' + COLORS.text + '">Student Score</text>';
+  svg += '<line x1="270" y1="410" x2="300" y2="410" stroke="' + COLORS.thresholdRed + '" stroke-width="1.5" stroke-dasharray="6,3"/>';
+  svg += '<text x="308" y="414" font-size="10" fill="' + COLORS.text + '">School Threshold</text>';
 
   svg += "</svg>";
   return svg;
@@ -254,8 +254,8 @@ function generateBarChart(data: ReportInput): string {
     svg += '<text x="' + (x + barWidth / 2) + '" y="' + (baseY - scoreH - 5) + '" text-anchor="middle" font-size="10" font-weight="bold" fill="' + COLORS.accent + '">' + d.score.toFixed(0) + '%</text>';
 
     // Threshold bar
-    svg += '<rect x="' + (x + barWidth + 6) + '" y="' + (baseY - threshH) + '" width="' + barWidth + '" height="' + threshH + '" fill="' + COLORS.thresholdRed + '" fill-opacity="0.7" rx="3"/>';
-    svg += '<text x="' + (x + barWidth + 6 + barWidth / 2) + '" y="' + (baseY - threshH - 5) + '" text-anchor="middle" font-size="10" font-weight="bold" fill="' + COLORS.thresholdRed + '">' + d.threshold.toFixed(0) + '%</text>';
+    svg += '<rect x="' + (x + barWidth + 6) + '" y="' + (baseY - threshH) + '" width="' + barWidth + '" height="' + threshH + '" fill="' + COLORS.green + '" fill-opacity="0.6" rx="3"/>';
+    svg += '<text x="' + (x + barWidth + 6 + barWidth / 2) + '" y="' + (baseY - threshH - 5) + '" text-anchor="middle" font-size="10" font-weight="bold" fill="' + COLORS.green + '">' + d.threshold.toFixed(0) + '%</text>';
 
     // Domain label
     svg += '<text x="' + (x + barWidth + 3) + '" y="' + (baseY + 18) + '" text-anchor="middle" font-size="10.5" font-weight="600" fill="' + COLORS.text + '">' + d.label + "</text>";
@@ -264,7 +264,7 @@ function generateBarChart(data: ReportInput): string {
   // Legend
   svg += '<rect x="150" y="222" width="12" height="12" fill="' + COLORS.accent + '" rx="2"/>';
   svg += '<text x="168" y="233" font-size="9.5" fill="' + COLORS.text + '">Student Score</text>';
-  svg += '<rect x="270" y="222" width="12" height="12" fill="' + COLORS.thresholdRed + '" fill-opacity="0.7" rx="2"/>';
+  svg += '<rect x="270" y="222" width="12" height="12" fill="' + COLORS.green + '" fill-opacity="0.6" rx="2"/>';
   svg += '<text x="288" y="233" font-size="9.5" fill="' + COLORS.text + '">School Threshold</text>';
 
   svg += "</svg>";
