@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import {
@@ -46,7 +47,6 @@ export function AdminSidebar() {
           const isActive =
             pathname === item.href ||
             (item.href !== "/admin" && pathname.startsWith(item.href));
-
           return (
             <Link
               key={item.href}
@@ -72,7 +72,10 @@ export function AdminSidebar() {
 
       {/* Footer */}
       <div className="border-t border-gray-200 p-3">
-        <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900">
+        <button
+          onClick={() => signOut({ callbackUrl: "/login" })}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900"
+        >
           <LogOut className="h-5 w-5 text-gray-400" />
           Sign out
         </button>

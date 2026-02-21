@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Card,
   CardContent,
@@ -35,16 +36,24 @@ interface SchoolData {
 export default function SchoolsPage() {
   const [schools, setSchools] = useState<SchoolData[]>([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     fetch("/api/admin/schools")
-      .then((r) => r.json())
+      .then((r) => {
+        if (r.status === 401) {
+          // Session expired — redirect to login
+          router.replace("/login?callbackUrl=/admin/schools");
+          return [];
+        }
+        return r.json();
+      })
       .then((data) => {
         setSchools(Array.isArray(data) ? data : []);
         setLoading(false);
       })
       .catch(() => setLoading(false));
-  }, []);
+  }, [router]);
 
   return (
     <div className="space-y-6">
@@ -88,12 +97,17 @@ export default function SchoolsPage() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {schools.map((school) => (
-            <Card key={school.id} className="transition-shadow hover:shadow-md">
+            <Card
+              key={school.id}
+              className="transition-shadow hover:shadow-md"
+            >
               <CardHeader className="pb-3">
                 <div className="flex items-start justify-between">
                   <div>
                     <CardTitle className="text-base">{school.name}</CardTitle>
-                    <p className="mt-0.5 text-xs text-gray-400">{school.slug}</p>
+                    <p className="mt-0.5 text-xs text-gray-400">
+                      {school.slug}
+                    </p>
                   </div>
                   <Badge
                     variant={school.is_active ? "success" : "secondary"}
@@ -120,7 +134,8 @@ export default function SchoolsPage() {
                   </div>
                   <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
                     <p className="text-xs text-gray-400 flex-1">
-                      {school.user_count} admin{school.user_count !== 1 ? "s" : ""}
+                      {school.user_count} admin
+                      {school.user_count !== 1 ? "s" : ""}
                     </p>
                     <p className="text-xs text-gray-400">
                       {school.contact_email}
