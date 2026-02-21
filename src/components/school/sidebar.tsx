@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -23,16 +24,30 @@ const navItems = [
 
 export function SchoolSidebar() {
   const pathname = usePathname();
+  const [schoolName, setSchoolName] = useState("School Admin");
+
+  useEffect(() => {
+    fetch("/api/school/dashboard")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data?.school?.name) {
+          setSchoolName(data.school.name);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   return (
     <aside className="flex h-screen w-64 flex-col border-r border-gray-200 bg-white">
       {/* Logo */}
       <div className="flex h-16 items-center gap-3 border-b border-gray-200 px-6">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-evalent-600">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-evalent-600">
           <span className="text-lg font-bold text-white">E</span>
         </div>
-        <div>
-          <p className="text-sm font-semibold text-gray-900">Evalent</p>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-semibold text-gray-900">
+            {schoolName}
+          </p>
           <p className="text-xs text-gray-500">School Admin</p>
         </div>
       </div>
