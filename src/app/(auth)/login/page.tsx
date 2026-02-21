@@ -11,7 +11,8 @@ import Image from "next/image";
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/admin";
+  const callbackUrl = searchParams.get("callbackUrl");
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -32,7 +33,26 @@ function LoginForm() {
       setError("Invalid email or password");
       setLoading(false);
     } else {
-      router.push(callbackUrl);
+      // If there's an explicit callbackUrl, use it
+      if (callbackUrl) {
+        router.push(callbackUrl);
+        return;
+      }
+
+      // Otherwise, fetch session to determine role-based redirect
+      try {
+        const sessionRes = await fetch("/api/auth/session");
+        const session = await sessionRes.json();
+
+        if (session?.user?.role === "school_admin") {
+          router.push("/school/students");
+        } else {
+          router.push("/admin");
+        }
+      } catch {
+        // Fallback if session fetch fails
+        router.push("/admin");
+      }
     }
   };
 
