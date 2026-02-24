@@ -56,12 +56,43 @@ const LOCALE_OPTIONS = [
   { value: "en-US", label: "American English" },
 ];
 
-const DEFAULT_TERMS = [
-  "Term 1 (September)",
-  "Term 2 (January)",
-  "Term 3 (April)",
-  "Immediate",
-];
+const TERM_PRESETS: Record<string, string[]> = {
+  UK: [
+    "Term 1 (September)",
+    "Term 2 (January)",
+    "Term 3 (April)",
+    "Immediate",
+  ],
+  IGCSE: [
+    "Term 1 (September)",
+    "Term 2 (January)",
+    "Term 3 (April)",
+    "Immediate",
+  ],
+  IB: [
+    "Term 1 (September)",
+    "Term 2 (January)",
+    "Term 3 (April)",
+    "Immediate",
+  ],
+  US: [
+    "Fall Semester (August)",
+    "Spring Semester (January)",
+    "Q1 (August)",
+    "Q2 (October)",
+    "Q3 (January)",
+    "Q4 (March)",
+    "Immediate",
+  ],
+  Other: [
+    "Term 1 (September)",
+    "Term 2 (January)",
+    "Term 3 (April)",
+    "Immediate",
+  ],
+};
+
+const DEFAULT_TERMS = TERM_PRESETS["UK"];
 
 export default function SchoolConfigPage() {
   const [school, setSchool] = useState<SchoolConfig | null>(null);
@@ -247,15 +278,23 @@ export default function SchoolConfigPage() {
             <select
               value={curriculum}
               onChange={(e) => {
-                setCurriculum(e.target.value);
+                const newCurriculum = e.target.value;
+                setCurriculum(newCurriculum);
                 if (
-                  e.target.value === "UK" ||
-                  e.target.value === "IGCSE"
+                  newCurriculum === "UK" ||
+                  newCurriculum === "IGCSE"
                 ) {
                   setGradeNaming("year");
+                  setLocale("en-GB");
+                } else if (newCurriculum === "US") {
+                  setGradeNaming("grade");
+                  setLocale("en-US");
                 } else {
                   setGradeNaming("grade");
                 }
+                // Auto-set admission terms to match curriculum preset
+                const preset = TERM_PRESETS[newCurriculum] || TERM_PRESETS["UK"];
+                setAdmissionTerms(preset);
               }}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-evalent-500 focus:outline-none focus:ring-1 focus:ring-evalent-500"
             >
