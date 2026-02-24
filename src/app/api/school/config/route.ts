@@ -5,7 +5,7 @@ import { authOptions } from "@/lib/auth";
 
 /**
  * PATCH /api/school/config
- * Update school settings (curriculum, grade_naming, locale, timezone)
+ * Update school settings (curriculum, grade_naming, locale, timezone, admission_terms)
  * Accessible by school_admin and super_admin
  */
 export async function PATCH(req: NextRequest) {
@@ -19,7 +19,8 @@ export async function PATCH(req: NextRequest) {
 
   // Super admin can pass school_id in the body
   const body = await req.json();
-  const targetSchoolId = isSuperAdmin && body.school_id ? body.school_id : schoolId;
+  const targetSchoolId =
+    isSuperAdmin && body.school_id ? body.school_id : schoolId;
 
   if (!targetSchoolId) {
     return NextResponse.json(
@@ -36,6 +37,7 @@ export async function PATCH(req: NextRequest) {
     default_assessor_email,
     default_assessor_first_name,
     default_assessor_last_name,
+    admission_terms,
   } = body;
 
   // Validate grade_naming
@@ -55,10 +57,23 @@ export async function PATCH(req: NextRequest) {
     );
   }
 
+  // Validate admission_terms — must be an array of strings if provided
+  if (admission_terms !== undefined) {
+    if (
+      !Array.isArray(admission_terms) ||
+      !admission_terms.every((t: unknown) => typeof t === "string")
+    ) {
+      return NextResponse.json(
+        { error: "admission_terms must be an array of strings" },
+        { status: 400 }
+      );
+    }
+  }
+
   const supabase = createServerClient();
 
   // Build update object — only include fields that were provided
-  const updates: Record<string, string> = {};
+  const updates: Record<string, any> = {};
   if (curriculum) updates.curriculum = curriculum;
   if (grade_naming) updates.grade_naming = grade_naming;
   if (locale) updates.locale = locale;
@@ -69,6 +84,8 @@ export async function PATCH(req: NextRequest) {
     updates.default_assessor_first_name = default_assessor_first_name;
   if (default_assessor_last_name !== undefined)
     updates.default_assessor_last_name = default_assessor_last_name;
+  if (admission_terms !== undefined)
+    updates.admission_terms = admission_terms;
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json(

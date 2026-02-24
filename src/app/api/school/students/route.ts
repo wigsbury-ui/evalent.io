@@ -24,6 +24,8 @@ const registerSchema = z.object({
   gender: z.string().optional(),
   nationality: z.string().optional(),
   first_language: z.string().optional(),
+  admission_year: z.number().int().min(2024).max(2030).optional(),
+  admission_term: z.string().optional(),
 });
 
 // GET /api/school/students — list students for logged-in school
@@ -57,6 +59,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const parsed = registerSchema.parse(body);
+
     const supabase = createServerClient();
 
     // Get school slug for student ref
@@ -103,6 +106,8 @@ export async function POST(req: NextRequest) {
         gender: parsed.gender || null,
         nationality: parsed.nationality || null,
         first_language: parsed.first_language || null,
+        admission_year: parsed.admission_year || null,
+        admission_term: parsed.admission_term || null,
         jotform_link: jotformLink,
         registered_by: session.user.id,
       })
@@ -124,6 +129,8 @@ export async function POST(req: NextRequest) {
         name: `${parsed.first_name} ${parsed.last_name}`,
         grade: parsed.grade_applied,
         student_ref: studentRef,
+        admission_year: parsed.admission_year || null,
+        admission_term: parsed.admission_term || null,
       },
     });
 

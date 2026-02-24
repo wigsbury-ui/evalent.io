@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Card,
@@ -10,8 +10,17 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2, CheckCircle2, Copy, ExternalLink } from "lucide-react";
+import {
+  ArrowLeft,
+  Loader2,
+  CheckCircle2,
+  Copy,
+  ExternalLink,
+} from "lucide-react";
 import Link from "next/link";
+
+const currentYear = new Date().getFullYear();
+const YEAR_OPTIONS = [currentYear, currentYear + 1, currentYear + 2];
 
 export default function RegisterStudentPage() {
   const router = useRouter();
@@ -24,6 +33,12 @@ export default function RegisterStudentPage() {
     last_name: string;
   } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [admissionTermOptions, setAdmissionTermOptions] = useState<string[]>([
+    "Term 1 (September)",
+    "Term 2 (January)",
+    "Term 3 (April)",
+    "Immediate",
+  ]);
 
   const [form, setForm] = useState({
     first_name: "",
@@ -33,7 +48,31 @@ export default function RegisterStudentPage() {
     gender: "",
     nationality: "",
     first_language: "",
+    admission_year: currentYear,
+    admission_term: "",
   });
+
+  // Fetch school config for admission term presets
+  useEffect(() => {
+    fetch("/api/school/dashboard")
+      .then((r) => r.json())
+      .then((data) => {
+        const terms = data?.school?.admission_terms;
+        if (terms && Array.isArray(terms) && terms.length > 0) {
+          setAdmissionTermOptions(terms);
+          setForm((prev) => ({
+            ...prev,
+            admission_term: terms[0],
+          }));
+        } else {
+          setForm((prev) => ({
+            ...prev,
+            admission_term: "Term 1 (September)",
+          }));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -41,7 +80,10 @@ export default function RegisterStudentPage() {
     const { name, value } = e.target;
     setForm((prev) => ({
       ...prev,
-      [name]: name === "grade_applied" ? parseInt(value) : value,
+      [name]:
+        name === "grade_applied" || name === "admission_year"
+          ? parseInt(value)
+          : value,
     }));
   };
 
@@ -124,7 +166,6 @@ export default function RegisterStudentPage() {
                 )}
               </button>
             </div>
-
             <div className="flex gap-3">
               <a
                 href={result.jotform_link}
@@ -158,6 +199,8 @@ export default function RegisterStudentPage() {
                 gender: "",
                 nationality: "",
                 first_language: "",
+                admission_year: currentYear,
+                admission_term: admissionTermOptions[0] || "",
               });
               setSaving(false);
             }}
@@ -248,6 +291,47 @@ export default function RegisterStudentPage() {
               </select>
             </div>
 
+            {/* Admission Period */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Admission Year *
+                </label>
+                <select
+                  name="admission_year"
+                  value={form.admission_year}
+                  onChange={handleChange}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-evalent-500 focus:outline-none focus:ring-1 focus:ring-evalent-500"
+                >
+                  {YEAR_OPTIONS.map((y) => (
+                    <option key={y} value={y}>
+                      {y}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Admission Term *
+                </label>
+                <select
+                  name="admission_term"
+                  value={form.admission_term}
+                  onChange={handleChange}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-evalent-500 focus:outline-none focus:ring-1 focus:ring-evalent-500"
+                >
+                  {admissionTermOptions.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1 text-xs text-gray-400">
+                  Term options can be customised in School Settings.
+                </p>
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -314,7 +398,7 @@ export default function RegisterStudentPage() {
           </Link>
           <Button type="submit" disabled={saving}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Register & Generate Link
+            Register &amp; Generate Link
           </Button>
         </div>
       </form>
