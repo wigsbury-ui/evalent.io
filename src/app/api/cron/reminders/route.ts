@@ -141,9 +141,11 @@ export async function GET(req: NextRequest) {
       let decisionBaseUrl = "";
       try {
         const token = await createDecisionToken({
-          submissionId: sub.id,
-          schoolId: sub.school_id,
-          assessorEmail: assessorEmail,
+          sub: sub.id,
+          email: assessorEmail,
+          school_id: sub.school_id,
+          student_name: studentName,
+          grade: sub.grade,
         });
         decisionBaseUrl = `${BASE_URL}/api/decision?token=${token}`;
       } catch {
