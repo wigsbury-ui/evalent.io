@@ -10,9 +10,15 @@ import {
   extractWritingResponses,
 } from "@/lib/scoring";
 import type { WritingTask } from "@/lib/scoring";
+import {
+  createDecisionToken,
+  generateAssessorEmail,
+  generateEmailSubject,
+  sendEmail,
+} from "@/lib/email";
 
 /**
- * Scoring Pipeline API — v2 (assessor tone, curriculum-aware)
+ * Scoring Pipeline API — v3 (inlined email sending)
  *
  * POST /api/score
  * Body: { submission_id: string }
@@ -91,8 +97,10 @@ export async function POST(req: NextRequest) {
       const k = rawKeys[i];
       const v = rawAnswers[k];
       if (!v) continue;
-      if (k.includes("student_name") && !studentName) studentName = String(v);
-      if (k.includes("meta_programme") && !programme) programme = String(v);
+      if (k.includes("student_name") && !studentName)
+        studentName = String(v);
+      if (k.includes("meta_programme") && !programme)
+        programme = String(v);
       if (k.includes("meta_language_locale")) {
         detectedLocale = String(v).includes("US") ? "en-US" : "en-GB";
       }
@@ -166,6 +174,8 @@ export async function POST(req: NextRequest) {
     let mathsThreshold = 55;
     let reasoningThreshold = 55;
     let assessorEmail: string | null = null;
+    let assessorFirstName: string | null = null;
+    let assessorLastName: string | null = null;
 
     if (submission.school_id) {
       const { data: gradeConfig } = await supabase
@@ -180,6 +190,23 @@ export async function POST(req: NextRequest) {
         mathsThreshold = gradeConfig.maths_threshold || 55;
         reasoningThreshold = gradeConfig.reasoning_threshold || 55;
         assessorEmail = gradeConfig.assessor_email || null;
+        assessorFirstName = gradeConfig.assessor_first_name || null;
+        assessorLastName = gradeConfig.assessor_last_name || null;
+      }
+    }
+
+    // Fallback: check school-level default assessor
+    if (!assessorEmail && submission.school_id) {
+      const { data: school } = await supabase
+        .from("schools")
+        .select("default_assessor_email, default_assessor_first_name, default_assessor_last_name")
+        .eq("id", submission.school_id)
+        .single();
+
+      if (school && school.default_assessor_email) {
+        assessorEmail = school.default_assessor_email;
+        assessorFirstName = school.default_assessor_first_name || null;
+        assessorLastName = school.default_assessor_last_name || null;
       }
     }
 
@@ -241,7 +268,6 @@ export async function POST(req: NextRequest) {
       reasoning_total: mcqResults.reasoning.total,
       reasoning_pct: mcqResults.reasoning.pct,
       mindset_score: mcqResults.mindset.score || 0,
-
       english_writing_response:
         writingResponses.find((w) => w.domain === "english")
           ?.student_response || null,
@@ -254,36 +280,30 @@ export async function POST(req: NextRequest) {
       creativity_writing_response:
         writingResponses.find((w) => w.domain === "creativity")
           ?.student_response || null,
-
       english_writing_band: writingEvals.english?.band || null,
       english_writing_score: writingEvals.english?.score ?? null,
       english_writing_narrative: writingEvals.english
         ? `${writingEvals.english.content_narrative} ${writingEvals.english.writing_narrative}`
         : null,
       english_combined: recommendation.english.combined_pct,
-
       maths_writing_band: writingEvals.mathematics?.band || null,
       maths_writing_score: writingEvals.mathematics?.score ?? null,
       maths_writing_narrative: writingEvals.mathematics
         ? `${writingEvals.mathematics.content_narrative} ${writingEvals.mathematics.writing_narrative}`
         : null,
       maths_combined: recommendation.mathematics.combined_pct,
-
       reasoning_narrative: reasoningNarrative,
       mindset_narrative: mindsetNarrative,
-
       values_writing_band: writingEvals.values?.band || null,
       values_writing_score: writingEvals.values?.score ?? null,
       values_narrative: writingEvals.values
         ? `${writingEvals.values.content_narrative} ${writingEvals.values.writing_narrative}`
         : null,
-
       creativity_writing_band: writingEvals.creativity?.band || null,
       creativity_writing_score: writingEvals.creativity?.score ?? null,
       creativity_narrative: writingEvals.creativity
         ? `${writingEvals.creativity.content_narrative} ${writingEvals.creativity.writing_narrative}`
         : null,
-
       overall_academic_pct: recommendation.overall_academic_pct,
       recommendation_band: recommendation.recommendation_band,
       processing_status: "complete",
@@ -301,32 +321,137 @@ export async function POST(req: NextRequest) {
       `[SCORING] Pipeline complete for ${submission_id} in ${duration}ms`
     );
 
-    // ─── 10. Auto-trigger report email ────────────────────────────
+    // ─── 10. Send report email directly (inlined, no self-fetch) ──
+    let emailSent = false;
+    let emailError: string | null = null;
+
     if (assessorEmail) {
       console.log(
-        `[SCORING] Auto-sending report to assessor: ${assessorEmail}`
+        `[SCORING] Sending report email to assessor: ${assessorEmail}`
       );
+
       try {
-        const sendUrl = new URL("/api/send-report", req.url);
-        fetch(sendUrl.toString(), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            submission_id: submission_id,
-            assessor_email: assessorEmail,
-          }),
-        }).catch((err) =>
-          console.error("[SCORING] Failed to trigger send-report:", err)
-        );
-      } catch {
-        console.error("[SCORING] Non-blocking send-report trigger failed");
+        // Fetch student details for email
+        let emailStudentName = studentName || "Unknown Student";
+        let emailStudentRef = "";
+        if (submission.student_id) {
+          const { data: student } = await supabase
+            .from("students")
+            .select("first_name, last_name, student_ref")
+            .eq("id", submission.student_id)
+            .single();
+          if (student) {
+            emailStudentName = `${student.first_name} ${student.last_name}`;
+            emailStudentRef = student.student_ref || "";
+          }
+        }
+
+        // Fetch school name for email
+        let schoolName = "School";
+        if (submission.school_id) {
+          const { data: school } = await supabase
+            .from("schools")
+            .select("name")
+            .eq("id", submission.school_id)
+            .single();
+          if (school) schoolName = school.name;
+        }
+
+        // Create decision token
+        const token = await createDecisionToken({
+          sub: submission_id,
+          email: assessorEmail,
+          school_id: submission.school_id || "",
+          student_name: emailStudentName,
+          grade: submission.grade || 10,
+        });
+
+        const appUrl =
+          process.env.NEXT_PUBLIC_APP_URL || "https://app.evalent.io";
+        const reportUrl = `${appUrl}/report?id=${submission_id}`;
+        const decisionBaseUrl = `${appUrl}/api/decision?token=${token}`;
+
+        // Format test date
+        const testDate = submission.submitted_at
+          ? new Date(submission.submitted_at).toLocaleDateString("en-GB", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            })
+          : new Date().toLocaleDateString("en-GB", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            });
+
+        // Generate email HTML
+        const emailHtml = generateAssessorEmail({
+          student_name: emailStudentName,
+          student_ref: emailStudentRef,
+          school_name: schoolName,
+          grade: submission.grade || 10,
+          test_date: testDate,
+          recommendation_band: recommendation.recommendation_band,
+          overall_academic_pct: recommendation.overall_academic_pct,
+          english_combined: recommendation.english.combined_pct,
+          maths_combined: recommendation.mathematics.combined_pct,
+          reasoning_pct: mcqResults.reasoning.pct,
+          mindset_score: mcqResults.mindset.score || 0,
+          report_url: reportUrl,
+          decision_base_url: decisionBaseUrl,
+        });
+
+        const subject = generateEmailSubject({
+          student_name: emailStudentName,
+          grade: submission.grade || 10,
+          school_name: schoolName,
+        });
+
+        // Send email via Resend
+        const result = await sendEmail({
+          to: assessorEmail,
+          subject,
+          html: emailHtml,
+        });
+
+        if (result.success) {
+          emailSent = true;
+          console.log(
+            `[SCORING] Report email sent successfully to ${assessorEmail} (id: ${result.id})`
+          );
+
+          // Update submission with email status
+          await supabase
+            .from("submissions")
+            .update({
+              processing_status: "report_sent",
+              report_sent_at: new Date().toISOString(),
+              report_sent_to: assessorEmail,
+            })
+            .eq("id", submission_id);
+        } else {
+          emailError = result.error || "Unknown email error";
+          console.error(
+            `[SCORING] Email send failed: ${emailError}`
+          );
+        }
+      } catch (err) {
+        emailError =
+          err instanceof Error ? err.message : String(err);
+        console.error(`[SCORING] Email error: ${emailError}`);
       }
+    } else {
+      console.log(
+        `[SCORING] No assessor email configured — skipping email send`
+      );
     }
+
+    const totalDuration = Date.now() - startTime;
 
     return NextResponse.json({
       message: "Scoring complete",
       submission_id,
-      duration_ms: duration,
+      duration_ms: totalDuration,
       scores: {
         english: {
           mcq: `${mcqResults.english.correct}/${mcqResults.english.total} (${mcqResults.english.pct}%)`,
@@ -347,7 +472,9 @@ export async function POST(req: NextRequest) {
       },
       recommendation: recommendation.recommendation_band,
       overall_academic_pct: recommendation.overall_academic_pct,
-      report_email_sent: !!assessorEmail,
+      report_email_sent: emailSent,
+      report_email_error: emailError,
+      assessor_email: assessorEmail || "none configured",
     });
   } catch (err) {
     console.error("[SCORING] Pipeline error:", err);
