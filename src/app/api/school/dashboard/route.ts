@@ -49,7 +49,7 @@ export async function GET(req: NextRequest) {
       supabase
         .from("submissions")
         .select(
-          "id, student_id, grade, processing_status, overall_academic_pct, recommendation_band, report_sent_at, created_at"
+          "id, student_id, grade, processing_status, overall_academic_pct, recommendation_band, report_sent_at, report_email_sent_at, assessor_email_used, created_at"
         )
         .eq("school_id", schoolId)
         .order("created_at", { ascending: false }),
@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
       supabase
         .from("schools")
         .select(
-          "id, name, slug, curriculum, locale, contact_email, timezone, is_active, subscription_plan, grade_naming, default_assessor_email, default_assessor_first_name, default_assessor_last_name, admission_terms"
+          "id, name, slug, curriculum, locale, contact_email, timezone, is_active, subscription_plan, grade_naming, default_assessor_email, default_assessor_first_name, default_assessor_last_name, admissions_lead_name, admissions_lead_email, admission_terms"
         )
         .eq("id", schoolId)
         .single(),
@@ -105,17 +105,12 @@ export async function GET(req: NextRequest) {
   });
 
   // Statuses that mean "report is ready / viewable"
-  const reportReadyStatuses = [
-    "complete",
-    "report_sent",
-    "decided",
-  ];
+  const reportReadyStatuses = ["complete", "report_sent", "decided"];
 
   // Reports ready = submissions that are complete, report_sent, or decided
   const reportsReady = submissions.filter(
     (s) =>
-      reportReadyStatuses.includes(s.processing_status) ||
-      s.report_sent_at
+      reportReadyStatuses.includes(s.processing_status) || s.report_sent_at
   ).length;
 
   // Awaiting decision = report is ready but no decision recorded

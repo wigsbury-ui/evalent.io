@@ -5,7 +5,7 @@ import { authOptions } from "@/lib/auth";
 
 /**
  * PATCH /api/school/config
- * Update school settings (curriculum, grade_naming, locale, timezone, admission_terms)
+ * Update school settings (curriculum, grade_naming, locale, timezone, admission_terms, admissions lead)
  * Accessible by school_admin and super_admin
  */
 export async function PATCH(req: NextRequest) {
@@ -17,7 +17,6 @@ export async function PATCH(req: NextRequest) {
   const schoolId = session.user.schoolId;
   const isSuperAdmin = session.user.role === "super_admin";
 
-  // Super admin can pass school_id in the body
   const body = await req.json();
   const targetSchoolId =
     isSuperAdmin && body.school_id ? body.school_id : schoolId;
@@ -38,9 +37,10 @@ export async function PATCH(req: NextRequest) {
     default_assessor_first_name,
     default_assessor_last_name,
     admission_terms,
+    admissions_lead_name,
+    admissions_lead_email,
   } = body;
 
-  // Validate grade_naming
   if (grade_naming && !["grade", "year"].includes(grade_naming)) {
     return NextResponse.json(
       { error: "grade_naming must be 'grade' or 'year'" },
@@ -48,7 +48,6 @@ export async function PATCH(req: NextRequest) {
     );
   }
 
-  // Validate curriculum
   const validCurricula = ["IB", "UK", "US", "IGCSE", "Other"];
   if (curriculum && !validCurricula.includes(curriculum)) {
     return NextResponse.json(
@@ -57,7 +56,6 @@ export async function PATCH(req: NextRequest) {
     );
   }
 
-  // Validate admission_terms — must be an array of strings if provided
   if (admission_terms !== undefined) {
     if (
       !Array.isArray(admission_terms) ||
@@ -72,7 +70,6 @@ export async function PATCH(req: NextRequest) {
 
   const supabase = createServerClient();
 
-  // Build update object — only include fields that were provided
   const updates: Record<string, any> = {};
   if (curriculum) updates.curriculum = curriculum;
   if (grade_naming) updates.grade_naming = grade_naming;
@@ -86,6 +83,10 @@ export async function PATCH(req: NextRequest) {
     updates.default_assessor_last_name = default_assessor_last_name;
   if (admission_terms !== undefined)
     updates.admission_terms = admission_terms;
+  if (admissions_lead_name !== undefined)
+    updates.admissions_lead_name = admissions_lead_name;
+  if (admissions_lead_email !== undefined)
+    updates.admissions_lead_email = admissions_lead_email;
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json(
@@ -106,7 +107,6 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Audit log
   await supabase.from("audit_log").insert({
     actor_id: session.user.id,
     actor_email: session.user.email,

@@ -22,6 +22,8 @@ import {
   CalendarDays,
   Plus,
   X,
+  ShieldCheck,
+  User,
 } from "lucide-react";
 
 interface SchoolConfig {
@@ -36,6 +38,8 @@ interface SchoolConfig {
   subscription_plan: string;
   grade_naming: string;
   admission_terms: string[] | null;
+  admissions_lead_name: string | null;
+  admissions_lead_email: string | null;
 }
 
 const CURRICULUM_OPTIONS = [
@@ -105,8 +109,13 @@ export default function SchoolConfigPage() {
   const [gradeNaming, setGradeNaming] = useState("grade");
   const [locale, setLocale] = useState("en-GB");
   const [timezone, setTimezone] = useState("UTC");
-  const [admissionTerms, setAdmissionTerms] = useState<string[]>(DEFAULT_TERMS);
+  const [admissionTerms, setAdmissionTerms] =
+    useState<string[]>(DEFAULT_TERMS);
   const [newTerm, setNewTerm] = useState("");
+
+  // Admissions Lead
+  const [leadName, setLeadName] = useState("");
+  const [leadEmail, setLeadEmail] = useState("");
 
   useEffect(() => {
     fetch("/api/school/dashboard")
@@ -122,7 +131,6 @@ export default function SchoolConfigPage() {
           setLoading(false);
           return;
         }
-        console.log("[CONFIG] Dashboard response:", { hasSchool: !!data.school, schoolName: data.school?.name });
         const s = data?.school || null;
         setSchool(s);
         if (s) {
@@ -133,6 +141,8 @@ export default function SchoolConfigPage() {
           if (s.admission_terms && Array.isArray(s.admission_terms)) {
             setAdmissionTerms(s.admission_terms);
           }
+          setLeadName(s.admissions_lead_name || "");
+          setLeadEmail(s.admissions_lead_email || "");
         }
         setLoading(false);
       })
@@ -158,7 +168,6 @@ export default function SchoolConfigPage() {
     if (!school) return;
     setSaving(true);
     setSaved(false);
-
     try {
       const res = await fetch("/api/school/config", {
         method: "PATCH",
@@ -169,9 +178,10 @@ export default function SchoolConfigPage() {
           locale,
           timezone,
           admission_terms: admissionTerms,
+          admissions_lead_name: leadName,
+          admissions_lead_email: leadEmail,
         }),
       });
-
       if (res.ok) {
         const updated = await res.json();
         setSchool({ ...school, ...updated });
@@ -259,6 +269,64 @@ export default function SchoolConfigPage() {
         </CardContent>
       </Card>
 
+      {/* Admissions Lead */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50">
+              <ShieldCheck className="h-5 w-5 text-amber-600" />
+            </div>
+            <div>
+              <CardTitle className="text-lg">Admissions Team Leader</CardTitle>
+              <CardDescription>
+                This person is notified when an assessor fails to respond within
+                72 hours. They can follow up directly or review the report
+                themselves.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                <User className="mr-1.5 inline h-4 w-4" />
+                Full Name
+              </label>
+              <input
+                type="text"
+                value={leadName}
+                onChange={(e) => setLeadName(e.target.value)}
+                placeholder="e.g. Sarah Thompson"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-evalent-500 focus:outline-none focus:ring-1 focus:ring-evalent-500"
+              />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                <Mail className="mr-1.5 inline h-4 w-4" />
+                Email Address
+              </label>
+              <input
+                type="email"
+                value={leadEmail}
+                onChange={(e) => setLeadEmail(e.target.value)}
+                placeholder="e.g. admissions@school.edu"
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-evalent-500 focus:outline-none focus:ring-1 focus:ring-evalent-500"
+              />
+            </div>
+          </div>
+          <div className="rounded-lg border border-amber-100 bg-amber-50 p-3">
+            <p className="text-xs text-amber-800">
+              <strong>Reminder schedule:</strong> After a report is emailed to an
+              assessor, Evalent will send a reminder at <strong>48 hours</strong>.
+              If still no response, a <strong>final reminder</strong> is sent at{" "}
+              <strong>72 hours</strong> along with an escalation email to the
+              admissions team leader above.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Editable settings */}
       <Card>
         <CardHeader>
@@ -292,8 +360,8 @@ export default function SchoolConfigPage() {
                 } else {
                   setGradeNaming("grade");
                 }
-                // Auto-set admission terms to match curriculum preset
-                const preset = TERM_PRESETS[newCurriculum] || TERM_PRESETS["UK"];
+                const preset =
+                  TERM_PRESETS[newCurriculum] || TERM_PRESETS["UK"];
                 setAdmissionTerms(preset);
               }}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-evalent-500 focus:outline-none focus:ring-1 focus:ring-evalent-500"
@@ -305,8 +373,8 @@ export default function SchoolConfigPage() {
               ))}
             </select>
             <p className="mt-1 text-xs text-gray-400">
-              Determines the educational framework and language used in AI report
-              narratives.
+              Determines the educational framework and language used in AI
+              report narratives.
             </p>
           </div>
 
@@ -328,8 +396,8 @@ export default function SchoolConfigPage() {
               ))}
             </select>
             <p className="mt-1 text-xs text-gray-400">
-              UK/British schools typically use &quot;Year&quot; (Year 4 = Grade 3
-              + 1). IB and American schools use &quot;Grade&quot;.
+              UK/British schools typically use &quot;Year&quot; (Year 4 = Grade
+              3 + 1). IB and American schools use &quot;Grade&quot;.
             </p>
           </div>
 
@@ -400,7 +468,6 @@ export default function SchoolConfigPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Current terms list */}
           <div className="space-y-2">
             {admissionTerms.map((term, index) => (
               <div
@@ -422,8 +489,6 @@ export default function SchoolConfigPage() {
               </p>
             )}
           </div>
-
-          {/* Add new term */}
           <div className="flex gap-2">
             <input
               value={newTerm}
