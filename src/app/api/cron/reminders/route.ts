@@ -80,9 +80,9 @@ export async function GET(req: NextRequest) {
     );
 
     // Get school info (for admissions lead)
-    const schoolIds = [
-      ...new Set(pendingSubmissions.map((s) => s.school_id)),
-    ];
+    const schoolIds = Array.from(
+      new Set(pendingSubmissions.map((s) => s.school_id))
+    );
     const { data: schools } = await supabase
       .from("schools")
       .select(
