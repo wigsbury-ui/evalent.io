@@ -260,7 +260,6 @@ export default function SchoolDashboard() {
                     <th className="pb-3 font-medium">Student</th>
                     <th className="pb-3 font-medium">Grade</th>
                     <th className="pb-3 font-medium">Admission</th>
-                    <th className="pb-3 font-medium">Ref</th>
                     <th className="pb-3 font-medium">Status</th>
                     <th className="pb-3 font-medium">Score</th>
                     <th className="pb-3 font-medium">Recommendation</th>
@@ -277,7 +276,15 @@ export default function SchoolDashboard() {
                     return (
                       <tr key={student.id} className="hover:bg-gray-50">
                         <td className="py-3 font-medium text-gray-900">
-                          {student.first_name} {student.last_name}
+                          <span
+                            className="group relative cursor-default"
+                            title={student.student_ref}
+                          >
+                            {student.first_name} {student.last_name}
+                            <span className="pointer-events-none absolute -top-8 left-0 z-20 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-xs font-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                              {student.student_ref}
+                            </span>
+                          </span>
                         </td>
                         <td className="py-3 text-gray-600">
                           G{student.grade_applied}
@@ -288,9 +295,6 @@ export default function SchoolDashboard() {
                             : student.admission_year
                               ? String(student.admission_year)
                               : "—"}
-                        </td>
-                        <td className="py-3 font-mono text-xs text-gray-400">
-                          {student.student_ref}
                         </td>
                         <td className="py-3">
                           <span

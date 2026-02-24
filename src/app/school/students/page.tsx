@@ -521,7 +521,6 @@ export default function StudentsPage() {
                     <SortHeader label="Student" sortKey="name" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
                     <SortHeader label="Grade" sortKey="grade" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
                     <SortHeader label="Admission" sortKey="admission" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
-                    <SortHeader label="Ref" sortKey="ref" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
                     <SortHeader label="Status" sortKey="status" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
                     <SortHeader label="Score" sortKey="score" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
                     <SortHeader label="Recommendation" sortKey="recommendation" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
@@ -538,7 +537,15 @@ export default function StudentsPage() {
                     return (
                       <tr key={student.id} className="hover:bg-gray-50">
                         <td className="py-3 font-medium text-gray-900">
-                          {student.first_name} {student.last_name}
+                          <span
+                            className="group relative cursor-default"
+                            title={student.student_ref}
+                          >
+                            {student.first_name} {student.last_name}
+                            <span className="pointer-events-none absolute -top-8 left-0 z-20 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-xs font-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                              {student.student_ref}
+                            </span>
+                          </span>
                         </td>
                         <td className="py-3 text-gray-600">
                           G{student.grade_applied}
@@ -549,9 +556,6 @@ export default function StudentsPage() {
                             : student.admission_year
                               ? String(student.admission_year)
                               : "—"}
-                        </td>
-                        <td className="py-3 font-mono text-xs text-gray-400">
-                          {student.student_ref}
                         </td>
                         <td className="py-3">
                           <span
