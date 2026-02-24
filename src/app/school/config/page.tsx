@@ -79,8 +79,19 @@ export default function SchoolConfigPage() {
 
   useEffect(() => {
     fetch("/api/school/dashboard")
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) {
+          console.error("[CONFIG] Dashboard API error:", r.status);
+          return null;
+        }
+        return r.json();
+      })
       .then((data) => {
+        if (!data) {
+          setLoading(false);
+          return;
+        }
+        console.log("[CONFIG] Dashboard response:", { hasSchool: !!data.school, schoolName: data.school?.name });
         const s = data?.school || null;
         setSchool(s);
         if (s) {
@@ -94,7 +105,10 @@ export default function SchoolConfigPage() {
         }
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch((err) => {
+        console.error("[CONFIG] Fetch error:", err);
+        setLoading(false);
+      });
   }, []);
 
   const addTerm = () => {
@@ -330,37 +344,6 @@ export default function SchoolConfigPage() {
               <option value="Asia/Kolkata">India (IST)</option>
             </select>
           </div>
-
-          {/* Save button */}
-          <div className="flex items-center gap-3 pt-2">
-            <Button
-              onClick={handleSave}
-              disabled={saving}
-              className="bg-evalent-700 hover:bg-evalent-600 text-white"
-            >
-              {saving ? (
-                <>
-                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  Saving...
-                </>
-              ) : saved ? (
-                <>
-                  <Check className="mr-2 h-4 w-4" />
-                  Saved
-                </>
-              ) : (
-                <>
-                  <Save className="mr-2 h-4 w-4" />
-                  Save Changes
-                </>
-              )}
-            </Button>
-            {saved && (
-              <span className="text-sm text-green-600">
-                Settings updated successfully.
-              </span>
-            )}
-          </div>
         </CardContent>
       </Card>
 
@@ -426,13 +409,39 @@ export default function SchoolConfigPage() {
               Add
             </Button>
           </div>
-
-          <p className="text-xs text-gray-400">
-            Changes to admission terms are saved when you click &quot;Save
-            Changes&quot; above.
-          </p>
         </CardContent>
       </Card>
+
+      {/* Save button */}
+      <div className="flex items-center gap-3">
+        <Button
+          onClick={handleSave}
+          disabled={saving}
+          className="bg-evalent-700 hover:bg-evalent-600 text-white"
+        >
+          {saving ? (
+            <>
+              <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+              Saving...
+            </>
+          ) : saved ? (
+            <>
+              <Check className="mr-2 h-4 w-4" />
+              Saved
+            </>
+          ) : (
+            <>
+              <Save className="mr-2 h-4 w-4" />
+              Save Changes
+            </>
+          )}
+        </Button>
+        {saved && (
+          <span className="text-sm text-green-600">
+            Settings updated successfully.
+          </span>
+        )}
+      </div>
     </div>
   );
 }
