@@ -22,6 +22,7 @@ import {
   ChevronUp,
   ChevronDown,
   ChevronsUpDown,
+  Download,
 } from "lucide-react";
 
 interface StudentData {
@@ -224,6 +225,8 @@ export default function StudentsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [showExport, setShowExport] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const fetchStudents = async () => {
     try {
@@ -262,6 +265,58 @@ export default function StudentsPage() {
     setTimeout(() => setCopied(null), 2000);
   };
 
+  /* ── Export helpers ──────────────────────────────────────────── */
+  const handleExport = async (format: "xlsx" | "csv") => {
+    setExporting(true);
+    setShowExport(false);
+    try {
+      if (format === "csv") {
+        // Direct download from API
+        const res = await fetch("/api/school/export?format=csv");
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download =
+          res.headers
+            .get("Content-Disposition")
+            ?.match(/filename="(.+)"/)?.[1] || "students.csv";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        // Get JSON, build Excel client-side with SheetJS
+        const res = await fetch("/api/school/export?format=json");
+        const data = await res.json();
+
+        // Dynamically load SheetJS
+        const XLSX = await import("xlsx");
+        const ws = XLSX.utils.json_to_sheet(data.rows);
+
+        // Auto-size columns
+        const colWidths = Object.keys(data.rows[0] || {}).map((key) => {
+          const maxLen = Math.max(
+            key.length,
+            ...data.rows.map((r: any) => String(r[key] || "").length)
+          );
+          return { wch: Math.min(maxLen + 2, 40) };
+        });
+        ws["!cols"] = colWidths;
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Students");
+        const dateStr = new Date().toISOString().slice(0, 10);
+        const filename = `${data.schoolName.replace(/[^a-zA-Z0-9]/g, "_")}_Students_${dateStr}.xlsx`;
+        XLSX.writeFile(wb, filename);
+      }
+    } catch (err) {
+      console.error("Export failed:", err);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const sorted = sortStudents(students, sortKey, sortDir);
 
   if (loading) {
@@ -284,6 +339,37 @@ export default function StudentsPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
+          <div className="relative">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowExport(!showExport)}
+              disabled={exporting || students.length === 0}
+            >
+              <Download
+                className={`mr-2 h-4 w-4 ${exporting ? "animate-pulse" : ""}`}
+              />
+              {exporting ? "Exporting…" : "Export"}
+            </Button>
+            {showExport && (
+              <div className="absolute right-0 top-full z-10 mt-1 w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                <button
+                  onClick={() => handleExport("xlsx")}
+                  className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  <FileText className="h-4 w-4 text-green-600" />
+                  Excel (.xlsx)
+                </button>
+                <button
+                  onClick={() => handleExport("csv")}
+                  className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                >
+                  <FileText className="h-4 w-4 text-blue-600" />
+                  CSV (.csv)
+                </button>
+              </div>
+            )}
+          </div>
           <Button
             variant="outline"
             size="sm"
