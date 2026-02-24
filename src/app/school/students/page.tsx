@@ -19,6 +19,9 @@ import {
   CheckCircle2,
   FileText,
   RefreshCw,
+  ChevronUp,
+  ChevronDown,
+  ChevronsUpDown,
 } from "lucide-react";
 
 interface StudentData {
@@ -44,6 +47,18 @@ interface StudentData {
   } | null;
 }
 
+type SortKey =
+  | "name"
+  | "grade"
+  | "admission"
+  | "ref"
+  | "status"
+  | "score"
+  | "recommendation"
+  | "decision";
+
+type SortDir = "asc" | "desc";
+
 const statusConfig: Record<string, { label: string; color: string }> = {
   registered: { label: "Registered", color: "bg-gray-100 text-gray-700" },
   submitted: { label: "Submitted", color: "bg-blue-100 text-blue-700" },
@@ -65,7 +80,27 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   error: { label: "Error", color: "bg-red-100 text-red-700" },
 };
 
-/* ── Recommendation band → badge variant mapping ──────────────── */
+const STATUS_ORDER: Record<string, number> = {
+  error: -1,
+  registered: 0,
+  submitted: 1,
+  pending: 2,
+  scoring: 3,
+  ai_evaluation: 4,
+  generating_report: 5,
+  sending: 6,
+  scored: 7,
+  complete: 8,
+  report_sent: 9,
+  decided: 10,
+};
+
+const REC_ORDER: Record<string, number> = {
+  "not yet ready": 1,
+  "borderline": 2,
+  "ready to admit": 3,
+};
+
 function getRecommendationVariant(
   band: string
 ): "success" | "warning" | "destructive" | "info" | "secondary" {
@@ -78,7 +113,6 @@ function getRecommendationVariant(
   return "secondary";
 }
 
-/* ── Decision → badge variant + display label ─────────────────── */
 function getDecisionVariant(
   decision: string
 ): "success" | "info" | "warning" | "destructive" | "secondary" {
@@ -97,11 +131,99 @@ function formatDecision(decision: string): string {
     .join(" ");
 }
 
+/* ── Sort comparator ──────────────────────────────────────────── */
+function getSortValue(student: StudentData, key: SortKey): string | number {
+  switch (key) {
+    case "name":
+      return `${student.first_name} ${student.last_name}`.toLowerCase();
+    case "grade":
+      return student.grade_applied;
+    case "admission":
+      return student.admission_year
+        ? `${student.admission_year}-${student.admission_term || ""}`
+        : "zzz";
+    case "ref":
+      return student.student_ref.toLowerCase();
+    case "status":
+      return STATUS_ORDER[student.pipeline_status] ?? 99;
+    case "score":
+      return student.submission?.overall_academic_pct ?? -1;
+    case "recommendation": {
+      const band =
+        student.submission?.recommendation_band?.toLowerCase() || "";
+      for (const [k, val] of Object.entries(REC_ORDER)) {
+        if (band.includes(k)) return val;
+      }
+      return 0;
+    }
+    case "decision":
+      return student.decision?.decision || "zzz";
+    default:
+      return "";
+  }
+}
+
+function sortStudents(
+  students: StudentData[],
+  key: SortKey,
+  dir: SortDir
+): StudentData[] {
+  return [...students].sort((a, b) => {
+    const aVal = getSortValue(a, key);
+    const bVal = getSortValue(b, key);
+    let cmp = 0;
+    if (typeof aVal === "number" && typeof bVal === "number") {
+      cmp = aVal - bVal;
+    } else {
+      cmp = String(aVal).localeCompare(String(bVal));
+    }
+    return dir === "asc" ? cmp : -cmp;
+  });
+}
+
+/* ── Sortable header component ────────────────────────────────── */
+function SortHeader({
+  label,
+  sortKey,
+  currentSort,
+  currentDir,
+  onSort,
+}: {
+  label: string;
+  sortKey: SortKey;
+  currentSort: SortKey;
+  currentDir: SortDir;
+  onSort: (key: SortKey) => void;
+}) {
+  const isActive = currentSort === sortKey;
+  return (
+    <th
+      className="pb-3 font-medium cursor-pointer select-none hover:text-gray-900 transition-colors"
+      onClick={() => onSort(sortKey)}
+    >
+      <div className="flex items-center gap-1">
+        {label}
+        {isActive ? (
+          currentDir === "asc" ? (
+            <ChevronUp className="h-3.5 w-3.5 text-evalent-600" />
+          ) : (
+            <ChevronDown className="h-3.5 w-3.5 text-evalent-600" />
+          )
+        ) : (
+          <ChevronsUpDown className="h-3.5 w-3.5 text-gray-300" />
+        )}
+      </div>
+    </th>
+  );
+}
+
 export default function StudentsPage() {
   const [students, setStudents] = useState<StudentData[]>([]);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
 
   const fetchStudents = async () => {
     try {
@@ -125,11 +247,22 @@ export default function StudentsPage() {
     fetchStudents();
   };
 
+  const handleSort = (key: SortKey) => {
+    if (key === sortKey) {
+      setSortDir(sortDir === "asc" ? "desc" : "asc");
+    } else {
+      setSortKey(key);
+      setSortDir("asc");
+    }
+  };
+
   const copyLink = (link: string, id: string) => {
     navigator.clipboard.writeText(link);
     setCopied(id);
     setTimeout(() => setCopied(null), 2000);
   };
+
+  const sorted = sortStudents(students, sortKey, sortDir);
 
   if (loading) {
     return (
@@ -197,7 +330,8 @@ export default function StudentsPage() {
               All Students ({students.length})
             </CardTitle>
             <CardDescription>
-              Click the report icon to view a student&apos;s assessment report.
+              Click a column header to sort. Click the report icon to view a
+              student&apos;s assessment report.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -205,20 +339,20 @@ export default function StudentsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 text-left text-gray-500">
-                    <th className="pb-3 font-medium">Student</th>
-                    <th className="pb-3 font-medium">Grade</th>
-                    <th className="pb-3 font-medium">Admission</th>
-                    <th className="pb-3 font-medium">Ref</th>
-                    <th className="pb-3 font-medium">Status</th>
-                    <th className="pb-3 font-medium">Score</th>
-                    <th className="pb-3 font-medium">Recommendation</th>
-                    <th className="pb-3 font-medium">Decision</th>
+                    <SortHeader label="Student" sortKey="name" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+                    <SortHeader label="Grade" sortKey="grade" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+                    <SortHeader label="Admission" sortKey="admission" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+                    <SortHeader label="Ref" sortKey="ref" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+                    <SortHeader label="Status" sortKey="status" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+                    <SortHeader label="Score" sortKey="score" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+                    <SortHeader label="Recommendation" sortKey="recommendation" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+                    <SortHeader label="Decision" sortKey="decision" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
                     <th className="pb-3 font-medium">Link</th>
                     <th className="pb-3 font-medium">Report</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {students.map((student) => {
+                  {sorted.map((student) => {
                     const sc =
                       statusConfig[student.pipeline_status] ||
                       statusConfig.registered;
