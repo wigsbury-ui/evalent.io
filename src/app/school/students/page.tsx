@@ -22,6 +22,8 @@ import {
   ChevronUp,
   ChevronDown,
   ChevronsUpDown,
+  ChevronLeft,
+  ChevronRight,
   Download,
 } from "lucide-react";
 
@@ -227,6 +229,8 @@ export default function StudentsPage() {
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [showExport, setShowExport] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
 
   const fetchStudents = async () => {
     try {
@@ -257,6 +261,7 @@ export default function StudentsPage() {
       setSortKey(key);
       setSortDir("asc");
     }
+    setCurrentPage(1);
   };
 
   const copyLink = (link: string, id: string) => {
@@ -395,6 +400,11 @@ export default function StudentsPage() {
 
   const sorted = sortStudents(students, sortKey, sortDir);
 
+  // Pagination
+  const totalPages = Math.ceil(sorted.length / rowsPerPage);
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const paginated = sorted.slice(startIndex, startIndex + rowsPerPage);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -521,7 +531,7 @@ export default function StudentsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {sorted.map((student) => {
+                  {paginated.map((student) => {
                     const sc =
                       statusConfig[student.pipeline_status] ||
                       statusConfig.registered;
@@ -641,6 +651,104 @@ export default function StudentsPage() {
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination */}
+            {sorted.length > 10 && (
+              <div className="flex items-center justify-between border-t border-gray-200 pt-4 mt-4">
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <span>Show</span>
+                  <select
+                    value={rowsPerPage}
+                    onChange={(e) => {
+                      setRowsPerPage(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                    className="rounded border border-gray-300 px-2 py-1 text-sm focus:border-evalent-500 focus:outline-none"
+                  >
+                    {[10, 25, 50, 100].map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                  <span>per page</span>
+                  <span className="ml-4 text-gray-400">
+                    {startIndex + 1}–{Math.min(startIndex + rowsPerPage, sorted.length)} of{" "}
+                    {sorted.length}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                    className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30 disabled:hover:bg-transparent"
+                  >
+                    <ChevronsUpDown className="h-4 w-4 rotate-90" />
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(currentPage - 1)}
+                    disabled={currentPage === 1}
+                    className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30 disabled:hover:bg-transparent"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </button>
+
+                  {/* Page numbers */}
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter((page) => {
+                      if (totalPages <= 7) return true;
+                      if (page === 1 || page === totalPages) return true;
+                      if (Math.abs(page - currentPage) <= 1) return true;
+                      return false;
+                    })
+                    .reduce<(number | string)[]>((acc, page, idx, arr) => {
+                      if (idx > 0 && page - (arr[idx - 1] as number) > 1) {
+                        acc.push("...");
+                      }
+                      acc.push(page);
+                      return acc;
+                    }, [])
+                    .map((item, idx) =>
+                      item === "..." ? (
+                        <span
+                          key={`ellipsis-${idx}`}
+                          className="px-1 text-sm text-gray-400"
+                        >
+                          …
+                        </span>
+                      ) : (
+                        <button
+                          key={item}
+                          onClick={() => setCurrentPage(item as number)}
+                          className={`min-w-[32px] rounded px-2 py-1 text-sm ${
+                            currentPage === item
+                              ? "bg-evalent-600 text-white font-medium"
+                              : "text-gray-600 hover:bg-gray-100"
+                          }`}
+                        >
+                          {item}
+                        </button>
+                      )
+                    )}
+
+                  <button
+                    onClick={() => setCurrentPage(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                    className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30 disabled:hover:bg-transparent"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                    className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30 disabled:hover:bg-transparent"
+                  >
+                    <ChevronsUpDown className="h-4 w-4 rotate-90" />
+                  </button>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
