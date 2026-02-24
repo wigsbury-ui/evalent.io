@@ -19,9 +19,13 @@ import {
   ChevronRight,
   GraduationCap,
   RotateCcw,
+  Clock,
+  Zap,
+  AlertTriangle,
 } from "lucide-react";
 
 /* ─── Types ─────────────────────────────────────────────────── */
+
 interface GradeConfig {
   id: string;
   grade: number;
@@ -44,13 +48,66 @@ interface AssessorFields {
   email: string;
 }
 
+interface ResponseMetric {
+  email: string;
+  avg_hours: number | null;
+  total_sent: number;
+  total_decided: number;
+  pending: number;
+}
+
 /* ─── Grade Label Helper ────────────────────────────────────── */
+
 function gradeDisplay(grade: number, naming: string): string {
   if (naming === "year") return `Year ${grade + 1}`;
   return `Grade ${grade}`;
 }
 
+/* ─── Response Time Helpers ─────────────────────────────────── */
+
+function responseLabel(avgHours: number | null): {
+  label: string;
+  color: string;
+  icon: typeof Zap;
+} {
+  if (avgHours === null)
+    return { label: "No data yet", color: "text-gray-400", icon: Clock };
+  if (avgHours <= 24)
+    return {
+      label: "Within 24 hours",
+      color: "text-green-600",
+      icon: Zap,
+    };
+  if (avgHours <= 48)
+    return {
+      label: "Within 48 hours",
+      color: "text-blue-600",
+      icon: Clock,
+    };
+  if (avgHours <= 72)
+    return {
+      label: "Within 3 days",
+      color: "text-amber-600",
+      icon: Clock,
+    };
+  return {
+    label: "Slow to respond",
+    color: "text-red-600",
+    icon: AlertTriangle,
+  };
+}
+
+function formatHours(hours: number): string {
+  if (hours < 1) return "< 1 hour";
+  if (hours < 24) return `${Math.round(hours)} hour${Math.round(hours) !== 1 ? "s" : ""}`;
+  const days = Math.floor(hours / 24);
+  const remaining = Math.round(hours % 24);
+  if (remaining === 0) return `${days} day${days !== 1 ? "s" : ""}`;
+  return `${days}d ${remaining}h`;
+}
+
 /* ─── Text Input Component ──────────────────────────────────── */
+
 function FieldInput({
   label,
   value,
@@ -87,12 +144,14 @@ function FieldInput({
 }
 
 /* ─── Main Page Component ───────────────────────────────────── */
+
 export default function AssessorsPage() {
   const [configs, setConfigs] = useState<GradeConfig[]>([]);
   const [school, setSchool] = useState<SchoolInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [responseMetrics, setResponseMetrics] = useState<ResponseMetric[]>([]);
 
   // Universal assessor
   const [globalAssessor, setGlobalAssessor] = useState<AssessorFields>({
@@ -106,15 +165,21 @@ export default function AssessorsPage() {
   const [gradeOverrides, setGradeOverrides] = useState<
     Record<number, AssessorFields>
   >({});
-  const [expandedGrades, setExpandedGrades] = useState<Set<number>>(new Set());
+  const [expandedGrades, setExpandedGrades] = useState<Set<number>>(
+    new Set()
+  );
 
   // Load data
   useEffect(() => {
     Promise.all([
       fetch("/api/school/grade-configs").then((r) => r.json()),
       fetch("/api/school/dashboard").then((r) => r.json()),
+      fetch("/api/school/assessor-metrics").then((r) => {
+        if (!r.ok) return [];
+        return r.json();
+      }),
     ])
-      .then(([configsData, dashData]) => {
+      .then(([configsData, dashData, metricsData]) => {
         const cfgs: GradeConfig[] = Array.isArray(configsData)
           ? configsData
           : [];
@@ -123,9 +188,12 @@ export default function AssessorsPage() {
         const s = dashData?.school;
         const schoolInfo: SchoolInfo = {
           grade_naming: s?.grade_naming || "grade",
-          default_assessor_email: s?.default_assessor_email || s?.contact_email || "",
-          default_assessor_first_name: s?.default_assessor_first_name || "",
-          default_assessor_last_name: s?.default_assessor_last_name || "",
+          default_assessor_email:
+            s?.default_assessor_email || s?.contact_email || "",
+          default_assessor_first_name:
+            s?.default_assessor_first_name || "",
+          default_assessor_last_name:
+            s?.default_assessor_last_name || "",
         };
         setSchool(schoolInfo);
 
@@ -145,7 +213,6 @@ export default function AssessorsPage() {
             last_name: c.assessor_last_name || "",
             email: c.assessor_email || "",
           };
-          // If this grade has its own assessor details, mark as custom
           if (
             c.assessor_first_name ||
             c.assessor_last_name ||
@@ -158,10 +225,22 @@ export default function AssessorsPage() {
         setGradeOverrides(overrides);
         setCustomGrades(custom);
 
+        // Set response metrics
+        if (Array.isArray(metricsData)) {
+          setResponseMetrics(metricsData);
+        }
+
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, []);
+
+  // Get metric for a specific email
+  const getMetric = (email: string): ResponseMetric | undefined => {
+    return responseMetrics.find(
+      (m) => m.email.toLowerCase() === email.toLowerCase()
+    );
+  };
 
   // Toggle custom grade
   const toggleCustom = useCallback(
@@ -170,7 +249,6 @@ export default function AssessorsPage() {
         const next = new Set(Array.from(prev));
         if (next.has(grade)) {
           next.delete(grade);
-          // Reset to global
           setGradeOverrides((prev) => ({
             ...prev,
             [grade]: {
@@ -231,7 +309,6 @@ export default function AssessorsPage() {
   const handleSave = async () => {
     setSaving(true);
     setSaved(false);
-
     try {
       // 1. Save global assessor to schools table
       await fetch("/api/school/config", {
@@ -250,7 +327,9 @@ export default function AssessorsPage() {
         const o = gradeOverrides[c.grade];
         return {
           id: c.id,
-          assessor_email: isCustom ? o?.email ?? globalAssessor.email : globalAssessor.email,
+          assessor_email: isCustom
+            ? o?.email ?? globalAssessor.email
+            : globalAssessor.email,
           assessor_first_name: isCustom
             ? o?.first_name ?? globalAssessor.first_name
             : globalAssessor.first_name,
@@ -289,6 +368,49 @@ export default function AssessorsPage() {
 
   const naming = school?.grade_naming || "grade";
 
+  // Build unique assessor list for response metrics display
+  const uniqueAssessors: {
+    email: string;
+    name: string;
+    grades: string[];
+  }[] = [];
+  const seenEmails = new Set<string>();
+
+  // Global assessor
+  if (globalAssessor.email && !seenEmails.has(globalAssessor.email.toLowerCase())) {
+    const assignedGrades = configs
+      .filter((c) => !customGrades.has(c.grade))
+      .map((c) => gradeDisplay(c.grade, naming));
+    uniqueAssessors.push({
+      email: globalAssessor.email,
+      name: [globalAssessor.first_name, globalAssessor.last_name]
+        .filter(Boolean)
+        .join(" ") || "Universal Assessor",
+      grades: assignedGrades,
+    });
+    seenEmails.add(globalAssessor.email.toLowerCase());
+  }
+
+  // Custom grade assessors
+  for (const grade of Array.from(customGrades)) {
+    const o = gradeOverrides[grade];
+    if (o?.email && !seenEmails.has(o.email.toLowerCase())) {
+      const assignedGrades = Array.from(customGrades)
+        .filter((g) => {
+          const ov = gradeOverrides[g];
+          return ov?.email?.toLowerCase() === o.email.toLowerCase();
+        })
+        .map((g) => gradeDisplay(g, naming));
+      uniqueAssessors.push({
+        email: o.email,
+        name: [o.first_name, o.last_name].filter(Boolean).join(" ") ||
+          "Assessor",
+        grades: assignedGrades,
+      });
+      seenEmails.add(o.email.toLowerCase());
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Page header */}
@@ -302,6 +424,118 @@ export default function AssessorsPage() {
         </p>
       </div>
 
+      {/* ─── RESPONSE TIME METRICS ────────────────────────────── */}
+      {responseMetrics.length > 0 && uniqueAssessors.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50">
+                <Clock className="h-5 w-5 text-blue-600" />
+              </div>
+              <div>
+                <CardTitle className="text-lg">Response Times</CardTitle>
+                <CardDescription>
+                  Average time from report email to decision, based on
+                  historical data.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {uniqueAssessors.map((assessor) => {
+                const metric = getMetric(assessor.email);
+                const info = responseLabel(metric?.avg_hours ?? null);
+                const IconComponent = info.icon;
+
+                return (
+                  <div
+                    key={assessor.email}
+                    className="flex items-center justify-between rounded-lg border border-gray-100 p-4"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-600">
+                        {assessor.name
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")
+                          .toUpperCase()
+                          .slice(0, 2)}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {assessor.name}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          {assessor.email}
+                          {assessor.grades.length > 0 && (
+                            <span>
+                              {" · "}
+                              {assessor.grades.join(", ")}
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4 text-right">
+                      {metric && metric.avg_hours !== null ? (
+                        <>
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">
+                              {formatHours(metric.avg_hours)}
+                            </p>
+                            <p className="text-xs text-gray-400">
+                              avg response
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-xs text-gray-400">
+                              {metric.total_decided}/{metric.total_sent}{" "}
+                              reviewed
+                            </p>
+                            {metric.pending > 0 && (
+                              <p className="text-xs text-amber-500">
+                                {metric.pending} pending
+                              </p>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <div>
+                          <p className="text-xs text-gray-400">
+                            {metric
+                              ? `${metric.pending} pending · no decisions yet`
+                              : "No reports sent"}
+                          </p>
+                        </div>
+                      )}
+                      <div
+                        className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium ${
+                          info.color
+                        } ${
+                          info.color.includes("green")
+                            ? "bg-green-50"
+                            : info.color.includes("blue")
+                            ? "bg-blue-50"
+                            : info.color.includes("amber")
+                            ? "bg-amber-50"
+                            : info.color.includes("red")
+                            ? "bg-red-50"
+                            : "bg-gray-50"
+                        }`}
+                      >
+                        <IconComponent className="h-3.5 w-3.5" />
+                        {info.label}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* ─── UNIVERSAL ASSESSOR ────────────────────────────────── */}
       <Card>
         <CardHeader>
@@ -312,8 +546,8 @@ export default function AssessorsPage() {
             <div>
               <CardTitle className="text-lg">Universal Assessor</CardTitle>
               <CardDescription>
-                This assessor receives reports for all grades unless overridden
-                below.
+                This assessor receives reports for all grades unless
+                overridden below.
               </CardDescription>
             </div>
           </div>
@@ -324,7 +558,10 @@ export default function AssessorsPage() {
               label="First Name"
               value={globalAssessor.first_name}
               onChange={(v) =>
-                setGlobalAssessor((prev) => ({ ...prev, first_name: v }))
+                setGlobalAssessor((prev) => ({
+                  ...prev,
+                  first_name: v,
+                }))
               }
               placeholder="e.g. Sarah"
               icon={<User className="h-4 w-4" />}
@@ -333,7 +570,10 @@ export default function AssessorsPage() {
               label="Last Name"
               value={globalAssessor.last_name}
               onChange={(v) =>
-                setGlobalAssessor((prev) => ({ ...prev, last_name: v }))
+                setGlobalAssessor((prev) => ({
+                  ...prev,
+                  last_name: v,
+                }))
               }
               placeholder="e.g. Thompson"
               icon={<User className="h-4 w-4" />}
@@ -352,7 +592,11 @@ export default function AssessorsPage() {
           <p className="text-xs text-gray-400">
             Reports will be addressed to{" "}
             {globalAssessor.first_name
-              ? `${globalAssessor.first_name}${globalAssessor.last_name ? " " + globalAssessor.last_name : ""}`
+              ? `${globalAssessor.first_name}${
+                  globalAssessor.last_name
+                    ? " " + globalAssessor.last_name
+                    : ""
+                }`
               : "the assessor"}{" "}
             and sent to{" "}
             <span className="font-medium text-gray-500">
@@ -360,7 +604,6 @@ export default function AssessorsPage() {
             </span>
             .
           </p>
-
           {configs.length > 0 && (
             <div className="flex items-center gap-3 border-t border-gray-100 pt-4">
               <Button
@@ -386,10 +629,13 @@ export default function AssessorsPage() {
                 <GraduationCap className="h-5 w-5 text-gray-500" />
               </div>
               <div>
-                <CardTitle className="text-lg">Grade-Level Assessors</CardTitle>
+                <CardTitle className="text-lg">
+                  Grade-Level Assessors
+                </CardTitle>
                 <CardDescription>
                   Toggle the checkbox to assign a different assessor for a
-                  specific grade. Unchecked grades use the universal assessor above.
+                  specific grade. Unchecked grades use the universal assessor
+                  above.
                 </CardDescription>
               </div>
             </div>
@@ -490,7 +736,11 @@ export default function AssessorsPage() {
                               : globalAssessor.first_name
                           }
                           onChange={(v) =>
-                            updateOverride(config.grade, "first_name", v)
+                            updateOverride(
+                              config.grade,
+                              "first_name",
+                              v
+                            )
                           }
                           placeholder={
                             globalAssessor.first_name || "First name"
@@ -506,7 +756,11 @@ export default function AssessorsPage() {
                               : globalAssessor.last_name
                           }
                           onChange={(v) =>
-                            updateOverride(config.grade, "last_name", v)
+                            updateOverride(
+                              config.grade,
+                              "last_name",
+                              v
+                            )
                           }
                           placeholder={
                             globalAssessor.last_name || "Last name"
@@ -518,7 +772,9 @@ export default function AssessorsPage() {
                       <FieldInput
                         label="Email Address"
                         value={
-                          isCustom ? overrides.email : globalAssessor.email
+                          isCustom
+                            ? overrides.email
+                            : globalAssessor.email
                         }
                         onChange={(v) =>
                           updateOverride(config.grade, "email", v)
@@ -533,8 +789,8 @@ export default function AssessorsPage() {
                       {!isCustom && (
                         <p className="text-xs text-gray-400">
                           Inheriting from universal assessor. Check
-                          &quot;Customise&quot; to set a different assessor for
-                          this grade.
+                          &quot;Customise&quot; to set a different assessor
+                          for this grade.
                         </p>
                       )}
                     </div>
@@ -552,7 +808,9 @@ export default function AssessorsPage() {
           <p className="text-xs text-gray-400">
             {customGrades.size === 0
               ? "All grades use the universal assessor."
-              : `${customGrades.size} grade${customGrades.size > 1 ? "s" : ""} with custom assessors.`}
+              : `${customGrades.size} grade${
+                  customGrades.size > 1 ? "s" : ""
+                } with custom assessors.`}
           </p>
           <div className="flex items-center gap-3">
             {saved && (
