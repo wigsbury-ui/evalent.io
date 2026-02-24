@@ -17,10 +17,8 @@ import {
   Clock,
   CheckCircle2,
   UserPlus,
-  ArrowRight,
   ExternalLink,
   Copy,
-  AlertCircle,
 } from "lucide-react";
 
 interface PipelineStudent {
@@ -33,6 +31,7 @@ interface PipelineStudent {
   created_at: string;
   pipeline_status: string;
   submission: {
+    id: string;
     overall_academic_pct: number | null;
     recommendation_band: string | null;
     processing_status: string;
@@ -61,13 +60,52 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   pending: { label: "Pending", color: "bg-blue-100 text-blue-700" },
   scoring: { label: "Scoring", color: "bg-amber-100 text-amber-700" },
   ai_evaluation: { label: "AI Eval", color: "bg-amber-100 text-amber-700" },
-  generating_report: { label: "Report Gen", color: "bg-purple-100 text-purple-700" },
+  generating_report: {
+    label: "Report Gen",
+    color: "bg-purple-100 text-purple-700",
+  },
   sending: { label: "Sending", color: "bg-purple-100 text-purple-700" },
   scored: { label: "Scored", color: "bg-green-100 text-green-700" },
-  report_sent: { label: "Report Sent", color: "bg-evalent-100 text-evalent-700" },
+  complete: { label: "Complete", color: "bg-green-100 text-green-700" },
+  report_sent: {
+    label: "Report Sent",
+    color: "bg-evalent-100 text-evalent-700",
+  },
   decided: { label: "Decided", color: "bg-emerald-100 text-emerald-700" },
   error: { label: "Error", color: "bg-red-100 text-red-700" },
 };
+
+/* ── Recommendation band → badge variant mapping ──────────────── */
+function getRecommendationVariant(
+  band: string
+): "success" | "warning" | "destructive" | "info" | "secondary" {
+  const lower = band.toLowerCase();
+  if (lower.startsWith("ready to admit")) return "success";
+  if (lower.includes("borderline")) return "warning";
+  if (lower.includes("not yet ready") || lower.includes("not ready"))
+    return "destructive";
+  if (lower.includes("support")) return "info";
+  return "secondary";
+}
+
+/* ── Decision → badge variant + display label ─────────────────── */
+function getDecisionVariant(
+  decision: string
+): "success" | "info" | "warning" | "destructive" | "secondary" {
+  const d = decision.toLowerCase();
+  if (d === "admit") return "success";
+  if (d === "admit_with_support") return "info";
+  if (d === "waitlist") return "warning";
+  if (d === "reject") return "destructive";
+  return "secondary";
+}
+
+function formatDecision(decision: string): string {
+  return decision
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
 
 export default function SchoolDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -106,10 +144,34 @@ export default function SchoolDashboard() {
   };
 
   const statCards = [
-    { label: "Registered Students", value: stats.total_students, icon: Users, color: "text-blue-600", bg: "bg-blue-50" },
-    { label: "Reports Sent", value: stats.reports_sent, icon: FileText, color: "text-evalent-600", bg: "bg-evalent-50" },
-    { label: "Awaiting Decision", value: stats.awaiting_decision, icon: Clock, color: "text-amber-600", bg: "bg-amber-50" },
-    { label: "Decisions Made", value: stats.decisions_made, icon: CheckCircle2, color: "text-green-600", bg: "bg-green-50" },
+    {
+      label: "Registered Students",
+      value: stats.total_students,
+      icon: Users,
+      color: "text-blue-600",
+      bg: "bg-blue-50",
+    },
+    {
+      label: "Reports Sent",
+      value: stats.reports_sent,
+      icon: FileText,
+      color: "text-evalent-600",
+      bg: "bg-evalent-50",
+    },
+    {
+      label: "Awaiting Decision",
+      value: stats.awaiting_decision,
+      icon: Clock,
+      color: "text-amber-600",
+      bg: "bg-amber-50",
+    },
+    {
+      label: "Decisions Made",
+      value: stats.decisions_made,
+      icon: CheckCircle2,
+      color: "text-green-600",
+      bg: "bg-green-50",
+    },
   ];
 
   return (
@@ -138,10 +200,16 @@ export default function SchoolDashboard() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-500">{stat.label}</p>
-                  <p className="mt-1 text-3xl font-bold text-gray-900">{stat.value}</p>
+                  <p className="text-sm font-medium text-gray-500">
+                    {stat.label}
+                  </p>
+                  <p className="mt-1 text-3xl font-bold text-gray-900">
+                    {stat.value}
+                  </p>
                 </div>
-                <div className={`flex h-12 w-12 items-center justify-center rounded-lg ${stat.bg}`}>
+                <div
+                  className={`flex h-12 w-12 items-center justify-center rounded-lg ${stat.bg}`}
+                >
                   <stat.icon className={`h-6 w-6 ${stat.color}`} />
                 </div>
               </div>
@@ -156,7 +224,9 @@ export default function SchoolDashboard() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="text-lg">Student Pipeline</CardTitle>
-              <CardDescription>Track students through the assessment process</CardDescription>
+              <CardDescription>
+                Track students through the assessment process
+              </CardDescription>
             </div>
             <Link href="/school/students/new">
               <Button variant="outline" size="sm">
@@ -170,7 +240,9 @@ export default function SchoolDashboard() {
           {!data?.pipeline?.length ? (
             <div className="flex flex-col items-center justify-center py-12 text-center">
               <Users className="h-12 w-12 text-gray-300" />
-              <p className="mt-3 text-sm text-gray-500">No students registered yet</p>
+              <p className="mt-3 text-sm text-gray-500">
+                No students registered yet
+              </p>
               <Link href="/school/students/new" className="mt-4">
                 <Button size="sm">
                   <UserPlus className="mr-2 h-4 w-4" />
@@ -188,24 +260,32 @@ export default function SchoolDashboard() {
                     <th className="pb-3 font-medium">Ref</th>
                     <th className="pb-3 font-medium">Status</th>
                     <th className="pb-3 font-medium">Score</th>
+                    <th className="pb-3 font-medium">Recommendation</th>
                     <th className="pb-3 font-medium">Decision</th>
-                    <th className="pb-3 font-medium">Assessment Link</th>
+                    <th className="pb-3 font-medium">Link</th>
+                    <th className="pb-3 font-medium">Report</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {data.pipeline.map((student) => {
-                    const sc = statusConfig[student.pipeline_status] || statusConfig.registered;
+                    const sc =
+                      statusConfig[student.pipeline_status] ||
+                      statusConfig.registered;
                     return (
                       <tr key={student.id} className="hover:bg-gray-50">
                         <td className="py-3 font-medium text-gray-900">
                           {student.first_name} {student.last_name}
                         </td>
-                        <td className="py-3 text-gray-600">G{student.grade_applied}</td>
+                        <td className="py-3 text-gray-600">
+                          G{student.grade_applied}
+                        </td>
                         <td className="py-3 font-mono text-xs text-gray-400">
                           {student.student_ref}
                         </td>
                         <td className="py-3">
-                          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${sc.color}`}>
+                          <span
+                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${sc.color}`}
+                          >
                             {sc.label}
                           </span>
                         </td>
@@ -215,16 +295,34 @@ export default function SchoolDashboard() {
                             : "—"}
                         </td>
                         <td className="py-3">
-                          {student.decision ? (
-                            <Badge variant={student.decision.decision === "admit" ? "success" : "secondary"}>
-                              {student.decision.decision.replace("_", " ")}
+                          {student.submission?.recommendation_band ? (
+                            <Badge
+                              variant={getRecommendationVariant(
+                                student.submission.recommendation_band
+                              )}
+                            >
+                              {student.submission.recommendation_band}
                             </Badge>
                           ) : (
                             <span className="text-gray-400">—</span>
                           )}
                         </td>
                         <td className="py-3">
-                          {student.jotform_link && student.pipeline_status === "registered" ? (
+                          {student.decision ? (
+                            <Badge
+                              variant={getDecisionVariant(
+                                student.decision.decision
+                              )}
+                            >
+                              {formatDecision(student.decision.decision)}
+                            </Badge>
+                          ) : (
+                            <span className="text-gray-400">—</span>
+                          )}
+                        </td>
+                        <td className="py-3">
+                          {student.jotform_link &&
+                          student.pipeline_status === "registered" ? (
                             <div className="flex items-center gap-1">
                               <a
                                 href={student.jotform_link}
@@ -235,7 +333,9 @@ export default function SchoolDashboard() {
                                 <ExternalLink className="h-4 w-4" />
                               </a>
                               <button
-                                onClick={() => copyLink(student.jotform_link!, student.id)}
+                                onClick={() =>
+                                  copyLink(student.jotform_link!, student.id)
+                                }
                                 className="text-gray-400 hover:text-gray-600"
                               >
                                 {copied === student.id ? (
@@ -247,8 +347,31 @@ export default function SchoolDashboard() {
                             </div>
                           ) : (
                             <span className="text-gray-400 text-xs">
-                              {student.pipeline_status !== "registered" ? "Completed" : "—"}
+                              {student.pipeline_status !== "registered"
+                                ? "Done"
+                                : "—"}
                             </span>
+                          )}
+                        </td>
+                        <td className="py-3">
+                          {student.submission?.id &&
+                          [
+                            "scored",
+                            "complete",
+                            "generating_report",
+                            "report_sent",
+                            "decided",
+                          ].includes(student.pipeline_status) ? (
+                            <a
+                              href={`/report?id=${student.submission.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-evalent-600 hover:text-evalent-700"
+                            >
+                              <FileText className="h-4 w-4" />
+                            </a>
+                          ) : (
+                            <span className="text-gray-400">—</span>
                           )}
                         </td>
                       </tr>
