@@ -22,7 +22,6 @@ export async function GET(req: NextRequest) {
       .order("created_at", { ascending: true })
       .limit(1)
       .single();
-
     if (firstSchool) {
       schoolId = firstSchool.id;
     }
@@ -47,7 +46,6 @@ export async function GET(req: NextRequest) {
         )
         .eq("school_id", schoolId)
         .order("created_at", { ascending: false }),
-
       supabase
         .from("submissions")
         .select(
@@ -55,11 +53,9 @@ export async function GET(req: NextRequest) {
         )
         .eq("school_id", schoolId)
         .order("created_at", { ascending: false }),
-
       supabase
         .from("decisions")
         .select("id, submission_id, decision, decided_at"),
-
       supabase
         .from("schools")
         .select(
@@ -92,12 +88,14 @@ export async function GET(req: NextRequest) {
   const pipeline = students.map((s) => {
     const sub = submissionByStudent[s.id];
     const dec = sub ? decisionBySub[sub.id] : null;
+
     let status = "registered";
     if (dec) status = "decided";
     else if (sub?.report_sent_at) status = "report_sent";
     else if (sub?.processing_status === "complete") status = "complete";
     else if (sub?.processing_status === "error") status = "error";
     else if (sub) status = sub.processing_status || "submitted";
+
     return {
       ...s,
       submission: sub || null,
@@ -106,19 +104,41 @@ export async function GET(req: NextRequest) {
     };
   });
 
-  // Counts
+  // Statuses that mean "report is ready / viewable"
+  const reportReadyStatuses = [
+    "complete",
+    "report_sent",
+    "decided",
+  ];
+
+  // Reports ready = submissions that are complete, report_sent, or decided
+  const reportsReady = submissions.filter(
+    (s) =>
+      reportReadyStatuses.includes(s.processing_status) ||
+      s.report_sent_at
+  ).length;
+
+  // Awaiting decision = report is ready but no decision recorded
+  const awaitingDecision = submissions.filter(
+    (s) =>
+      (reportReadyStatuses.includes(s.processing_status) ||
+        s.report_sent_at) &&
+      !decisionBySub[s.id]
+  ).length;
+
+  // In pipeline = submissions still being processed (not yet complete)
+  const inPipeline = submissions.filter(
+    (s) =>
+      !reportReadyStatuses.includes(s.processing_status) &&
+      s.processing_status !== "error"
+  ).length;
+
   const stats = {
     total_students: students.length,
-    reports_sent: submissions.filter((s) => s.report_sent_at).length,
-    awaiting_decision: submissions.filter(
-      (s) => s.report_sent_at && !decisionBySub[s.id]
-    ).length,
+    reports_sent: reportsReady,
+    awaiting_decision: awaitingDecision,
     decisions_made: decisions.length,
-    in_pipeline: submissions.filter(
-      (s) =>
-        s.processing_status !== "complete" &&
-        s.processing_status !== "error"
-    ).length,
+    in_pipeline: inPipeline,
   };
 
   return NextResponse.json({ school, stats, pipeline });
