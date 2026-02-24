@@ -30,6 +30,8 @@ interface PipelineStudent {
   jotform_link: string | null;
   created_at: string;
   pipeline_status: string;
+  admission_year: number | null;
+  admission_term: string | null;
   submission: {
     id: string;
     overall_academic_pct: number | null;
@@ -257,6 +259,7 @@ export default function SchoolDashboard() {
                   <tr className="border-b border-gray-200 text-left text-gray-500">
                     <th className="pb-3 font-medium">Student</th>
                     <th className="pb-3 font-medium">Grade</th>
+                    <th className="pb-3 font-medium">Admission</th>
                     <th className="pb-3 font-medium">Ref</th>
                     <th className="pb-3 font-medium">Status</th>
                     <th className="pb-3 font-medium">Score</th>
@@ -278,6 +281,13 @@ export default function SchoolDashboard() {
                         </td>
                         <td className="py-3 text-gray-600">
                           G{student.grade_applied}
+                        </td>
+                        <td className="py-3 text-gray-600 text-xs">
+                          {student.admission_year && student.admission_term
+                            ? `${student.admission_term} ${student.admission_year}`
+                            : student.admission_year
+                              ? String(student.admission_year)
+                              : "—"}
                         </td>
                         <td className="py-3 font-mono text-xs text-gray-400">
                           {student.student_ref}

@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
       supabase
         .from("students")
         .select(
-          "id, first_name, last_name, grade_applied, student_ref, jotform_link, created_at"
+          "id, first_name, last_name, grade_applied, student_ref, jotform_link, created_at, admission_year, admission_term"
         )
         .eq("school_id", schoolId)
         .order("created_at", { ascending: false }),
@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
       supabase
         .from("schools")
         .select(
-          "id, name, slug, curriculum, locale, contact_email, timezone, is_active, subscription_plan, grade_naming, default_assessor_email, default_assessor_first_name, default_assessor_last_name"
+          "id, name, slug, curriculum, locale, contact_email, timezone, is_active, subscription_plan, grade_naming, default_assessor_email, default_assessor_first_name, default_assessor_last_name, admission_terms"
         )
         .eq("id", schoolId)
         .single(),
