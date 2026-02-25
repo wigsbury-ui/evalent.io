@@ -62,15 +62,20 @@ export async function POST(req: NextRequest) {
 
     const supabase = createServerClient();
 
-    // Get school slug for student ref
+    // Get school info for student ref + locale (for video voice selection)
     const { data: school } = await supabase
       .from("schools")
-      .select("slug")
+      .select("slug, locale, curriculum")
       .eq("id", session.user.schoolId)
       .single();
 
     const schoolSlug = school?.slug || "EVL";
     const studentRef = generateStudentRef(schoolSlug, parsed.grade_applied);
+
+    // Determine voice from school locale
+    // en-US → "us", everything else → "uk"
+    const locale = school?.locale || "en-GB";
+    const voice = locale === "en-US" ? "us" : "uk";
 
     // Build Jotform link with prefilled metadata
     const formId = JOTFORM_IDS[parsed.grade_applied];
@@ -87,8 +92,11 @@ export async function POST(req: NextRequest) {
       meta_grade: `G${parsed.grade_applied}`,
       meta_school_id: session.user.schoolId,
       meta_student_ref: studentRef,
+      meta_language_locale: locale,
+      meta_programme: school?.curriculum || "IB",
       meta_mode: "live",
       meta_pipeline_version: "2.0",
+      voice: voice,
     });
 
     const jotformLink = `https://form.jotform.com/${formId}?${prefills.toString()}`;
@@ -131,6 +139,8 @@ export async function POST(req: NextRequest) {
         student_ref: studentRef,
         admission_year: parsed.admission_year || null,
         admission_term: parsed.admission_term || null,
+        voice: voice,
+        locale: locale,
       },
     });
 
