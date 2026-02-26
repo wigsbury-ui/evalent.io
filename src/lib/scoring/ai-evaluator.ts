@@ -216,8 +216,13 @@ async function fetchWithRetry(
 
 export async function evaluateWriting(
     task: WritingTask,
-    apiKey: string
+    apiKey?: string
 ): Promise<WritingEvaluation> {
+    const key = apiKey || process.env.ANTHROPIC_API_KEY || "";
+    if (!key) {
+        console.error("[AI_EVAL] No API key available");
+        return fallback(task.domain, "no API key configured");
+    }
     if (!task.student_response || task.student_response.trim().length < 10) {
         return {
             domain: task.domain,
@@ -241,7 +246,7 @@ export async function evaluateWriting(
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "x-api-key": apiKey,
+                    "x-api-key": key,
                     "anthropic-version": "2023-06-01",
                 },
                 body: JSON.stringify({
