@@ -214,15 +214,112 @@ async function fetchWithRetry(
     throw new Error(`[AI_EVAL] ${label}: exhausted all retries`);
 }
 
-export async function evaluateWriting(
-    task: WritingTask,
-    apiKey?: string
-): Promise<WritingEvaluation> {
-    const key = apiKey || process.env.ANTHROPIC_API_KEY || "";
-    if (!key) {
-        console.error("[AI_EVAL] No API key available");
-        return fallback(task.domain, "no API key configured");
+export function generateReasoningNarrativePrompt(
+    score_pct: number,
+    threshold: number,
+    grade: number,
+    correct: number,
+    total: number,
+    locale: string,
+    student_name?: string,
+    programme?: string
+): { system: string; user: string } {
+    const lang = locale === "en-US" ? "American English" : "British English";
+    const curriculum = getCurriculumContext(programme);
+    const name = student_name || "The student";
+
+    return {
+        system: `You are a senior admissions assessor writing a reasoning score interpretation for a ${gradeLabel(grade, programme)} applicant to ${curriculum}. Write in ${lang}.
+
+AUDIENCE: School admissions panel only — not shared with the student or parents.
+VOICE: Third person, professional. Refer to the student as "${name}". Be evaluative, not encouraging. Ground the interpretation in what the score implies about reasoning readiness.
+LENGTH: 3-4 sentences.`,
+
+        user: `${name}, a ${gradeLabel(grade, programme)} applicant, scored ${correct}/${total} (${score_pct}%) on the reasoning section. The school's threshold for this domain is ${threshold}%.
+
+Write a professional assessment interpreting this score. Address whether it meets the threshold, what it suggests about the student's logical reasoning and problem-solving readiness, and any implications for admissions. Return ONLY the narrative text — no JSON, no headers.`,
+    };
+}
+
+export function generateMindsetNarrativePrompt(
+    mindset_score: number,
+    grade: number,
+    locale: string,
+    student_name?: string,
+    programme?: string
+): { system: string; user: string } {
+    const lang = locale === "en-US" ? "American English" : "British English";
+    const curriculum = getCurriculumContext(programme);
+    const name = student_name || "The student";
+
+    const descriptor =
+        mindset_score >= 3.5
+            ? "strong growth orientation"
+            : mindset_score >= 2.5
+                ? "developing growth mindset with some fixed-mindset tendencies"
+                : mindset_score >= 1.5
+                    ? "limited growth orientation; may benefit from targeted support"
+                    : "significant fixed-mindset tendencies; structured coaching recommended";
+
+    return {
+        system: `You are a senior admissions assessor interpreting a mindset and learning readiness score for a ${gradeLabel(grade, programme)} applicant to ${curriculum}. Write in ${lang}.
+
+AUDIENCE: School admissions panel only — not shared with the student or parents.
+VOICE: Third person, professional. Refer to the student as "${name}". Draw on Carol Dweck's growth mindset framework but write as an assessor, not a coach. Be honest about what the score implies without being dismissive.
+CONTEXT: The mindset lens is complementary — it does not determine admission. It signals where coaching, mentoring, or structured support around learning habits may be needed.
+LENGTH: 3-4 sentences.`,
+
+        user: `${name}, a ${gradeLabel(grade, programme)} applicant, received a mindset / readiness score of ${mindset_score} out of 4.0, which indicates ${descriptor}.
+
+Write a professional assessment for the admissions panel. Interpret what this score suggests about the student's current approach to challenge, feedback, and persistence. Note any implications for pastoral or academic support if admitted. Return ONLY the narrative text — no JSON, no headers.`,
+    };
+}
+
+export async function generateNarrative(system: string, user: string): Promise<string> {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) return "Narrative unavailable — API key not configured.";
+
+    try {
+        const res = await fetchWithRetry(
+            "https://api.anthropic.com/v1/messages",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "x-api-key": apiKey,
+                    "anthropic-version": "2023-06-01",
+                },
+                body: JSON.stringify({
+                    model: CLAUDE_MODEL,
+                    max_tokens: 512,
+                    system,
+                    messages: [{ role: "user", content: user }],
+                }),
+            },
+            "narrative"
+        );
+
+        if (!res.ok) {
+            const errText = await res.text();
+            console.error(`[AI_EVAL] Narrative API ${res.status} (after retries): ${errText}`);
+            return "Narrative generation encountered an error.";
+        }
+
+        const data = await res.json();
+        return data.content?.[0]?.text?.trim() || "";
+    } catch (err) {
+        console.error("[AI_EVAL] Narrative error:", err);
+        return "Narrative generation encountered an error.";
     }
+}
+
+export async function evaluateWriting(task: WritingTask): Promise<WritingEvaluation> {
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+        console.error("[AI_EVAL] No ANTHROPIC_API_KEY");
+        return fallback(task.domain, "No API key");
+    }
+
     if (!task.student_response || task.student_response.trim().length < 10) {
         return {
             domain: task.domain,
@@ -246,7 +343,7 @@ export async function evaluateWriting(
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "x-api-key": key,
+                    "x-api-key": apiKey,
                     "anthropic-version": "2023-06-01",
                 },
                 body: JSON.stringify({
@@ -279,7 +376,7 @@ export async function evaluateWriting(
             threshold_comment: parsed.threshold_comment || "",
         };
     } catch (err) {
-        console.error("[AI_EVAL] Error:", err);
+        console.error(`[AI_EVAL] Error for ${task.domain}:`, err);
         return fallback(task.domain, String(err));
     }
 }
