@@ -111,3 +111,45 @@ export async function POST(req: NextRequest) {
         );
     }
 }
+
+/**
+ * DELETE /api/students?id=xxx
+ * Hard-deletes a student and their associated submissions.
+ */
+export async function DELETE(req: NextRequest) {
+    try {
+        const url = new URL(req.url);
+        const studentId = url.searchParams.get("id");
+
+        if (!studentId) {
+            return NextResponse.json(
+                { error: "Student ID is required" },
+                { status: 400 }
+            );
+        }
+
+        const supabase = createServerClient();
+
+        // Delete submissions first (FK constraint)
+        await supabase
+            .from("submissions")
+            .delete()
+            .eq("student_id", studentId);
+
+        // Delete the student
+        const { error } = await supabase
+            .from("students")
+            .delete()
+            .eq("id", studentId);
+
+        if (error) throw error;
+
+        return NextResponse.json({ success: true });
+    } catch (err) {
+        console.error("Failed to delete student:", err);
+        return NextResponse.json(
+            { message: "Internal server error" },
+            { status: 500 }
+        );
+    }
+}
