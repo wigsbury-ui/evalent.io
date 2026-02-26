@@ -271,6 +271,18 @@ export default function StudentsPage() {
     setTimeout(() => setCopied(null), 2000);
   };
 
+  const handleDelete = async (studentId: string, studentName: string) => {
+    if (!confirm("Delete " + studentName + "? This will also remove their submissions. This cannot be undone.")) return;
+    try {
+      const res = await fetch("/api/students?id=" + studentId, { method: "DELETE" });
+      if (!res.ok) throw new Error("Delete failed");
+      setStudents(prev => prev.filter(s => s.id !== studentId));
+    } catch (err) {
+      console.error("Delete error:", err);
+      alert("Failed to delete student");
+    }
+  };
+
   /* ââ Export helpers ââââââââââââââââââââââââââââââââââââââââââââ */
   const handleExport = async (format: "xlsx" | "csv" | "pdf") => {
     setExporting(true);
