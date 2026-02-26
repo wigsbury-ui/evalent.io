@@ -73,9 +73,9 @@ export async function POST(req: NextRequest) {
     const studentRef = generateStudentRef(schoolSlug, parsed.grade_applied);
 
     // Determine voice from school locale
-    // en-US → "us", everything else → "uk"
-    const locale = school?.locale || "en-GB";
-    const voice = locale === "en-US" ? "us" : "uk";
+    // en-US → "US", everything else → "UK"
+    const rawLocale = school?.locale || "en-GB";
+    const voice = rawLocale === "en-US" ? "US" : "UK";
 
     // Build Jotform link with prefilled metadata
     const formId = JOTFORM_IDS[parsed.grade_applied];
@@ -88,11 +88,12 @@ export async function POST(req: NextRequest) {
 
     const prefills = new URLSearchParams({
       student_name: `${parsed.first_name} ${parsed.last_name}`,
+      student_first_name: parsed.first_name,
       school_id: session.user.schoolId,
       meta_grade: `G${parsed.grade_applied}`,
       meta_school_id: session.user.schoolId,
       meta_student_ref: studentRef,
-      meta_language_locale: locale,
+      meta_language_locale: voice,
       meta_programme: school?.curriculum || "IB",
       meta_mode: "live",
       meta_pipeline_version: "2.0",
@@ -140,7 +141,7 @@ export async function POST(req: NextRequest) {
         admission_year: parsed.admission_year || null,
         admission_term: parsed.admission_term || null,
         voice: voice,
-        locale: locale,
+        locale: rawLocale,
       },
     });
 
