@@ -47,13 +47,10 @@ export async function generateExecutiveSummary(
   var systemPrompt =
     "You are a senior educational assessment specialist writing an executive summary " +
     "for a school admissions report. Your audience is the Head of Admissions. " +
-    "Write in third person. IMPORTANT: Always use the student's first name ('" +
+    "Write in third person. You MUST use the name '" +
     firstName +
-    "') as the grammatical subject of each sentence — " +
-    "NEVER start a sentence with 'The student' or just 'The'. " +
-    "For example write '" +
-    firstName +
-    " demonstrates...' NOT 'The demonstrates...' or 'The student demonstrates...'. " +
+    "' (not 'the student', not 'the', not pronouns) as the subject in the first sentence. " +
+    "Use '" + firstName + "' at least twice in the summary. " +
     "Be precise, evidence-based and professional. " +
     "The summary must synthesise the data into a coherent 3-4 sentence narrative " +
     "that explains the student's profile and concludes with a clear justification " +
