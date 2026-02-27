@@ -985,8 +985,10 @@ function pageDomain(
   if (domainData.writing_response) {
     writingSection +=
       '<div style="margin-top:8px;">' +
-      sectionSubHeader("Student\u2019s Written Response") +
       '<div class="student-writing">' +
+      '<span style="font-style:normal;font-weight:700;color:' +
+      COLORS.primary +
+      ';">Student\u2019s Written Response: </span>' +
       domainData.writing_response +
       "</div></div>";
   }
@@ -1122,8 +1124,10 @@ function pageLens(
     '<div class="narrative">' +
     narrativeToParagraphs(lens.narrative) +
     "</div>" +
-    sectionSubHeader("Student\u2019s Response") +
     '<div class="student-writing">' +
+    '<span style="font-style:normal;font-weight:700;color:' +
+    COLORS.primary +
+    ';">Student\u2019s Response: </span>' +
     (lens.response || "No written response was provided.") +
     "</div>" +
     pageFooter(pageNum, totalPages) +
