@@ -26,6 +26,7 @@ import {
   ChevronRight,
   Download,
   Trash2,
+  RotateCcw,
 } from "lucide-react";
 
 interface StudentData {
@@ -60,7 +61,6 @@ type SortKey =
   | "score"
   | "recommendation"
   | "decision";
-
 type SortDir = "asc" | "desc";
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -136,7 +136,10 @@ function formatDecision(decision: string): string {
 }
 
 /* ── Sort comparator ──────────────────────────────────────────── */
-function getSortValue(student: StudentData, key: SortKey): string | number {
+function getSortValue(
+  student: StudentData,
+  key: SortKey
+): string | number {
   switch (key) {
     case "name":
       return `${student.first_name} ${student.last_name}`.toLowerCase();
@@ -232,6 +235,7 @@ export default function StudentsPage() {
   const [exporting, setExporting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(25);
+  const [rescoring, setRescoring] = useState<string | null>(null);
 
   const fetchStudents = async () => {
     try {
@@ -272,14 +276,69 @@ export default function StudentsPage() {
   };
 
   const handleDelete = async (studentId: string, studentName: string) => {
-    if (!confirm("Delete " + studentName + "? This will also remove their submissions. This cannot be undone.")) return;
+    if (
+      !confirm(
+        "Delete " +
+          studentName +
+          "? This will also remove their submissions. This cannot be undone."
+      )
+    )
+      return;
     try {
-      const res = await fetch("/api/students?id=" + studentId, { method: "DELETE" });
+      const res = await fetch("/api/students?id=" + studentId, {
+        method: "DELETE",
+      });
       if (!res.ok) throw new Error("Delete failed");
-      setStudents(prev => prev.filter(s => s.id !== studentId));
+      setStudents((prev) => prev.filter((s) => s.id !== studentId));
     } catch (err) {
       console.error("Delete error:", err);
       alert("Failed to delete student");
+    }
+  };
+
+  const handleRescore = async (student: StudentData) => {
+    if (!student.submission?.id) {
+      alert("No submission found for this student. They must complete the assessment first.");
+      return;
+    }
+    if (
+      !confirm(
+        "Re-evaluate " +
+          student.first_name +
+          " " +
+          student.last_name +
+          "?\n\nThis will re-run the full scoring pipeline (MCQ scoring, AI writing evaluation, MCQ analysis, executive summary) and generate a new report.\n\nThis may take 30–60 seconds."
+      )
+    )
+      return;
+
+    setRescoring(student.id);
+    try {
+      const res = await fetch("/api/score", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ submission_id: student.submission.id }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Re-score failed");
+      }
+      // Refresh the list to show updated status
+      await fetchStudents();
+      alert(
+        "Re-evaluation complete for " +
+          student.first_name +
+          " " +
+          student.last_name +
+          ".\n\nThe report has been regenerated. Click the report icon to view it."
+      );
+    } catch (err: any) {
+      console.error("Rescore error:", err);
+      alert("Re-evaluation failed: " + (err.message || "Unknown error"));
+      // Refresh anyway to see current state
+      await fetchStudents();
+    } finally {
+      setRescoring(null);
     }
   };
 
@@ -305,10 +364,8 @@ export default function StudentsPage() {
       } else if (format === "xlsx") {
         const res = await fetch("/api/school/export?format=json");
         const data = await res.json();
-
         const XLSX = await import("xlsx");
         const ws = XLSX.utils.json_to_sheet(data.rows);
-
         const colWidths = Object.keys(data.rows[0] || {}).map((key) => {
           const maxLen = Math.max(
             key.length,
@@ -317,7 +374,6 @@ export default function StudentsPage() {
           return { wch: Math.min(maxLen + 2, 40) };
         });
         ws["!cols"] = colWidths;
-
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "Students");
         const dateStr = new Date().toISOString().slice(0, 10);
@@ -326,11 +382,13 @@ export default function StudentsPage() {
       } else if (format === "pdf") {
         const res = await fetch("/api/school/export?format=json");
         const data = await res.json();
-
         const { default: jsPDF } = await import("jspdf");
         await import("jspdf-autotable");
-
-        const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+        const doc = new jsPDF({
+          orientation: "landscape",
+          unit: "mm",
+          format: "a4",
+        });
 
         // Header
         doc.setFontSize(16);
@@ -356,7 +414,6 @@ export default function StudentsPage() {
           "Decision",
           "Decision Date",
         ];
-
         const rows = data.rows.map((r: any) =>
           columns.map((col) => r[col] || "—")
         );
@@ -365,19 +422,14 @@ export default function StudentsPage() {
           head: [columns],
           body: rows,
           startY: 28,
-          styles: {
-            fontSize: 8,
-            cellPadding: 2,
-          },
+          styles: { fontSize: 8, cellPadding: 2 },
           headStyles: {
             fillColor: [30, 58, 138],
             textColor: 255,
             fontStyle: "bold",
             fontSize: 8,
           },
-          alternateRowStyles: {
-            fillColor: [245, 247, 250],
-          },
+          alternateRowStyles: { fillColor: [245, 247, 250] },
           columnStyles: {
             0: { cellWidth: 35 },
             3: { cellWidth: 35, fontSize: 7 },
@@ -456,22 +508,20 @@ export default function StudentsPage() {
                   onClick={() => handleExport("xlsx")}
                   className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                 >
-                  <FileText className="h-4 w-4 text-green-600" />
-                  Excel (.xlsx)
+                  <FileText className="h-4 w-4 text-green-600" /> Excel
+                  (.xlsx)
                 </button>
                 <button
                   onClick={() => handleExport("csv")}
                   className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                 >
-                  <FileText className="h-4 w-4 text-blue-600" />
-                  CSV (.csv)
+                  <FileText className="h-4 w-4 text-blue-600" /> CSV (.csv)
                 </button>
                 <button
                   onClick={() => handleExport("pdf")}
                   className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
                 >
-                  <FileText className="h-4 w-4 text-red-600" />
-                  PDF (.pdf)
+                  <FileText className="h-4 w-4 text-red-600" /> PDF (.pdf)
                 </button>
               </div>
             )}
@@ -504,8 +554,8 @@ export default function StudentsPage() {
               No students registered
             </h3>
             <p className="mt-2 max-w-sm text-center text-sm text-gray-500">
-              Register students to generate their unique assessment links and
-              begin the admissions process.
+              Register students to generate their unique assessment links
+              and begin the admissions process.
             </p>
             <Link href="/school/students/new" className="mt-6">
               <Button>
@@ -522,8 +572,8 @@ export default function StudentsPage() {
               All Students ({students.length})
             </CardTitle>
             <CardDescription>
-              Click a column header to sort. Click the report icon to view a
-              student&apos;s assessment report.
+              Click a column header to sort. Click the report icon to view
+              a student&apos;s assessment report.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -531,16 +581,58 @@ export default function StudentsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200 text-left text-gray-500">
-                    <SortHeader label="Student" sortKey="name" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
-                    <SortHeader label="Grade" sortKey="grade" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
-                    <SortHeader label="Admission" sortKey="admission" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
-                    <SortHeader label="Status" sortKey="status" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
-                    <SortHeader label="Score" sortKey="score" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
-                    <SortHeader label="Recommendation" sortKey="recommendation" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
-                    <SortHeader label="Decision" sortKey="decision" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+                    <SortHeader
+                      label="Student"
+                      sortKey="name"
+                      currentSort={sortKey}
+                      currentDir={sortDir}
+                      onSort={handleSort}
+                    />
+                    <SortHeader
+                      label="Grade"
+                      sortKey="grade"
+                      currentSort={sortKey}
+                      currentDir={sortDir}
+                      onSort={handleSort}
+                    />
+                    <SortHeader
+                      label="Admission"
+                      sortKey="admission"
+                      currentSort={sortKey}
+                      currentDir={sortDir}
+                      onSort={handleSort}
+                    />
+                    <SortHeader
+                      label="Status"
+                      sortKey="status"
+                      currentSort={sortKey}
+                      currentDir={sortDir}
+                      onSort={handleSort}
+                    />
+                    <SortHeader
+                      label="Score"
+                      sortKey="score"
+                      currentSort={sortKey}
+                      currentDir={sortDir}
+                      onSort={handleSort}
+                    />
+                    <SortHeader
+                      label="Recommendation"
+                      sortKey="recommendation"
+                      currentSort={sortKey}
+                      currentDir={sortDir}
+                      onSort={handleSort}
+                    />
+                    <SortHeader
+                      label="Decision"
+                      sortKey="decision"
+                      currentSort={sortKey}
+                      currentDir={sortDir}
+                      onSort={handleSort}
+                    />
                     <th className="pb-3 font-medium">Link</th>
                     <th className="pb-3 font-medium">Report</th>
-                        <th className="pb-3 w-8"></th>
+                    <th className="pb-3 w-20"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -548,8 +640,13 @@ export default function StudentsPage() {
                     const sc =
                       statusConfig[student.pipeline_status] ||
                       statusConfig.registered;
+                    const isRescoring = rescoring === student.id;
+                    const hasSubmission = !!student.submission?.id;
                     return (
-                      <tr key={student.id} className="hover:bg-gray-50">
+                      <tr
+                        key={student.id}
+                        className="hover:bg-gray-50"
+                      >
                         <td className="py-3 font-medium text-gray-900">
                           <span
                             className="group relative cursor-default"
@@ -565,7 +662,8 @@ export default function StudentsPage() {
                           G{student.grade_applied}
                         </td>
                         <td className="py-3 text-gray-600 text-xs">
-                          {student.admission_year && student.admission_term
+                          {student.admission_year &&
+                          student.admission_term
                             ? `${student.admission_term} ${student.admission_year}`
                             : student.admission_year
                               ? String(student.admission_year)
@@ -575,25 +673,33 @@ export default function StudentsPage() {
                           <span
                             className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${sc.color}`}
                           >
-                            {sc.label}
+                            {isRescoring ? "Re-scoring…" : sc.label}
                           </span>
                         </td>
                         <td className="py-3 text-gray-600">
-                          {student.submission?.overall_academic_pct != null
+                          {student.submission?.overall_academic_pct !=
+                          null
                             ? `${student.submission.overall_academic_pct.toFixed(1)}%`
                             : "—"}
                         </td>
                         <td className="py-3">
-                          {student.submission?.recommendation_band ? (
+                          {student.submission
+                            ?.recommendation_band ? (
                             <Badge
                               variant={getRecommendationVariant(
-                                student.submission.recommendation_band
+                                student.submission
+                                  .recommendation_band
                               )}
                             >
-                              {student.submission.recommendation_band}
+                              {
+                                student.submission
+                                  .recommendation_band
+                              }
                             </Badge>
                           ) : (
-                            <span className="text-gray-400">—</span>
+                            <span className="text-gray-400">
+                              —
+                            </span>
                           )}
                         </td>
                         <td className="py-3">
@@ -603,15 +709,20 @@ export default function StudentsPage() {
                                 student.decision.decision
                               )}
                             >
-                              {formatDecision(student.decision.decision)}
+                              {formatDecision(
+                                student.decision.decision
+                              )}
                             </Badge>
                           ) : (
-                            <span className="text-gray-400">—</span>
+                            <span className="text-gray-400">
+                              —
+                            </span>
                           )}
                         </td>
                         <td className="py-3">
                           {student.jotform_link &&
-                          student.pipeline_status === "registered" ? (
+                          student.pipeline_status ===
+                            "registered" ? (
                             <div className="flex items-center gap-1">
                               <a
                                 href={student.jotform_link}
@@ -623,7 +734,10 @@ export default function StudentsPage() {
                               </a>
                               <button
                                 onClick={() =>
-                                  copyLink(student.jotform_link!, student.id)
+                                  copyLink(
+                                    student.jotform_link!,
+                                    student.id
+                                  )
                                 }
                                 className="text-gray-400 hover:text-gray-600"
                               >
@@ -636,7 +750,8 @@ export default function StudentsPage() {
                             </div>
                           ) : (
                             <span className="text-gray-400 text-xs">
-                              {student.pipeline_status !== "registered"
+                              {student.pipeline_status !==
+                              "registered"
                                 ? "Done"
                                 : "—"}
                             </span>
@@ -660,17 +775,48 @@ export default function StudentsPage() {
                               <FileText className="h-4 w-4" />
                             </a>
                           ) : (
-                            <span className="text-gray-400">—</span>
+                            <span className="text-gray-400">
+                              —
+                            </span>
                           )}
                         </td>
                         <td className="py-3">
-                          <button
-                            onClick={() => handleDelete(student.id, student.first_name + " " + student.last_name)}
-                            className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                            title="Delete student"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          <div className="flex items-center gap-1">
+                            {/* Re-evaluate button (testing tool) */}
+                            <button
+                              onClick={() => handleRescore(student)}
+                              disabled={!hasSubmission || isRescoring}
+                              className={`p-1 transition-colors ${
+                                hasSubmission && !isRescoring
+                                  ? "text-gray-400 hover:text-amber-600"
+                                  : "text-gray-200 cursor-not-allowed"
+                              }`}
+                              title={
+                                hasSubmission
+                                  ? "Re-evaluate (re-run scoring pipeline)"
+                                  : "No submission to re-evaluate"
+                              }
+                            >
+                              <RotateCcw
+                                className={`h-4 w-4 ${isRescoring ? "animate-spin" : ""}`}
+                              />
+                            </button>
+                            {/* Delete button */}
+                            <button
+                              onClick={() =>
+                                handleDelete(
+                                  student.id,
+                                  student.first_name +
+                                    " " +
+                                    student.last_name
+                                )
+                              }
+                              className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                              title="Delete student"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -700,11 +846,14 @@ export default function StudentsPage() {
                   </select>
                   <span>per page</span>
                   <span className="ml-4 text-gray-400">
-                    {startIndex + 1}–{Math.min(startIndex + rowsPerPage, sorted.length)} of{" "}
-                    {sorted.length}
+                    {startIndex + 1}–
+                    {Math.min(
+                      startIndex + rowsPerPage,
+                      sorted.length
+                    )}{" "}
+                    of {sorted.length}
                   </span>
                 </div>
-
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => setCurrentPage(1)}
@@ -714,7 +863,9 @@ export default function StudentsPage() {
                     <ChevronsUpDown className="h-4 w-4 rotate-90" />
                   </button>
                   <button
-                    onClick={() => setCurrentPage(currentPage - 1)}
+                    onClick={() =>
+                      setCurrentPage(currentPage - 1)
+                    }
                     disabled={currentPage === 1}
                     className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30 disabled:hover:bg-transparent"
                   >
@@ -722,20 +873,31 @@ export default function StudentsPage() {
                   </button>
 
                   {/* Page numbers */}
-                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  {Array.from(
+                    { length: totalPages },
+                    (_, i) => i + 1
+                  )
                     .filter((page) => {
                       if (totalPages <= 7) return true;
-                      if (page === 1 || page === totalPages) return true;
-                      if (Math.abs(page - currentPage) <= 1) return true;
+                      if (page === 1 || page === totalPages)
+                        return true;
+                      if (Math.abs(page - currentPage) <= 1)
+                        return true;
                       return false;
                     })
-                    .reduce<(number | string)[]>((acc, page, idx, arr) => {
-                      if (idx > 0 && page - (arr[idx - 1] as number) > 1) {
-                        acc.push("...");
-                      }
-                      acc.push(page);
-                      return acc;
-                    }, [])
+                    .reduce<(number | string)[]>(
+                      (acc, page, idx, arr) => {
+                        if (
+                          idx > 0 &&
+                          page - (arr[idx - 1] as number) > 1
+                        ) {
+                          acc.push("...");
+                        }
+                        acc.push(page);
+                        return acc;
+                      },
+                      []
+                    )
                     .map((item, idx) =>
                       item === "..." ? (
                         <span
@@ -747,7 +909,9 @@ export default function StudentsPage() {
                       ) : (
                         <button
                           key={item}
-                          onClick={() => setCurrentPage(item as number)}
+                          onClick={() =>
+                            setCurrentPage(item as number)
+                          }
                           className={`min-w-[32px] rounded px-2 py-1 text-sm ${
                             currentPage === item
                               ? "bg-evalent-600 text-white font-medium"
@@ -760,7 +924,9 @@ export default function StudentsPage() {
                     )}
 
                   <button
-                    onClick={() => setCurrentPage(currentPage + 1)}
+                    onClick={() =>
+                      setCurrentPage(currentPage + 1)
+                    }
                     disabled={currentPage === totalPages}
                     className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30 disabled:hover:bg-transparent"
                   >
