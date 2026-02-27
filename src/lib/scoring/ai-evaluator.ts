@@ -48,7 +48,7 @@ function getCurriculumContext(programme?: string): string {
     if (p === "US" || p.includes("AMERICAN") || p.includes("US"))
         return "an American-curriculum school. Use language consistent with Common Core and US educational standards — grade-level benchmarks, ELA/Math standards, and college-readiness expectations";
     if (p === "UK" || p.includes("BRITISH") || p.includes("UK") || p.includes("IGCSE"))
-        return "a British-curriculum school. Use language consistent with the English National Curriculum and Cambridge frameworks — key stage expectations, attainment targets, and GCSE/IGCSE readiness";
+        return "a British-curriculum school. Use language consistent with the English National Curriculum and Cambridge frameworks — key stage expectations and attainment targets. For primary-age students (up to Year 6), focus on Key Stage 2 progression and upper primary readiness rather than referencing GCSE or IGCSE examinations";
     return "an international school. Use professionally neutral educational language appropriate for a selective admissions context";
 }
 

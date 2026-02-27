@@ -6,6 +6,11 @@
  * 3-4 sentence narrative that justifies the recommendation band.
  *
  * Called during the scoring pipeline and stored in submissions.executive_summary.
+ *
+ * v2 CHANGES:
+ * - Fixed "The demonstrates" bug: prompt now explicitly requires student first name
+ *   as subject and forbids starting with "The student" or "The"
+ * - Grade-aware curriculum language (no GCSE references for primary students)
  */
 
 import Anthropic from "@anthropic-ai/sdk";
@@ -36,12 +41,19 @@ export interface ExecSummaryInput {
 export async function generateExecutiveSummary(
   input: ExecSummaryInput
 ): Promise<string> {
-  var firstName = input.student_name.split(" ")[0] || input.student_name;
+  var firstName =
+    input.student_name.split(" ")[0] || input.student_name;
 
   var systemPrompt =
     "You are a senior educational assessment specialist writing an executive summary " +
     "for a school admissions report. Your audience is the Head of Admissions. " +
-    "Write in third person using the student's first name. " +
+    "Write in third person. IMPORTANT: Always use the student's first name ('" +
+    firstName +
+    "') as the grammatical subject of each sentence — " +
+    "NEVER start a sentence with 'The student' or just 'The'. " +
+    "For example write '" +
+    firstName +
+    " demonstrates...' NOT 'The demonstrates...' or 'The student demonstrates...'. " +
     "Be precise, evidence-based and professional. " +
     "The summary must synthesise the data into a coherent 3-4 sentence narrative " +
     "that explains the student's profile and concludes with a clear justification " +
@@ -55,44 +67,94 @@ export async function generateExecutiveSummary(
     else gradeLabel = "Year " + (input.grade + 1);
   }
 
-  var domains = [];
+  var domains: string[] = [];
   domains.push(
-    "English: " + input.english_combined_pct.toFixed(1) + "% combined" +
-    " (MCQ " + input.english_mcq_pct.toFixed(1) + "%" +
-    (input.english_writing_band ? ", writing: " + input.english_writing_band : ", no writing submitted") +
-    "), threshold: " + input.english_threshold + "%"
+    "English: " +
+      input.english_combined_pct.toFixed(1) +
+      "% combined" +
+      " (MCQ " +
+      input.english_mcq_pct.toFixed(1) +
+      "%" +
+      (input.english_writing_band
+        ? ", writing: " + input.english_writing_band
+        : ", no writing submitted") +
+      "), threshold: " +
+      input.english_threshold +
+      "%"
   );
   domains.push(
-    "Mathematics: " + input.maths_combined_pct.toFixed(1) + "% combined" +
-    " (MCQ " + input.maths_mcq_pct.toFixed(1) + "%" +
-    (input.maths_writing_band ? ", writing: " + input.maths_writing_band : ", no writing submitted") +
-    "), threshold: " + input.maths_threshold + "%"
+    "Mathematics: " +
+      input.maths_combined_pct.toFixed(1) +
+      "% combined" +
+      " (MCQ " +
+      input.maths_mcq_pct.toFixed(1) +
+      "%" +
+      (input.maths_writing_band
+        ? ", writing: " + input.maths_writing_band
+        : ", no writing submitted") +
+      "), threshold: " +
+      input.maths_threshold +
+      "%"
   );
   domains.push(
-    "Reasoning: " + input.reasoning_pct.toFixed(1) + "% (MCQ only), threshold: " + input.reasoning_threshold + "%"
+    "Reasoning: " +
+      input.reasoning_pct.toFixed(1) +
+      "% (MCQ only), threshold: " +
+      input.reasoning_threshold +
+      "%"
   );
 
   var mindsetLabel = "not assessed";
   if (input.mindset_score > 0) {
-    if (input.mindset_score >= 3.5) mindsetLabel = "Strong Growth Orientation (" + input.mindset_score.toFixed(1) + "/4)";
-    else if (input.mindset_score >= 2.5) mindsetLabel = "Developing Growth Mindset (" + input.mindset_score.toFixed(1) + "/4)";
-    else if (input.mindset_score >= 1.5) mindsetLabel = "May Need Support (" + input.mindset_score.toFixed(1) + "/4)";
-    else mindsetLabel = "Significant Coaching Needed (" + input.mindset_score.toFixed(1) + "/4)";
+    if (input.mindset_score >= 3.5)
+      mindsetLabel =
+        "Strong Growth Orientation (" +
+        input.mindset_score.toFixed(1) +
+        "/4)";
+    else if (input.mindset_score >= 2.5)
+      mindsetLabel =
+        "Developing Growth Mindset (" +
+        input.mindset_score.toFixed(1) +
+        "/4)";
+    else if (input.mindset_score >= 1.5)
+      mindsetLabel =
+        "May Need Support (" + input.mindset_score.toFixed(1) + "/4)";
+    else
+      mindsetLabel =
+        "Significant Coaching Needed (" +
+        input.mindset_score.toFixed(1) +
+        "/4)";
   }
 
   var lenses = "";
   if (input.values_band) lenses += "Values: " + input.values_band + ". ";
-  if (input.creativity_band) lenses += "Creativity: " + input.creativity_band + ". ";
+  if (input.creativity_band)
+    lenses += "Creativity: " + input.creativity_band + ". ";
 
   var userPrompt =
-    "Student: " + firstName + "\n" +
-    "Applying for: " + gradeLabel + "\n" +
-    "Overall academic score: " + input.overall_academic_pct.toFixed(1) + "%\n" +
-    "Recommendation: " + input.recommendation_band + "\n\n" +
-    "Domain scores:\n" + domains.join("\n") + "\n\n" +
-    "Mindset: " + mindsetLabel + "\n" +
+    "Student: " +
+    firstName +
+    "\n" +
+    "Applying for: " +
+    gradeLabel +
+    "\n" +
+    "Overall academic score: " +
+    input.overall_academic_pct.toFixed(1) +
+    "%\n" +
+    "Recommendation: " +
+    input.recommendation_band +
+    "\n\n" +
+    "Domain scores:\n" +
+    domains.join("\n") +
+    "\n\n" +
+    "Mindset: " +
+    mindsetLabel +
+    "\n" +
     (lenses ? "Lenses: " + lenses + "\n" : "") +
     "\nWrite a 3-4 sentence executive summary for this student's admissions report. " +
+    "Start the first sentence with '" +
+    firstName +
+    "'. " +
     "Conclude by justifying the recommendation band.";
 
   try {
