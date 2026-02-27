@@ -23,7 +23,9 @@ const registerSchema = z.object({
   date_of_birth: z.string().optional(),
   gender: z.string().optional(),
   nationality: z.string().optional(),
+  nationality_2: z.string().optional(),
   first_language: z.string().optional(),
+  languages_spoken: z.array(z.string()).optional(),
   admission_year: z.number().int().min(2024).max(2030).optional(),
   admission_term: z.string().optional(),
 });
@@ -36,6 +38,7 @@ export async function GET(req: NextRequest) {
   }
 
   const supabase = createServerClient();
+
   const { data, error } = await supabase
     .from("students")
     .select("*")
@@ -45,7 +48,6 @@ export async function GET(req: NextRequest) {
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-
   return NextResponse.json(data);
 }
 
@@ -102,6 +104,13 @@ export async function POST(req: NextRequest) {
 
     const jotformLink = `https://form.jotform.com/${formId}?${prefills.toString()}`;
 
+    // Resolve first_language: use explicit field, or first entry from languages_spoken
+    const firstLanguage =
+      parsed.first_language ||
+      (parsed.languages_spoken && parsed.languages_spoken.length > 0
+        ? parsed.languages_spoken[0]
+        : null);
+
     // Insert student
     const { data: student, error } = await supabase
       .from("students")
@@ -114,7 +123,9 @@ export async function POST(req: NextRequest) {
         date_of_birth: parsed.date_of_birth || null,
         gender: parsed.gender || null,
         nationality: parsed.nationality || null,
-        first_language: parsed.first_language || null,
+        nationality_2: parsed.nationality_2 || null,
+        first_language: firstLanguage,
+        languages_spoken: parsed.languages_spoken || null,
         admission_year: parsed.admission_year || null,
         admission_term: parsed.admission_term || null,
         jotform_link: jotformLink,
