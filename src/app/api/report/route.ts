@@ -4,7 +4,7 @@ import { generateReportHTML } from "@/lib/report";
 import type { ReportInput, ConstructScore } from "@/lib/report";
 
 /**
- * Report Generation API — v3
+ * Report Generation API — v3b
  *
  * GET /api/report?submission_id=xxx
  * Returns the HTML report (can be printed to PDF in browser)
@@ -13,6 +13,7 @@ import type { ReportInput, ConstructScore } from "@/lib/report";
  * Returns the report data as JSON
  *
  * v3: adds construct breakdowns, executive summary, strengths/development
+ * v3b: passes MCQ analysis narratives to report generator
  */
 
 /** Match student answer text to correct answer letter using option texts */
@@ -502,6 +503,7 @@ export async function GET(req: NextRequest) {
           englishThreshold,
         comment: "",
         construct_breakdown: englishConstructs,
+        mcq_narrative: submission.english_mcq_narrative || "",
       },
       mathematics: {
         mcq_pct: submission.maths_mcq_pct || 0,
@@ -519,6 +521,7 @@ export async function GET(req: NextRequest) {
           mathsThreshold,
         comment: "",
         construct_breakdown: mathsConstructs,
+        mcq_narrative: submission.maths_mcq_narrative || "",
       },
       reasoning: {
         mcq_pct: submission.reasoning_pct || 0,
@@ -528,6 +531,7 @@ export async function GET(req: NextRequest) {
         delta: (submission.reasoning_pct || 0) - reasoningThreshold,
         narrative: submission.reasoning_narrative || "",
         construct_breakdown: reasoningConstructs,
+        mcq_narrative: submission.reasoning_mcq_narrative || "",
       },
       mindset: {
         score: submission.mindset_score || 0,

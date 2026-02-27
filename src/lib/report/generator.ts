@@ -1,5 +1,10 @@
 /**
- * Evalent PDF Report Generator — v5
+ * Evalent PDF Report Generator — v5b
+ *
+ * Changes from v5:
+ * - MCQ analysis narrative rendered on English, Maths, Reasoning pages
+ * - Narrative appears after construct bar chart, before writing section
+ * - Styled with blue-left-border card consistent with exec summary
  *
  * Changes from v4:
  * - Cover page: recommendation pill, exec summary, radar (hero), S&D panel only
@@ -304,6 +309,17 @@ function constructBarChart(constructs: ConstructScore[], threshold: number): str
   return svg;
 }
 
+// ─── Render MCQ analysis narrative card ─────────────────────────
+function mcqNarrativeSection(narrative: string | undefined): string {
+  if (!narrative) return "";
+  return (
+    '<div style="background:' + COLORS.lightGray + ';border-radius:8px;padding:12px 16px;margin:10px 0;font-size:10pt;line-height:1.6;border-left:4px solid ' + COLORS.accent + ';">' +
+    '<div style="font-size:9pt;font-weight:700;color:' + COLORS.primary + ';margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px;">Multiple-Choice Analysis</div>' +
+    narrativeToParagraphs(narrative) +
+    "</div>"
+  );
+}
+
 // ─── Styles ─────────────────────────────────────────────────────
 function getStyles(): string {
   return (
@@ -446,7 +462,7 @@ function page2_AcademicSummary(data: ReportInput, totalPages: number): string {
   );
 }
 
-// ─── DOMAIN PAGE ────────────────────────────────────────────────
+// ─── DOMAIN PAGE (English / Maths) ──────────────────────────────
 function pageDomain(data: ReportInput, label: string, domainData: ReportInput["english"], pageNum: number, totalPages: number): string {
   var cChart =
     domainData.construct_breakdown && domainData.construct_breakdown.length > 0
@@ -454,6 +470,9 @@ function pageDomain(data: ReportInput, label: string, domainData: ReportInput["e
         constructBarChart(domainData.construct_breakdown, domainData.threshold) +
         "</div>"
       : "";
+
+  // MCQ analysis narrative (NEW in v5b)
+  var mcqNarrative = mcqNarrativeSection(domainData.mcq_narrative);
 
   var writingSection = "";
   if (domainData.writing_narrative) {
@@ -490,6 +509,7 @@ function pageDomain(data: ReportInput, label: string, domainData: ReportInput["e
     '<div class="score-box"><div class="label">Combined Score</div><div class="value" style="color:' + deltaColor(domainData.delta) + '">' + domainData.combined_pct.toFixed(1) + '%</div><div class="label">Threshold: ' + domainData.threshold.toFixed(1) + "%</div></div>" +
     "</div>" +
     cChart +
+    mcqNarrative +
     writingSection +
     bottomComment +
     pageFooter(pageNum, totalPages) +
@@ -506,6 +526,9 @@ function pageReasoning(data: ReportInput, pageNum: number, totalPages: number): 
         "</div>"
       : "";
 
+  // MCQ analysis narrative (NEW in v5b)
+  var mcqNarrative = mcqNarrativeSection(data.reasoning.mcq_narrative);
+
   return (
     '<div class="page">' +
     pageHeader(data) +
@@ -516,6 +539,7 @@ function pageReasoning(data: ReportInput, pageNum: number, totalPages: number): 
     '<div class="score-box"><div class="label">\u0394 vs Threshold</div><div class="value" style="color:' + deltaColor(data.reasoning.delta) + '">' + formatDelta(data.reasoning.delta) + "</div></div>" +
     "</div>" +
     cChart +
+    mcqNarrative +
     '<div class="narrative">' + narrativeToParagraphs(data.reasoning.narrative) + "</div>" +
     pageFooter(pageNum, totalPages) +
     "</div>"
