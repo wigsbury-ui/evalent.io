@@ -32,6 +32,7 @@ export interface QuestionResult {
   correct_answer: string;
   is_correct: boolean;
   question_text: string;
+  construct: string;
 }
 
 export interface MCQScoringResult {
@@ -111,6 +112,7 @@ export function scoreMCQs(
       correct_answer: key.correct_answer || "",
       is_correct: isCorrect,
       question_text: key.question_text,
+      construct: key.construct || "",
     });
 
     if (key.question_number <= 3) {
@@ -191,15 +193,18 @@ function textToLetter(text: string, key: AnswerKey): string | null {
   for (var j = 0; j < validOpts.length; j++) {
     if (validOpts[j].text === student) return validOpts[j].letter;
   }
+
   // Contains match (either direction)
   for (var k = 0; k < validOpts.length; k++) {
     if (validOpts[k].text.indexOf(student) !== -1 || student.indexOf(validOpts[k].text) !== -1) {
       return validOpts[k].letter;
     }
   }
+
   // Letter prefix pattern: "A) something" or "B. something"
   var m = text.match(/^([A-D])[\)\.\s:]/i);
   if (m) return m[1].toUpperCase();
+
   // Single letter answer
   if (text.trim().length === 1 && /[A-Da-d]/.test(text.trim())) return text.trim().toUpperCase();
 

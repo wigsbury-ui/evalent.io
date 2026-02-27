@@ -8,6 +8,7 @@ import {
   generateMindsetNarrativePrompt,
   calculateRecommendation,
   extractWritingResponses,
+  generateAllMCQAnalyses,
 } from "@/lib/scoring";
 import type { WritingTask } from "@/lib/scoring";
 import {
@@ -18,7 +19,7 @@ import {
 } from "@/lib/email";
 
 /**
- * Scoring Pipeline API — v3 (inlined email sending)
+ * Scoring Pipeline API — v4 (MCQ analysis + inlined email sending)
  *
  * POST /api/score
  * Body: { submission_id: string }
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
 
     const supabase = createServerClient();
 
-    // ─── 1. Fetch submission ───────────────────────────────────────
+    // ─── 1. Fetch submission ─────────────────────────────────────
     const { data: submission, error: subError } = await supabase
       .from("submissions")
       .select("*")
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest) {
       `[SCORING] Starting pipeline for submission ${submission_id} (grade ${submission.grade})`
     );
 
-    // ─── 2. Fetch answer keys ────────────────────────────────────
+    // ─── 2. Fetch answer keys ──────────────────────────────────
     const { data: answerKeys, error: keyError } = await supabase
       .from("answer_keys")
       .select("*")
@@ -76,7 +77,7 @@ export async function POST(req: NextRequest) {
       `[SCORING] Found ${answerKeys.length} answer keys for grade ${submission.grade}`
     );
 
-    // ─── 3. Score MCQs ──────────────────────────────────────────
+    // ─── 3. Score MCQs ────────────────────────────────────────
     const rawAnswers = submission.raw_answers as Record<string, any>;
     const mcqResults = scoreMCQs(rawAnswers, answerKeys);
 
@@ -121,14 +122,14 @@ export async function POST(req: NextRequest) {
       `[SCORING] Metadata: name="${studentName}", programme="${programme}", locale="${locale}"`
     );
 
-    // ─── 4. Extract writing responses ────────────────────────────
+    // ─── 4. Extract writing responses ──────────────────────────
     const writingResponses = extractWritingResponses(rawAnswers, answerKeys);
     console.log(
       `[SCORING] Found ${writingResponses.length} writing responses:`,
       writingResponses.map((w) => w.domain)
     );
 
-    // ─── 5. Update with MCQ scores ──────────────────────────────
+    // ─── 5. Update with MCQ scores ────────────────────────────
     await supabase
       .from("submissions")
       .update({
@@ -146,7 +147,7 @@ export async function POST(req: NextRequest) {
       })
       .eq("id", submission_id);
 
-    // ─── 6. AI Writing Evaluation ─────────────────────────────────
+    // ─── 6. AI Writing Evaluation ─────────────────────────────
     const grade = submission.grade;
     const writingEvals: Record<string, any> = {};
 
@@ -169,7 +170,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // ─── 7. Generate reasoning + mindset narratives ──────────────
+    // ─── 7. Generate reasoning + mindset narratives ──────────
     let englishThreshold = 55;
     let mathsThreshold = 55;
     let reasoningThreshold = 55;
@@ -239,7 +240,42 @@ export async function POST(req: NextRequest) {
       mindsetPrompt.user
     );
 
-    // ─── 8. Calculate recommendation band ─────────────────────────
+    // ─── 7b. Generate MCQ analysis narratives ────────────────
+    console.log(`[SCORING] Generating MCQ analysis narratives...`);
+    var mcqAnalysisInput: Record<string, { items: any[]; pct: number }> = {};
+    var analysisDomains = ["english", "mathematics", "reasoning"];
+    for (var ai = 0; ai < analysisDomains.length; ai++) {
+      var adomain = analysisDomains[ai];
+      var domainResult = (mcqResults as any)[adomain];
+      if (domainResult && domainResult.answers) {
+        var mappedItems = [];
+        for (var bi = 0; bi < domainResult.answers.length; bi++) {
+          var a = domainResult.answers[bi];
+          mappedItems.push({
+            question_number: a.question_number,
+            construct: a.construct || "",
+            question_text: a.question_text || "",
+            student_answer_letter: a.student_answer_letter,
+            correct_answer: a.correct_answer,
+            is_correct: a.is_correct,
+          });
+        }
+        mcqAnalysisInput[adomain] = {
+          items: mappedItems,
+          pct: domainResult.pct,
+        };
+      }
+    }
+
+    const mcqAnalyses = await generateAllMCQAnalyses(
+      mcqAnalysisInput,
+      studentName || "the student",
+      grade,
+      programme || undefined
+    );
+    console.log("[SCORING] MCQ analyses generated for: " + Object.keys(mcqAnalyses).join(", "));
+
+    // ─── 8. Calculate recommendation band ─────────────────────
     const recommendation = calculateRecommendation({
       english_mcq_pct: mcqResults.english.pct,
       english_writing_score: writingEvals.english?.score ?? null,
@@ -256,7 +292,7 @@ export async function POST(req: NextRequest) {
       `[SCORING] Recommendation: ${recommendation.recommendation_band} (overall: ${recommendation.overall_academic_pct}%)`
     );
 
-    // ─── 9. Save all results ──────────────────────────────────────
+    // ─── 9. Save all results ────────────────────────────────────
     const updatePayload: Record<string, any> = {
       english_mcq_score: mcqResults.english.correct,
       english_mcq_total: mcqResults.english.total,
@@ -304,6 +340,10 @@ export async function POST(req: NextRequest) {
       creativity_narrative: writingEvals.creativity
         ? `${writingEvals.creativity.content_narrative} ${writingEvals.creativity.writing_narrative}`
         : null,
+      // MCQ analysis narratives (NEW)
+      english_mcq_narrative: mcqAnalyses.english?.narrative || null,
+      maths_mcq_narrative: mcqAnalyses.mathematics?.narrative || null,
+      reasoning_mcq_narrative: mcqAnalyses.reasoning?.narrative || null,
       overall_academic_pct: recommendation.overall_academic_pct,
       recommendation_band: recommendation.recommendation_band,
       processing_status: "complete",
@@ -329,7 +369,6 @@ export async function POST(req: NextRequest) {
       console.log(
         `[SCORING] Sending report email to assessor: ${assessorEmail}`
       );
-
       try {
         // Fetch student details for email
         let emailStudentName = studentName || "Unknown Student";
@@ -366,8 +405,7 @@ export async function POST(req: NextRequest) {
           grade: submission.grade || 10,
         });
 
-        const appUrl =
-          process.env.NEXT_PUBLIC_APP_URL || "https://app.evalent.io";
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.evalent.io";
         const reportUrl = `${appUrl}/report?id=${submission_id}`;
         const decisionBaseUrl = `${appUrl}/api/decision?token=${token}`;
 
@@ -436,8 +474,7 @@ export async function POST(req: NextRequest) {
           );
         }
       } catch (err) {
-        emailError =
-          err instanceof Error ? err.message : String(err);
+        emailError = err instanceof Error ? err.message : String(err);
         console.error(`[SCORING] Email error: ${emailError}`);
       }
     } else {
@@ -478,6 +515,7 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     console.error("[SCORING] Pipeline error:", err);
+
     try {
       const body = await req.clone().json();
       if (body?.submission_id) {
@@ -493,6 +531,7 @@ export async function POST(req: NextRequest) {
     } catch {
       // Ignore
     }
+
     return NextResponse.json(
       { error: "Scoring pipeline failed", details: String(err) },
       { status: 500 }

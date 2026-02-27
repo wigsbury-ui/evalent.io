@@ -1,15 +1,8 @@
-export { scoreMCQs, type MCQScoringResult, type DomainScore } from "./mcq-scorer";
-export {
-  evaluateWriting,
-  generateNarrative,
-  generateReasoningNarrativePrompt,
-  generateMindsetNarrativePrompt,
-  type WritingEvaluation,
-  type WritingTask,
-} from "./ai-evaluator";
-export {
-  calculateRecommendation,
-  type RecommendationResult,
-  type DomainResult,
-} from "./recommendation";
-export { extractWritingResponses, type ExtractedWriting } from "./writing-extractor";
+export { scoreMCQs } from "./mcq-scorer";
+export type { DomainScore, QuestionResult, MCQScoringResult } from "./mcq-scorer";
+export { evaluateWriting, generateNarrative, generateReasoningNarrativePrompt, generateMindsetNarrativePrompt } from "./ai-evaluator";
+export type { WritingEvaluation, WritingTask } from "./ai-evaluator";
+export { extractWritingTasks } from "./writing-extractor";
+export { calculateRecommendation } from "./recommendation";
+export { generateMCQAnalysis, generateAllMCQAnalyses } from "./mcq-analyser";
+export type { MCQAnalysisInput, MCQAnalysisResult, MCQItemResult } from "./mcq-analyser";
