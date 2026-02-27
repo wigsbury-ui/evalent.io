@@ -6,3 +6,5 @@ export { extractWritingResponses } from "./writing-extractor";
 export { calculateRecommendation } from "./recommendation";
 export { generateMCQAnalysis, generateAllMCQAnalyses } from "./mcq-analyser";
 export type { MCQAnalysisInput, MCQAnalysisResult, MCQItemResult } from "./mcq-analyser";
+export { generateExecutiveSummary } from "./executive-summary";
+export type { ExecSummaryInput } from "./executive-summary";

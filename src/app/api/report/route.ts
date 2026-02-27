@@ -4,7 +4,7 @@ import { generateReportHTML } from "@/lib/report";
 import type { ReportInput, ConstructScore } from "@/lib/report";
 
 /**
- * Report Generation API — v3b
+ * Report Generation API — v4
  *
  * GET /api/report?submission_id=xxx
  * Returns the HTML report (can be printed to PDF in browser)
@@ -14,6 +14,7 @@ import type { ReportInput, ConstructScore } from "@/lib/report";
  *
  * v3: adds construct breakdowns, executive summary, strengths/development
  * v3b: passes MCQ analysis narratives to report generator
+ * v4: uses AI-generated executive summary from scoring pipeline
  */
 
 /** Match student answer text to correct answer letter using option texts */
@@ -252,223 +253,112 @@ export async function GET(req: NextRequest) {
       submission.english_combined || submission.english_mcq_pct || 0;
     const engDelta = engPct - englishThreshold;
     if (engDelta >= 15) {
-      strengths.push(
-        "Strong overall English performance (" +
-          engPct.toFixed(0) +
-          "%), well above threshold"
-      );
+      strengths.push("Strong overall English performance (" + engPct.toFixed(0) + "%), well above threshold");
     } else if (engDelta < -10) {
-      development.push(
-        "English (" +
-          engPct.toFixed(0) +
-          "%) is " +
-          Math.abs(engDelta).toFixed(0) +
-          " points below the school\u2019s threshold"
-      );
+      development.push("English (" + engPct.toFixed(0) + "%) is " + Math.abs(engDelta).toFixed(0) + " points below the school\u2019s threshold");
     }
 
     const engWriteScore = submission.english_writing_score;
     const engWriteBand = submission.english_writing_band;
     if (engWriteScore !== null && engWriteScore !== undefined) {
       if (engWriteScore >= 3) {
-        strengths.push(
-          "English writing rated \u201c" +
-            engWriteBand +
-            "\u201d \u2014 demonstrates confident written expression"
-        );
+        strengths.push("English writing rated \u201c" + engWriteBand + "\u201d \u2014 demonstrates confident written expression");
       } else if (engWriteScore <= 1.5) {
-        development.push(
-          "English writing rated \u201c" +
-            (engWriteBand || "Limited") +
-            "\u201d \u2014 will need structured literacy support"
-        );
+        development.push("English writing rated \u201c" + (engWriteBand || "Limited") + "\u201d \u2014 will need structured literacy support");
       }
     }
 
-    const mathPct =
-      submission.maths_combined || submission.maths_mcq_pct || 0;
+    const mathPct = submission.maths_combined || submission.maths_mcq_pct || 0;
     const mathDelta = mathPct - mathsThreshold;
     if (mathDelta >= 15) {
-      strengths.push(
-        "Strong Mathematics performance (" +
-          mathPct.toFixed(0) +
-          "%), comfortably above threshold"
-      );
+      strengths.push("Strong Mathematics performance (" + mathPct.toFixed(0) + "%), comfortably above threshold");
     } else if (mathDelta < -10) {
-      development.push(
-        "Mathematics (" +
-          mathPct.toFixed(0) +
-          "%) is " +
-          Math.abs(mathDelta).toFixed(0) +
-          " points below threshold"
-      );
+      development.push("Mathematics (" + mathPct.toFixed(0) + "%) is " + Math.abs(mathDelta).toFixed(0) + " points below threshold");
     }
 
     const mathWriteScore = submission.maths_writing_score;
     const mathWriteBand = submission.maths_writing_band;
     if (mathWriteScore !== null && mathWriteScore !== undefined) {
       if (mathWriteScore >= 3) {
-        strengths.push(
-          "Mathematical reasoning in writing rated \u201c" +
-            mathWriteBand +
-            "\u201d"
-        );
+        strengths.push("Mathematical reasoning in writing rated \u201c" + mathWriteBand + "\u201d");
       } else if (mathWriteScore <= 1.5) {
-        development.push(
-          "Mathematical extended reasoning rated \u201c" +
-            (mathWriteBand || "Limited") +
-            "\u201d \u2014 may need scaffolded problem-solving"
-        );
+        development.push("Mathematical extended reasoning rated \u201c" + (mathWriteBand || "Limited") + "\u201d \u2014 may need scaffolded problem-solving");
       }
     }
 
     const resPct = submission.reasoning_pct || 0;
     const resDelta = resPct - reasoningThreshold;
     if (resDelta >= 15) {
-      strengths.push(
-        "Reasoning (" +
-          resPct.toFixed(0) +
-          "%) is a clear strength \u2014 confident working with unfamiliar problems"
-      );
+      strengths.push("Reasoning (" + resPct.toFixed(0) + "%) is a clear strength \u2014 confident working with unfamiliar problems");
     } else if (resDelta < -10) {
-      development.push(
-        "Reasoning (" +
-          resPct.toFixed(0) +
-          "%) below threshold \u2014 may need support with abstract thinking"
-      );
+      development.push("Reasoning (" + resPct.toFixed(0) + "%) below threshold \u2014 may need support with abstract thinking");
     }
 
     // Construct-level
-    const allConstructs = [
-      ...englishConstructs,
-      ...mathsConstructs,
-      ...reasoningConstructs,
-    ];
+    const allConstructs = [...englishConstructs, ...mathsConstructs, ...reasoningConstructs];
     for (let ci = 0; ci < allConstructs.length; ci++) {
       const c = allConstructs[ci];
       if (c.total >= 2 && c.pct >= 80 && strengths.length < 6) {
-        strengths.push(
-          c.construct +
-            ": " +
-            c.correct +
-            "/" +
-            c.total +
-            " (" +
-            c.pct.toFixed(0) +
-            "%)"
-        );
+        strengths.push(c.construct + ": " + c.correct + "/" + c.total + " (" + c.pct.toFixed(0) + "%)");
       }
     }
     for (let ci = 0; ci < allConstructs.length; ci++) {
       const c = allConstructs[ci];
       if (c.total >= 2 && c.pct <= 40 && development.length < 6) {
-        development.push(
-          c.construct +
-            ": " +
-            c.correct +
-            "/" +
-            c.total +
-            " (" +
-            c.pct.toFixed(0) +
-            "%) \u2014 needs targeted focus"
-        );
+        development.push(c.construct + ": " + c.correct + "/" + c.total + " (" + c.pct.toFixed(0) + "%) \u2014 needs targeted focus");
       }
     }
 
     // Mindset
     const mindsetScore = submission.mindset_score || 0;
     if (mindsetScore >= 3.5) {
-      strengths.push(
-        "Strong growth mindset (" +
-          mindsetScore.toFixed(1) +
-          "/4) \u2014 likely to respond well to challenge"
-      );
+      strengths.push("Strong growth mindset (" + mindsetScore.toFixed(1) + "/4) \u2014 likely to respond well to challenge");
     } else if (mindsetScore > 0 && mindsetScore <= 2.0) {
-      development.push(
-        "Mindset score (" +
-          mindsetScore.toFixed(1) +
-          "/4) suggests coaching on resilience and effort may be needed"
-      );
+      development.push("Mindset score (" + mindsetScore.toFixed(1) + "/4) suggests coaching on resilience and effort may be needed");
     }
 
     // Lenses
-    if (
-      submission.values_writing_score !== null &&
-      submission.values_writing_score >= 3
-    ) {
-      strengths.push(
-        "Values lens rated \u201c" +
-          (submission.values_writing_band || "Good") +
-          "\u201d"
-      );
+    if (submission.values_writing_score !== null && submission.values_writing_score >= 3) {
+      strengths.push("Values lens rated \u201c" + (submission.values_writing_band || "Good") + "\u201d");
     }
-    if (
-      submission.creativity_writing_score !== null &&
-      submission.creativity_writing_score >= 3
-    ) {
-      strengths.push(
-        "Creativity lens rated \u201c" +
-          (submission.creativity_writing_band || "Good") +
-          "\u201d"
-      );
+    if (submission.creativity_writing_score !== null && submission.creativity_writing_score >= 3) {
+      strengths.push("Creativity lens rated \u201c" + (submission.creativity_writing_band || "Good") + "\u201d");
     }
-    if (
-      submission.values_writing_score !== null &&
-      submission.values_writing_score <= 1.5
-    ) {
-      development.push(
-        "Values response was limited \u2014 may benefit from pastoral induction"
-      );
+    if (submission.values_writing_score !== null && submission.values_writing_score <= 1.5) {
+      development.push("Values response was limited \u2014 may benefit from pastoral induction");
     }
 
     const finalStrengths = strengths.slice(0, 5);
     const finalDevelopment = development.slice(0, 5);
 
     // ─── EXECUTIVE SUMMARY ───────────────────────────────────────
-    const studentFirst = studentName.split(" ")[0] || studentName;
-    const domains = [
-      { name: "English", pct: engPct },
-      { name: "Mathematics", pct: mathPct },
-      { name: "Reasoning", pct: resPct },
-    ];
-    const sortedAsc = domains.slice().sort(function (a, b) {
-      return a.pct - b.pct;
-    });
-    const sortedDesc = domains.slice().sort(function (a, b) {
-      return b.pct - a.pct;
-    });
-    const strongest = sortedDesc[0];
-    const weakest = sortedAsc[0];
+    // Use AI-generated summary from scoring pipeline if available,
+    // otherwise fall back to simple constructed version
+    let execSummary = submission.executive_summary || "";
 
-    let execSummary =
-      studentFirst +
-      " achieved an overall academic score of " +
-      (submission.overall_academic_pct || 0).toFixed(1) +
-      "%, with the strongest performance in " +
-      strongest.name +
-      " (" +
-      strongest.pct.toFixed(0) +
-      "%).";
+    if (!execSummary) {
+      // Fallback: simple constructed summary
+      const studentFirst = studentName.split(" ")[0] || studentName;
+      const domains = [
+        { name: "English", pct: engPct },
+        { name: "Mathematics", pct: mathPct },
+        { name: "Reasoning", pct: resPct },
+      ];
+      const sortedDesc = domains.slice().sort(function (a, b) { return b.pct - a.pct; });
+      const sortedAsc = domains.slice().sort(function (a, b) { return a.pct - b.pct; });
+      const strongest = sortedDesc[0];
+      const weakest = sortedAsc[0];
 
-    if (weakest.pct < strongest.pct - 15) {
-      execSummary +=
-        " " +
-        weakest.name +
-        " (" +
-        weakest.pct.toFixed(0) +
-        "%) represents the area with most room for growth.";
-    }
+      execSummary = studentFirst + " achieved an overall academic score of " +
+        (submission.overall_academic_pct || 0).toFixed(1) + "%, with the strongest performance in " +
+        strongest.name + " (" + strongest.pct.toFixed(0) + "%).";
 
-    if (mindsetScore >= 3.0) {
-      execSummary +=
-        " A positive growth mindset score (" +
-        mindsetScore.toFixed(1) +
-        "/4) suggests the applicant would respond well to the demands of a challenging academic environment.";
-    } else if (mindsetScore > 0 && mindsetScore < 2.0) {
-      execSummary +=
-        " The mindset profile (" +
-        mindsetScore.toFixed(1) +
-        "/4) suggests that targeted pastoral and resilience support may be beneficial.";
+      if (weakest.pct < strongest.pct - 15) {
+        execSummary += " " + weakest.name + " (" + weakest.pct.toFixed(0) + "%) represents the area with most room for growth.";
+      }
+
+      execSummary += " Based on this profile, the Evalent recommendation is " +
+        (submission.recommendation_band || "Pending") + ".";
     }
 
     // ─── BUILD REPORT DATA ───────────────────────────────────────
@@ -495,12 +385,9 @@ export async function GET(req: NextRequest) {
         writing_score: submission.english_writing_score ?? null,
         writing_narrative: submission.english_writing_narrative || null,
         writing_response: submission.english_writing_response || null,
-        combined_pct:
-          submission.english_combined || submission.english_mcq_pct || 0,
+        combined_pct: submission.english_combined || submission.english_mcq_pct || 0,
         threshold: englishThreshold,
-        delta:
-          (submission.english_combined || submission.english_mcq_pct || 0) -
-          englishThreshold,
+        delta: (submission.english_combined || submission.english_mcq_pct || 0) - englishThreshold,
         comment: "",
         construct_breakdown: englishConstructs,
         mcq_narrative: submission.english_mcq_narrative || "",
@@ -513,12 +400,9 @@ export async function GET(req: NextRequest) {
         writing_score: submission.maths_writing_score ?? null,
         writing_narrative: submission.maths_writing_narrative || null,
         writing_response: submission.maths_writing_response || null,
-        combined_pct:
-          submission.maths_combined || submission.maths_mcq_pct || 0,
+        combined_pct: submission.maths_combined || submission.maths_mcq_pct || 0,
         threshold: mathsThreshold,
-        delta:
-          (submission.maths_combined || submission.maths_mcq_pct || 0) -
-          mathsThreshold,
+        delta: (submission.maths_combined || submission.maths_mcq_pct || 0) - mathsThreshold,
         comment: "",
         construct_breakdown: mathsConstructs,
         mcq_narrative: submission.maths_mcq_narrative || "",

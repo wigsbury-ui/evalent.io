@@ -9,6 +9,7 @@ import {
   calculateRecommendation,
   extractWritingResponses,
   generateAllMCQAnalyses,
+  generateExecutiveSummary,
 } from "@/lib/scoring";
 import type { WritingTask } from "@/lib/scoring";
 import {
@@ -19,7 +20,7 @@ import {
 } from "@/lib/email";
 
 /**
- * Scoring Pipeline API — v4 (MCQ analysis + inlined email sending)
+ * Scoring Pipeline API — v5 (MCQ analysis + exec summary + inlined email)
  *
  * POST /api/score
  * Body: { submission_id: string }
@@ -292,6 +293,30 @@ export async function POST(req: NextRequest) {
       `[SCORING] Recommendation: ${recommendation.recommendation_band} (overall: ${recommendation.overall_academic_pct}%)`
     );
 
+    // ─── 8b. Generate AI executive summary ───────────────────
+    console.log(`[SCORING] Generating executive summary...`);
+    const execSummary = await generateExecutiveSummary({
+      student_name: studentName || "the student",
+      grade,
+      programme: programme || undefined,
+      recommendation_band: recommendation.recommendation_band,
+      overall_academic_pct: recommendation.overall_academic_pct,
+      english_mcq_pct: mcqResults.english.pct,
+      english_writing_band: writingEvals.english?.band || null,
+      english_combined_pct: recommendation.english.combined_pct,
+      maths_mcq_pct: mcqResults.mathematics.pct,
+      maths_writing_band: writingEvals.mathematics?.band || null,
+      maths_combined_pct: recommendation.mathematics.combined_pct,
+      reasoning_pct: mcqResults.reasoning.pct,
+      mindset_score: mcqResults.mindset.score || 0,
+      english_threshold: englishThreshold,
+      maths_threshold: mathsThreshold,
+      reasoning_threshold: reasoningThreshold,
+      values_band: writingEvals.values?.band || null,
+      creativity_band: writingEvals.creativity?.band || null,
+    });
+    console.log(`[SCORING] Executive summary generated (${execSummary.length} chars)`);
+
     // ─── 9. Save all results ────────────────────────────────────
     const updatePayload: Record<string, any> = {
       english_mcq_score: mcqResults.english.correct,
@@ -340,10 +365,12 @@ export async function POST(req: NextRequest) {
       creativity_narrative: writingEvals.creativity
         ? `${writingEvals.creativity.content_narrative} ${writingEvals.creativity.writing_narrative}`
         : null,
-      // MCQ analysis narratives (NEW)
+      // MCQ analysis narratives
       english_mcq_narrative: mcqAnalyses.english?.narrative || null,
       maths_mcq_narrative: mcqAnalyses.mathematics?.narrative || null,
       reasoning_mcq_narrative: mcqAnalyses.reasoning?.narrative || null,
+      // AI executive summary
+      executive_summary: execSummary,
       overall_academic_pct: recommendation.overall_academic_pct,
       recommendation_band: recommendation.recommendation_band,
       processing_status: "complete",
