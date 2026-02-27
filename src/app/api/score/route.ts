@@ -20,10 +20,14 @@ import {
 } from "@/lib/email";
 
 /**
- * Scoring Pipeline API — v5 (MCQ analysis + exec summary + inlined email)
+ * Scoring Pipeline API — v6 (fixed student name extraction)
  *
  * POST /api/score
  * Body: { submission_id: string }
+ *
+ * v6 CHANGES:
+ * - Fixed webhook key match: "student_first_name" now matches q3_student_first_name
+ * - Fixed DB fallback: queries first_name + last_name (not non-existent student_name)
  */
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
@@ -99,7 +103,7 @@ export async function POST(req: NextRequest) {
       const k = rawKeys[i];
       const v = rawAnswers[k];
       if (!v) continue;
-      if (k.includes("student_name") && !studentName)
+      if ((k.includes("student_first_name") || k.includes("student_name")) && !studentName)
         studentName = String(v);
       if (k.includes("meta_programme") && !programme)
         programme = String(v);
@@ -112,10 +116,10 @@ export async function POST(req: NextRequest) {
     if (!studentName && submission.student_id) {
       const { data: student } = await supabase
         .from("students")
-        .select("student_name")
+        .select("first_name, last_name")
         .eq("id", submission.student_id)
         .single();
-      if (student) studentName = student.student_name;
+      if (student) studentName = [student.first_name, student.last_name].filter(Boolean).join(" ");
     }
 
     const locale = detectedLocale;
