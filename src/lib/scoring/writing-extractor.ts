@@ -15,14 +15,19 @@
  *   _CREA_ or _creativ → creativity
  */
 
+export type DomainType = "english" | "mathematics" | "reasoning" | "mindset" | "values" | "creativity";
+
 export interface WritingResponse {
-  domain: string;
+  domain: DomainType;
   student_response: string;
   prompt_text: string;
   field_name: string;
 }
 
-function inferDomain(fieldName: string): string | null {
+/** @deprecated Use WritingResponse instead */
+export type ExtractedWriting = WritingResponse;
+
+function inferDomain(fieldName: string): DomainType | null {
   var lower = fieldName.toLowerCase();
   if (lower.indexOf("_en_") !== -1 || lower.indexOf("english") !== -1)
     return "english";
@@ -98,7 +103,7 @@ export function extractWritingResponses(
     if (!domain) {
       // Try to match against answer_key labels
       if (writingKeysByLabel[fieldName]) {
-        domain = writingKeysByLabel[fieldName].domain;
+        domain = writingKeysByLabel[fieldName].domain as DomainType;
       } else {
         continue; // Can't determine domain
       }
@@ -155,7 +160,7 @@ export function extractWritingResponses(
       if (rFieldName === label) {
         seenDomains[akEntry.domain] = true;
         results.push({
-          domain: akEntry.domain,
+          domain: akEntry.domain as DomainType,
           student_response: rText,
           prompt_text: akEntry.question_text || "",
           field_name: rFieldName,
