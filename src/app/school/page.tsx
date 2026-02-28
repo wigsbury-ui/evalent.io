@@ -887,9 +887,9 @@ export default function SchoolDashboard() {
         </Card>
       </div>
 
-      {/* ── Row 2: Grade chart + Thresholds + Recommendation bands ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-        {/* Grade-by-grade bar chart — spans 2 cols */}
+      {/* ── Row 2: Grade chart (2/3) + Donut & Thresholds stacked (1/3) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* Grade-by-grade bar chart — 2/3 width */}
         <Card className="border-0 shadow-sm lg:col-span-2">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold" style={{ color: "#1a2b6b" }}>
@@ -910,45 +910,48 @@ export default function SchoolDashboard() {
           </CardContent>
         </Card>
 
-        {/* Threshold line chart */}
-        <Card className="border-0 shadow-sm lg:col-span-2">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="text-base font-semibold" style={{ color: "#1a2b6b" }}>
-                  Entrance Thresholds
-                </CardTitle>
-                <CardDescription className="text-xs">
-                  Pass marks by subject across grades
-                </CardDescription>
-              </div>
-              <Link href="/school/grades">
-                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-gray-400 hover:text-gray-600">
-                  Edit
-                  <ChevronRight className="w-3 h-3 ml-0.5" />
-                </Button>
-              </Link>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <ThresholdLineChart configs={gradeConfigs} gradeNaming={gradeNaming} />
-          </CardContent>
-        </Card>
+        {/* Right column: Donut + Threshold stacked */}
+        <div className="flex flex-col gap-4 lg:col-span-1">
+          {/* Recommendation band donut */}
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold" style={{ color: "#1a2b6b" }}>
+                Recommendations
+              </CardTitle>
+              <CardDescription className="text-xs">
+                AI band distribution
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <BandDonut bands={bandData} total={totalBanded} />
+            </CardContent>
+          </Card>
 
-        {/* Recommendation band donut */}
-        <Card className="border-0 shadow-sm lg:col-span-1">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold" style={{ color: "#1a2b6b" }}>
-              Recommendations
-            </CardTitle>
-            <CardDescription className="text-xs">
-              AI band distribution
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <BandDonut bands={bandData} total={totalBanded} />
-          </CardContent>
-        </Card>
+          {/* Threshold line chart */}
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="pb-2">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base font-semibold" style={{ color: "#1a2b6b" }}>
+                    Entrance Thresholds
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    Pass marks by subject across grades
+                  </CardDescription>
+                </div>
+                <Link href="/school/grades">
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-gray-400 hover:text-gray-600">
+                    Edit
+                    <ChevronRight className="w-3 h-3 ml-0.5" />
+                  </Button>
+                </Link>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <ThresholdLineChart configs={gradeConfigs} gradeNaming={gradeNaming} />
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       {/* ── Row 3: Recent Activity + Quick Actions ── */}
