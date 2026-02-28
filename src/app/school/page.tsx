@@ -65,6 +65,13 @@ interface DashboardData {
   pipeline: PipelineStudent[];
 }
 
+interface GradeConfig {
+  grade: number;
+  english_threshold: number;
+  maths_threshold: number;
+  reasoning_threshold: number;
+}
+
 /* ──────────────────────────────────────────────
  * Status & band config
  * ────────────────────────────────────────────── */
@@ -329,6 +336,233 @@ function BandDonut({ bands, total }: { bands: BandCount[]; total: number }) {
 }
 
 /* ──────────────────────────────────────────────
+ * Threshold line chart (pure SVG)
+ * ────────────────────────────────────────────── */
+
+const thresholdLines = [
+  { key: "english_threshold" as const, label: "English", color: "#3b82f6" },
+  { key: "maths_threshold" as const, label: "Maths", color: "#f59e0b" },
+  { key: "reasoning_threshold" as const, label: "Reasoning", color: "#8b5cf6" },
+];
+
+function ThresholdLineChart({
+  configs,
+  gradeNaming,
+}: {
+  configs: GradeConfig[];
+  gradeNaming: string;
+}) {
+  const [hoveredLine, setHoveredLine] = useState<string | null>(null);
+  const [hoveredPoint, setHoveredPoint] = useState<{
+    line: string;
+    grade: number;
+    value: number;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  if (configs.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-40 text-gray-400 text-sm">
+        No grade thresholds configured
+      </div>
+    );
+  }
+
+  const sorted = [...configs].sort((a, b) => a.grade - b.grade);
+  const gradeLabel = (g: number) => (gradeNaming === "year" ? "Y" + g : "G" + g);
+
+  // Chart dimensions
+  const w = 400;
+  const h = 160;
+  const padLeft = 32;
+  const padRight = 16;
+  const padTop = 16;
+  const padBottom = 28;
+  const chartW = w - padLeft - padRight;
+  const chartH = h - padTop - padBottom;
+
+  // Y axis: 0-100%
+  const minY = 0;
+  const maxY = 100;
+
+  const xStep = sorted.length > 1 ? chartW / (sorted.length - 1) : chartW / 2;
+  const getX = (i: number) => padLeft + (sorted.length > 1 ? i * xStep : chartW / 2);
+  const getY = (val: number) =>
+    padTop + chartH - ((val - minY) / (maxY - minY)) * chartH;
+
+  // Build polyline paths
+  const paths = thresholdLines.map((line) => {
+    const points = sorted.map((c, i) => {
+      const val = c[line.key];
+      return { x: getX(i), y: getY(val), val, grade: c.grade };
+    });
+    const d = points
+      .map((p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `L ${p.x} ${p.y}`))
+      .join(" ");
+    return { ...line, points, d };
+  });
+
+  // Y grid lines
+  const yTicks = [0, 25, 50, 75, 100];
+
+  return (
+    <div>
+      <svg
+        viewBox={`0 0 ${w} ${h}`}
+        className="w-full"
+        style={{ maxHeight: 200 }}
+      >
+        {/* Grid lines */}
+        {yTicks.map((tick) => (
+          <g key={tick}>
+            <line
+              x1={padLeft}
+              y1={getY(tick)}
+              x2={w - padRight}
+              y2={getY(tick)}
+              stroke="#f1f5f9"
+              strokeWidth={1}
+            />
+            <text
+              x={padLeft - 6}
+              y={getY(tick) + 3}
+              textAnchor="end"
+              className="text-[8px]"
+              fill="#94a3b8"
+            >
+              {tick}
+            </text>
+          </g>
+        ))}
+
+        {/* X axis labels */}
+        {sorted.map((c, i) => (
+          <text
+            key={c.grade}
+            x={getX(i)}
+            y={h - 4}
+            textAnchor="middle"
+            className="text-[9px] font-semibold"
+            fill="#1a2b6b"
+          >
+            {gradeLabel(c.grade)}
+          </text>
+        ))}
+
+        {/* Lines */}
+        {paths.map((path) => {
+          const isHovered = hoveredLine === path.key;
+          const isFaded = hoveredLine != null && !isHovered;
+          return (
+            <g key={path.key}>
+              <path
+                d={path.d}
+                fill="none"
+                stroke={path.color}
+                strokeWidth={isHovered ? 2.5 : 1.8}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                style={{
+                  opacity: isFaded ? 0.15 : 1,
+                  transition: "all 0.25s ease",
+                }}
+              />
+              {/* Dots */}
+              {path.points.map((p, i) => (
+                <circle
+                  key={i}
+                  cx={p.x}
+                  cy={p.y}
+                  r={isHovered ? 4 : 3}
+                  fill="white"
+                  stroke={path.color}
+                  strokeWidth={isHovered ? 2.5 : 1.5}
+                  style={{
+                    opacity: isFaded ? 0.15 : 1,
+                    transition: "all 0.25s ease",
+                    cursor: "pointer",
+                  }}
+                  onMouseEnter={() =>
+                    setHoveredPoint({
+                      line: path.key,
+                      grade: p.grade,
+                      value: p.val,
+                      x: p.x,
+                      y: p.y,
+                    })
+                  }
+                  onMouseLeave={() => setHoveredPoint(null)}
+                />
+              ))}
+            </g>
+          );
+        })}
+
+        {/* Tooltip */}
+        {hoveredPoint && (
+          <g>
+            <rect
+              x={hoveredPoint.x - 20}
+              y={hoveredPoint.y - 22}
+              width={40}
+              height={16}
+              rx={4}
+              fill="#1a2b6b"
+            />
+            <text
+              x={hoveredPoint.x}
+              y={hoveredPoint.y - 11}
+              textAnchor="middle"
+              fill="white"
+              className="text-[8px] font-semibold"
+            >
+              {hoveredPoint.value}%
+            </text>
+          </g>
+        )}
+      </svg>
+
+      {/* Interactive legend */}
+      <div className="flex gap-4 justify-center mt-2">
+        {thresholdLines.map((line) => {
+          const isActive = hoveredLine === line.key;
+          return (
+            <button
+              key={line.key}
+              onMouseEnter={() => setHoveredLine(line.key)}
+              onMouseLeave={() => setHoveredLine(null)}
+              onClick={() =>
+                setHoveredLine(hoveredLine === line.key ? null : line.key)
+              }
+              className="flex items-center gap-1.5 px-2 py-0.5 rounded-full transition-all duration-200"
+              style={{
+                backgroundColor: isActive ? line.color + "15" : "transparent",
+                cursor: "pointer",
+              }}
+            >
+              <div
+                className="w-3 h-0.5 rounded-full"
+                style={{ backgroundColor: line.color }}
+              />
+              <span
+                className="text-xs"
+                style={{
+                  color: isActive ? line.color : "#6b7280",
+                  fontWeight: isActive ? 600 : 400,
+                }}
+              >
+                {line.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────
  * Activity feed
  * ────────────────────────────────────────────── */
 
@@ -419,17 +653,28 @@ const activityLabels: Record<string, string> = {
 
 export default function SchoolDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
+  const [gradeConfigs, setGradeConfigs] = useState<GradeConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/school/dashboard")
-      .then((r) => r.json())
-      .then((d) => {
-        setData(d);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+    Promise.all([
+      fetch("/api/school/dashboard").then((r) => r.json()),
+      fetch("/api/school/grade-configs").then((r) => r.json()).catch(() => []),
+    ]).then(([dashData, configData]) => {
+      setData(dashData);
+      if (Array.isArray(configData)) {
+        setGradeConfigs(
+          configData.map((c: any) => ({
+            grade: c.grade,
+            english_threshold: c.english_threshold ?? 55,
+            maths_threshold: c.maths_threshold ?? 55,
+            reasoning_threshold: c.reasoning_threshold ?? 55,
+          }))
+        );
+      }
+      setLoading(false);
+    }).catch(() => setLoading(false));
   }, []);
 
   if (loading) {
@@ -642,8 +887,8 @@ export default function SchoolDashboard() {
         </Card>
       </div>
 
-      {/* ── Row 2: Grade chart + Recommendation bands ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {/* ── Row 2: Grade chart + Thresholds + Recommendation bands ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
         {/* Grade-by-grade bar chart — spans 2 cols */}
         <Card className="border-0 shadow-sm lg:col-span-2">
           <CardHeader className="pb-2">
@@ -665,14 +910,39 @@ export default function SchoolDashboard() {
           </CardContent>
         </Card>
 
+        {/* Threshold line chart */}
+        <Card className="border-0 shadow-sm lg:col-span-2">
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base font-semibold" style={{ color: "#1a2b6b" }}>
+                  Entrance Thresholds
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Pass marks by subject across grades
+                </CardDescription>
+              </div>
+              <Link href="/school/grades">
+                <Button variant="ghost" size="sm" className="h-7 px-2 text-xs text-gray-400 hover:text-gray-600">
+                  Edit
+                  <ChevronRight className="w-3 h-3 ml-0.5" />
+                </Button>
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <ThresholdLineChart configs={gradeConfigs} gradeNaming={gradeNaming} />
+          </CardContent>
+        </Card>
+
         {/* Recommendation band donut */}
-        <Card className="border-0 shadow-sm">
+        <Card className="border-0 shadow-sm lg:col-span-1">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold" style={{ color: "#1a2b6b" }}>
               Recommendations
             </CardTitle>
             <CardDescription className="text-xs">
-              AI assessment band distribution
+              AI band distribution
             </CardDescription>
           </CardHeader>
           <CardContent>
