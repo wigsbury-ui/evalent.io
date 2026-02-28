@@ -129,6 +129,8 @@ interface GradeBarData {
 }
 
 function GradeChart({ data, gradeNaming }: { data: GradeBarData[]; gradeNaming: string }) {
+  const [activeSegment, setActiveSegment] = useState<string | null>(null);
+
   if (data.length === 0) return null;
 
   const maxTotal = Math.max(...data.map((d) => d.total), 1);
@@ -145,6 +147,13 @@ function GradeChart({ data, gradeNaming }: { data: GradeBarData[]; gradeNaming: 
   const gradeLabel = (g: number) =>
     gradeNaming === "year" ? "Y" + g : "G" + g;
 
+  // When a segment is active, show that segment's count above each bar instead of total
+  const getBarLabel = (d: GradeBarData) => {
+    if (!activeSegment) return d.total;
+    const val = d[activeSegment as keyof GradeBarData] as number;
+    return val > 0 ? val : "";
+  };
+
   return (
     <div>
       <div className="flex items-end gap-3" style={{ height: 200 }}>
@@ -153,7 +162,9 @@ function GradeChart({ data, gradeNaming }: { data: GradeBarData[]; gradeNaming: 
           let cumulative = 0;
           return (
             <div key={d.grade} className="flex-1 flex flex-col items-center gap-1">
-              <span className="text-xs font-medium text-gray-500">{d.total}</span>
+              <span className="text-xs font-medium text-gray-500 tabular-nums">
+                {getBarLabel(d)}
+              </span>
               <div
                 className="w-full rounded-t-md overflow-hidden relative"
                 style={{ height: barHeight, minHeight: d.total > 0 ? 8 : 0 }}
@@ -164,14 +175,18 @@ function GradeChart({ data, gradeNaming }: { data: GradeBarData[]; gradeNaming: 
                   const pct = (val / d.total) * 100;
                   const bottom = (cumulative / d.total) * 100;
                   cumulative += val;
+                  const isActive = activeSegment === seg.key;
+                  const isFaded = activeSegment != null && !isActive;
                   return (
                     <div
                       key={seg.key}
-                      className="absolute left-0 right-0"
+                      className="absolute left-0 right-0 transition-all duration-300 ease-out"
                       style={{
                         backgroundColor: seg.color,
                         bottom: bottom + "%",
                         height: pct + "%",
+                        opacity: isFaded ? 0.15 : 1,
+                        filter: isActive ? "brightness(1.1)" : "none",
                       }}
                       title={seg.label + ": " + val}
                     />
@@ -185,19 +200,52 @@ function GradeChart({ data, gradeNaming }: { data: GradeBarData[]; gradeNaming: 
           );
         })}
       </div>
-      {/* Legend */}
-      <div className="flex flex-wrap gap-4 mt-4 justify-center">
+
+      {/* Interactive Legend */}
+      <div className="flex flex-wrap gap-2 mt-4 justify-center">
         {segments
           .filter((s) => s.key !== "error")
-          .map((seg) => (
-            <div key={seg.key} className="flex items-center gap-1.5">
-              <div
-                className="w-2.5 h-2.5 rounded-sm"
-                style={{ backgroundColor: seg.color }}
-              />
-              <span className="text-xs text-gray-500">{seg.label}</span>
-            </div>
-          ))}
+          .map((seg) => {
+            const isActive = activeSegment === seg.key;
+            const total = data.reduce((sum, d) => sum + (d[seg.key] as number), 0);
+            return (
+              <button
+                key={seg.key}
+                onClick={() => setActiveSegment(isActive ? null : seg.key)}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full transition-all duration-200 border"
+                style={{
+                  backgroundColor: isActive ? seg.color + "18" : "transparent",
+                  borderColor: isActive ? seg.color : "transparent",
+                  cursor: "pointer",
+                }}
+              >
+                <div
+                  className="w-2.5 h-2.5 rounded-full transition-transform duration-200"
+                  style={{
+                    backgroundColor: seg.color,
+                    transform: isActive ? "scale(1.3)" : "scale(1)",
+                  }}
+                />
+                <span
+                  className="text-xs transition-colors duration-200"
+                  style={{
+                    color: isActive ? seg.color : "#6b7280",
+                    fontWeight: isActive ? 600 : 400,
+                  }}
+                >
+                  {seg.label}
+                </span>
+                {isActive && (
+                  <span
+                    className="text-xs font-bold ml-0.5"
+                    style={{ color: seg.color }}
+                  >
+                    {total}
+                  </span>
+                )}
+              </button>
+            );
+          })}
       </div>
     </div>
   );
