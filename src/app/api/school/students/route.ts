@@ -8,15 +8,15 @@ import { z } from "zod";
 const JOTFORM_IDS: Record<number, string> = {
   3: "260320999939472",
   4: "260482838643061",
-  5: "260482974360058",
-  6: "260483151046047",
+  5: "260473002939456",
+  6: "260482974360058",
   7: "260471812050447",
-  8: "260472051943454",
-  9: "260472537687468",
-  10: "260471847392464",
+  8: "260483151046047",
+  9: "260483906227461",
+  10: "260484588498478",
 };
 
-const registerSchema = z.object({
+const registerStudentSchema = z.object({
   first_name: z.string().min(1, "First name is required"),
   last_name: z.string().min(1, "Last name is required"),
   grade_applied: z.number().int().min(3).max(10),
@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const parsed = registerSchema.parse(body);
+    const parsed = registerStudentSchema.parse(body);
 
     const supabase = createServerClient();
 
@@ -102,7 +102,9 @@ export async function POST(req: NextRequest) {
       voice: voice,
     });
 
-    const jotformLink = `https://form.jotform.com/${formId}?${prefills.toString()}`;
+    // Use the Evalent-branded assessment shell
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.evalent.io";
+    const jotformLink = `${appUrl}/assess?form=${formId}&${prefills.toString()}`;
 
     // Resolve first_language: use explicit field, or first entry from languages_spoken
     const firstLanguage =
