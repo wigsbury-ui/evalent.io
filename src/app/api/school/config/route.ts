@@ -5,7 +5,8 @@ import { authOptions } from "@/lib/auth";
 
 /**
  * PATCH /api/school/config
- * Update school settings (curriculum, grade_naming, locale, timezone, admission_terms, admissions lead)
+ * Update school settings (curriculum, grade_naming, locale, timezone, admission_terms,
+ * admissions lead, custom_presets)
  * Accessible by school_admin and super_admin
  */
 export async function PATCH(req: NextRequest) {
@@ -39,6 +40,7 @@ export async function PATCH(req: NextRequest) {
     admission_terms,
     admissions_lead_name,
     admissions_lead_email,
+    custom_presets,
   } = body;
 
   if (grade_naming && !["grade", "year"].includes(grade_naming)) {
@@ -68,6 +70,32 @@ export async function PATCH(req: NextRequest) {
     }
   }
 
+  // Validate custom_presets structure
+  if (custom_presets !== undefined) {
+    if (!Array.isArray(custom_presets)) {
+      return NextResponse.json(
+        { error: "custom_presets must be an array" },
+        { status: 400 }
+      );
+    }
+    // Limit to 20 presets
+    if (custom_presets.length > 20) {
+      return NextResponse.json(
+        { error: "Maximum 20 custom presets allowed" },
+        { status: 400 }
+      );
+    }
+    // Basic structure validation
+    for (const p of custom_presets) {
+      if (!p.id || !p.name || !p.thresholds) {
+        return NextResponse.json(
+          { error: "Each preset must have id, name, and thresholds" },
+          { status: 400 }
+        );
+      }
+    }
+  }
+
   const supabase = createServerClient();
 
   const updates: Record<string, any> = {};
@@ -81,12 +109,12 @@ export async function PATCH(req: NextRequest) {
     updates.default_assessor_first_name = default_assessor_first_name;
   if (default_assessor_last_name !== undefined)
     updates.default_assessor_last_name = default_assessor_last_name;
-  if (admission_terms !== undefined)
-    updates.admission_terms = admission_terms;
+  if (admission_terms !== undefined) updates.admission_terms = admission_terms;
   if (admissions_lead_name !== undefined)
     updates.admissions_lead_name = admissions_lead_name;
   if (admissions_lead_email !== undefined)
     updates.admissions_lead_email = admissions_lead_email;
+  if (custom_presets !== undefined) updates.custom_presets = custom_presets;
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json(

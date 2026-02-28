@@ -22,6 +22,7 @@ export async function GET(req: NextRequest) {
       .order("created_at", { ascending: true })
       .limit(1)
       .single();
+
     if (firstSchool) {
       schoolId = firstSchool.id;
     }
@@ -46,6 +47,7 @@ export async function GET(req: NextRequest) {
         )
         .eq("school_id", schoolId)
         .order("created_at", { ascending: false }),
+
       supabase
         .from("submissions")
         .select(
@@ -53,13 +55,15 @@ export async function GET(req: NextRequest) {
         )
         .eq("school_id", schoolId)
         .order("created_at", { ascending: false }),
+
       supabase
         .from("decisions")
         .select("id, submission_id, decision, decided_at"),
+
       supabase
         .from("schools")
         .select(
-          "id, name, slug, curriculum, locale, contact_email, timezone, is_active, subscription_plan, grade_naming, default_assessor_email, default_assessor_first_name, default_assessor_last_name, admissions_lead_name, admissions_lead_email, admission_terms"
+          "id, name, slug, curriculum, locale, contact_email, timezone, is_active, subscription_plan, grade_naming, default_assessor_email, default_assessor_first_name, default_assessor_last_name, admissions_lead_name, admissions_lead_email, admission_terms, custom_presets"
         )
         .eq("id", schoolId)
         .single(),
@@ -107,13 +111,11 @@ export async function GET(req: NextRequest) {
   // Statuses that mean "report is ready / viewable"
   const reportReadyStatuses = ["complete", "report_sent", "decided"];
 
-  // Reports ready = submissions that are complete, report_sent, or decided
   const reportsReady = submissions.filter(
     (s) =>
       reportReadyStatuses.includes(s.processing_status) || s.report_sent_at
   ).length;
 
-  // Awaiting decision = report is ready but no decision recorded
   const awaitingDecision = submissions.filter(
     (s) =>
       (reportReadyStatuses.includes(s.processing_status) ||
@@ -121,7 +123,6 @@ export async function GET(req: NextRequest) {
       !decisionBySub[s.id]
   ).length;
 
-  // In pipeline = submissions still being processed (not yet complete)
   const inPipeline = submissions.filter(
     (s) =>
       !reportReadyStatuses.includes(s.processing_status) &&
