@@ -85,19 +85,26 @@ export async function POST(req: NextRequest) {
       "meta_source_form_id": formId || "",
     });
 
+    // Build the Evalent-branded assessment URL
+    // The /assess page wraps Jotform in an Evalent-branded shell
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.evalent.io";
+    const assessUrl = appUrl + "/assess?form=" + formId + "&" + prefills.toString();
+
+    // Also keep the direct Jotform link for reference / fallback
     const jotformLink = "https://form.jotform.com/" + formId + "?" + prefills.toString();
 
-    // Update student with link
+    // Update student with the branded assessment link
     await supabase
       .from("students")
-      .update({ jotform_link: jotformLink })
+      .update({ jotform_link: assessUrl })
       .eq("id", student.id);
 
     return NextResponse.json(
       {
         id: student.id,
         student_ref: student.student_ref,
-        jotform_link: jotformLink,
+        jotform_link: assessUrl,
+        jotform_direct_link: jotformLink,
       },
       { status: 201 }
     );
@@ -110,16 +117,17 @@ export async function POST(req: NextRequest) {
     }
     console.error("Failed to register student:", err);
     return NextResponse.json(
-      { message: "Internal server error" },
+      { message: "Failed to register student" },
       { status: 500 }
     );
   }
 }
 
+// DELETE handler — remove a student by ID
 export async function DELETE(req: NextRequest) {
   try {
-    const url = new URL(req.url);
-    const studentId = url.searchParams.get("id");
+    const { searchParams } = new URL(req.url);
+    const studentId = searchParams.get("id");
 
     if (!studentId) {
       return NextResponse.json(
@@ -130,15 +138,8 @@ export async function DELETE(req: NextRequest) {
 
     const supabase = createServerClient();
 
-    // Delete submissions first (cascade)
-    const { error: subError } = await supabase
-      .from("submissions")
-      .delete()
-      .eq("student_id", studentId);
-
-    if (subError) {
-      console.error("Failed to delete submissions:", subError);
-    }
+    // Delete related submissions first (FK constraint)
+    await supabase.from("submissions").delete().eq("student_id", studentId);
 
     // Delete the student
     const { error } = await supabase
@@ -152,7 +153,7 @@ export async function DELETE(req: NextRequest) {
   } catch (err) {
     console.error("Failed to delete student:", err);
     return NextResponse.json(
-      { message: "Internal server error" },
+      { message: "Failed to delete student" },
       { status: 500 }
     );
   }
