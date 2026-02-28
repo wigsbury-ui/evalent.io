@@ -273,8 +273,8 @@ export default function SchoolConfigPage() {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50">
-              <ShieldCheck className="h-5 w-5 text-amber-600" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-evalent-50">
+              <ShieldCheck className="h-5 w-5 text-evalent-600" />
             </div>
             <div>
               <CardTitle className="text-lg">Admissions Team Leader</CardTitle>
@@ -315,8 +315,8 @@ export default function SchoolConfigPage() {
               />
             </div>
           </div>
-          <div className="rounded-lg border border-amber-100 bg-amber-50 p-3">
-            <p className="text-xs text-amber-800">
+          <div className="rounded-lg border border-evalent-100 bg-evalent-50 p-3">
+            <p className="text-xs text-evalent-800">
               <strong>Reminder schedule:</strong> After a report is emailed to an
               assessor, Evalent will send a reminder at <strong>48 hours</strong>.
               If still no response, a <strong>final reminder</strong> is sent at{" "}
