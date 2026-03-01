@@ -424,6 +424,7 @@ export default function AssessorsPage() {
           Set a universal assessor or customise per grade.
         </p>
       </div>
+      <LearnMoreLink featureId="assessors" title="Managing Assessors" />
 
       {/* ─── RESPONSE TIME METRICS ────────────────────────────── */}
       {responseMetrics.length > 0 && uniqueAssessors.length > 0 && (
@@ -432,8 +433,6 @@ export default function AssessorsPage() {
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50">
                 <Clock className="h-5 w-5 text-blue-600" />
-              
-      <LearnMoreLink featureId="assessors" title="Managing Assessors" />
       </div>
               <div>
                 <CardTitle className="text-lg">Response Times</CardTitle>

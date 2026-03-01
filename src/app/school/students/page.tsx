@@ -490,7 +490,8 @@ export default function StudentsPage() {
             Manage registered students and track assessment progress.
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex items-center gap-3">
           <div className="relative">
             <Button
               variant="outline"
@@ -545,7 +546,8 @@ export default function StudentsPage() {
             </Button>
           </Link>
         </div>
-            <LearnMoreLink featureId="student_registration" title="Managing Students" />
+          <LearnMoreLink featureId="student_registration" title="Managing Students" />
+        </div>
       </div>
 
       {students.length === 0 ? (
