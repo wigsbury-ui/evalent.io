@@ -231,7 +231,7 @@ export default function SchoolConfigPage() {
           <Badge variant={school.is_active ? "default" : "secondary"}>
           {school.is_active ? "Active" : "Inactive"}
         </Badge>
-          <LearnMoreLink featureId="school_config" title="School Configuration" />
+          <LearnMoreLink featureId="school_config" title="School Settingsuration" />
         </div>
       </div>
 

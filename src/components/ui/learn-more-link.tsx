@@ -14,7 +14,7 @@ interface LearnMoreLinkProps {
  * Drop-in "Learn more" link with video popup.
  * Renders nothing if no video URL is configured for the feature.
  *
- * Usage: <LearnMoreLink featureId="school_config" title="School Configuration" />
+ * Usage: <LearnMoreLink featureId="school_config" title="School Settingsuration" />
  */
 export function LearnMoreLink({ featureId, title }: LearnMoreLinkProps) {
   const { url } = useHelpVideo(featureId);

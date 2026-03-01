@@ -16,8 +16,8 @@ import {
 
 const navItems = [
   { href: "/school", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/school/config", label: "School Config", icon: Settings },
-  { href: "/school/grades", label: "Grade Config", icon: GraduationCap },
+  { href: "/school/config", label: "School Settings", icon: Settings },
+  { href: "/school/grades", label: "Pass Thresholds", icon: GraduationCap },
   { href: "/school/assessors", label: "Assessors", icon: Users },
   { href: "/school/students", label: "Students", icon: UserPlus },
 ];
