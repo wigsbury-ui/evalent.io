@@ -21,7 +21,9 @@ import {
   X,
   Trash2,
   BookmarkPlus,
+  Play,
 } from "lucide-react";
+import { VideoModal } from "@/components/ui/video-modal";
 
 /* ─── Types ─────────────────────────────────────────────────── */
 
@@ -262,6 +264,10 @@ export default function GradeConfigPage() {
   const [customPresets, setCustomPresets] = useState<PresetProfile[]>([]);
   const [showSaveModal, setShowSaveModal] = useState(false);
 
+  // Help video
+  const [helpVideoUrl, setHelpVideoUrl] = useState<string | null>(null);
+  const [showVideo, setShowVideo] = useState(false);
+
   const allPresets: PresetProfile[] = [...customPresets, ...BUILT_IN_PRESETS];
 
   // Load data
@@ -269,7 +275,8 @@ export default function GradeConfigPage() {
     Promise.all([
       fetch("/api/school/grade-configs").then((r) => r.json()),
       fetch("/api/school/dashboard").then((r) => r.json()),
-    ]).then(([configsData, dashData]) => {
+      fetch("/api/admin/help-videos").then((r) => r.json()).catch(() => []),
+    ]).then(([configsData, dashData, helpVideos]) => {
       const cfgs: GradeConfig[] = Array.isArray(configsData) ? configsData : [];
       setConfigs(cfgs);
       const s = dashData?.school;
@@ -297,6 +304,13 @@ export default function GradeConfigPage() {
         setGradeOverrides(overrides);
         setCustomGrades(custom);
       }
+
+      // Load help video for this feature
+      if (Array.isArray(helpVideos)) {
+        const vid = helpVideos.find((v: any) => v.id === "grade_thresholds");
+        if (vid?.url) setHelpVideoUrl(vid.url);
+      }
+
       setLoading(false);
     }).catch(() => setLoading(false));
   }, []);
@@ -464,14 +478,25 @@ export default function GradeConfigPage() {
           <h1 className="text-3xl font-bold tracking-tight text-gray-900">Assessment Thresholds</h1>
           <p className="mt-1 text-gray-500">Start with a preset or set thresholds manually. Fine-tune any grade after.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setShowSaveModal(true)} className="text-gray-600">
-            <BookmarkPlus className="mr-2 h-4 w-4" />Save as Preset
-          </Button>
-          <Button variant={showPresets ? "default" : "outline"} onClick={() => setShowPresets(!showPresets)}
-            className={showPresets ? "bg-evalent-700 hover:bg-evalent-600 text-white" : ""}>
-            <Sparkles className="mr-2 h-4 w-4" />{showPresets ? "Hide Presets" : "School Presets"}
-          </Button>
+        <div className="flex flex-col items-end gap-2">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setShowSaveModal(true)} className="text-gray-600">
+              <BookmarkPlus className="mr-2 h-4 w-4" />Save as Preset
+            </Button>
+            <Button variant={showPresets ? "default" : "outline"} onClick={() => setShowPresets(!showPresets)}
+              className={showPresets ? "bg-evalent-700 hover:bg-evalent-600 text-white" : ""}>
+              <Sparkles className="mr-2 h-4 w-4" />{showPresets ? "Hide Presets" : "School Presets"}
+            </Button>
+          </div>
+          {helpVideoUrl && (
+            <button
+              onClick={() => setShowVideo(true)}
+              className="flex items-center gap-1.5 text-xs text-evalent-600 hover:text-evalent-800 transition-colors"
+            >
+              <Play className="h-3 w-3" />
+              <span className="underline underline-offset-2">Learn more</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -601,6 +626,9 @@ export default function GradeConfigPage() {
       </div>
 
       {showSaveModal && <SavePresetModal onSave={saveCustomPreset} onCancel={() => setShowSaveModal(false)} />}
+      {showVideo && helpVideoUrl && (
+        <VideoModal url={helpVideoUrl} title="Understanding Threshold Presets" onClose={() => setShowVideo(false)} />
+      )}
     </div>
   );
 }

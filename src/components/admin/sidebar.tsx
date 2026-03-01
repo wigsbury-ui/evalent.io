@@ -13,6 +13,7 @@ import {
   FileText,
   ScrollText,
   LogOut,
+  Video,
 } from "lucide-react";
 
 const navItems = [
@@ -21,6 +22,7 @@ const navItems = [
   { href: "/admin/answer-keys", label: "Answer Keys", icon: Key },
   { href: "/admin/prompts", label: "AI Prompts", icon: Bot },
   { href: "/admin/reports", label: "Report Templates", icon: FileText },
+  { href: "/admin/help-videos", label: "Help Videos", icon: Video },
   { href: "/admin/audit", label: "Audit Log", icon: ScrollText },
 ];
 
@@ -47,6 +49,7 @@ export function AdminSidebar() {
           const isActive =
             pathname === item.href ||
             (item.href !== "/admin" && pathname.startsWith(item.href));
+
           return (
             <Link
               key={item.href}
