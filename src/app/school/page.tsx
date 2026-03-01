@@ -1234,7 +1234,7 @@ export default function SchoolDashboard() {
                           )}
                         </p>
                         <p className="text-xs text-gray-400">
-                          {gradeLabelShort(item.grade)} · {timeAgo(item.time)}
+                          {gradeLabel(item.grade)} · {timeAgo(item.time)}
                         </p>
                       </div>
                     </div>
@@ -1371,7 +1371,7 @@ export default function SchoolDashboard() {
                           </div>
                         </td>
                         <td className="py-3 pr-4 text-gray-600">
-                          {gradeLabelShort(s.grade_applied)}
+                          {gradeLabel(s.grade_applied)}
                         </td>
                         <td className="py-3 pr-4">
                           <Badge variant="secondary" className={stCfg.color + " text-xs"}>
