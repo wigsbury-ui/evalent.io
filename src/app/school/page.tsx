@@ -25,6 +25,7 @@ import {
   ChevronRight,
   AlertCircle,
 } from "lucide-react";
+import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 /* ──────────────────────────────────────────────
  * Types
