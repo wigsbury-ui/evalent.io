@@ -1139,7 +1139,7 @@ export default function SchoolDashboard() {
         </Card>
 
         {/* Right column: Donut + Threshold stacked */}
-        <div className="flex flex-col gap-4 lg:col-span-1">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Recommendation band donut */}
           <Card className="border-0 shadow-sm">
             <CardHeader className="pb-2">
