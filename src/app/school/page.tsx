@@ -46,6 +46,9 @@ interface PipelineStudent {
     overall_academic_pct: number | null;
     recommendation_band: string | null;
     processing_status: string;
+    english_combined: number | null;
+    maths_combined: number | null;
+    reasoning_pct: number | null;
   } | null;
   decision: {
     decision: string;
@@ -651,6 +654,243 @@ const activityLabels: Record<string, string> = {
  * Main Dashboard Component
  * ────────────────────────────────────────────── */
 
+
+/* ── Domain Performance Cards ─────────────────────────────── */
+function DomainPerformanceCards({
+  pipeline,
+  gradeConfigs,
+  gradeLabel,
+}: {
+  pipeline: PipelineStudent[];
+  gradeConfigs: GradeConfig[];
+  gradeLabel: (g: number) => string;
+}) {
+  const [expandedDomain, setExpandedDomain] = useState<string | null>(null);
+
+  // Build threshold lookup by grade
+  const thresholdByGrade: Record<number, GradeConfig> = {};
+  for (const gc of gradeConfigs) thresholdByGrade[gc.grade] = gc;
+
+  // Get scored students with domain data
+  const scored = pipeline.filter(
+    (s) =>
+      s.submission &&
+      s.submission.english_combined != null &&
+      s.submission.maths_combined != null &&
+      s.submission.reasoning_pct != null
+  );
+
+  if (scored.length === 0) return null;
+
+  const domains = [
+    {
+      key: "english",
+      label: "English",
+      color: "#2563eb",
+      bgLight: "#eff6ff",
+      bgAccent: "#dbeafe",
+      getScore: (s: PipelineStudent) => s.submission?.english_combined ?? 0,
+      getThreshold: (gc: GradeConfig) => gc.english_threshold,
+    },
+    {
+      key: "maths",
+      label: "Mathematics",
+      color: "#16a34a",
+      bgLight: "#f0fdf4",
+      bgAccent: "#dcfce7",
+      getScore: (s: PipelineStudent) => s.submission?.maths_combined ?? 0,
+      getThreshold: (gc: GradeConfig) => gc.maths_threshold,
+    },
+    {
+      key: "reasoning",
+      label: "Reasoning",
+      color: "#9333ea",
+      bgLight: "#faf5ff",
+      bgAccent: "#f3e8ff",
+      getScore: (s: PipelineStudent) => s.submission?.reasoning_pct ?? 0,
+      getThreshold: (gc: GradeConfig) => gc.reasoning_threshold,
+    },
+  ];
+
+  return (
+    <div className="space-y-3">
+      <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+        Academic Realms — Student Performance vs Thresholds
+      </h3>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {domains.map((domain) => {
+          const isExpanded = expandedDomain === domain.key;
+
+          // Calculate stats
+          const scores = scored.map((s) => ({
+            student: s,
+            score: domain.getScore(s),
+            threshold: thresholdByGrade[s.grade_applied]
+              ? domain.getThreshold(thresholdByGrade[s.grade_applied])
+              : 55,
+          }));
+
+          const aboveCount = scores.filter((s) => s.score >= s.threshold).length;
+          const belowCount = scores.length - aboveCount;
+          const avgScore = scores.reduce((a, s) => a + s.score, 0) / scores.length;
+          const avgThreshold =
+            scores.reduce((a, s) => a + s.threshold, 0) / scores.length;
+
+          return (
+            <div
+              key={domain.key}
+              className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden transition-all duration-300"
+              style={{
+                borderTop: `3px solid ${domain.color}`,
+              }}
+            >
+              {/* Card header — always visible */}
+              <button
+                onClick={() =>
+                  setExpandedDomain(isExpanded ? null : domain.key)
+                }
+                className="w-full text-left px-5 py-4 hover:bg-gray-50/50 transition-colors"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <span
+                    className="text-sm font-semibold"
+                    style={{ color: domain.color }}
+                  >
+                    {domain.label}
+                  </span>
+                  <span className="text-xs text-gray-400">
+                    {isExpanded ? "▲ Close" : "▼ Details"}
+                  </span>
+                </div>
+
+                {/* Average score vs threshold */}
+                <div className="flex items-end gap-2 mb-3">
+                  <span className="text-2xl font-bold text-gray-900">
+                    {avgScore.toFixed(1)}%
+                  </span>
+                  <span className="text-sm text-gray-400 pb-0.5">
+                    avg · threshold {avgThreshold.toFixed(0)}%
+                  </span>
+                </div>
+
+                {/* Dot strip — each dot is a student */}
+                <div className="flex items-center gap-1 mb-2">
+                  {scores
+                    .sort((a, b) => a.score - b.score)
+                    .map((s, i) => (
+                      <div
+                        key={i}
+                        className="relative group"
+                        style={{ flex: "0 0 auto" }}
+                      >
+                        <div
+                          className="w-3 h-3 rounded-full transition-transform hover:scale-150"
+                          style={{
+                            backgroundColor:
+                              s.score >= s.threshold
+                                ? domain.color
+                                : "#ef4444",
+                            opacity: s.score >= s.threshold ? 1 : 0.7,
+                          }}
+                        />
+                        <div className="pointer-events-none absolute -top-8 left-1/2 -translate-x-1/2 z-20 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-xs text-white opacity-0 shadow-lg group-hover:opacity-100 transition-opacity">
+                          {s.student.first_name} {s.student.last_name}:{" "}
+                          {s.score.toFixed(1)}%
+                        </div>
+                      </div>
+                    ))}
+                </div>
+
+                {/* Above/below summary */}
+                <div className="flex items-center gap-3 text-xs">
+                  <span style={{ color: domain.color }} className="font-medium">
+                    ● {aboveCount} above
+                  </span>
+                  <span className="text-red-500 font-medium">
+                    ● {belowCount} below
+                  </span>
+                </div>
+              </button>
+
+              {/* Expanded detail — individual student list */}
+              {isExpanded && (
+                <div
+                  className="border-t px-5 py-3 space-y-1.5 max-h-64 overflow-y-auto"
+                  style={{ backgroundColor: domain.bgLight }}
+                >
+                  {scores
+                    .sort((a, b) => b.score - a.score)
+                    .map((s, i) => {
+                      const delta = s.score - s.threshold;
+                      const isAbove = delta >= 0;
+                      return (
+                        <div
+                          key={i}
+                          className="flex items-center justify-between py-1.5 text-sm"
+                        >
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="w-2 h-2 rounded-full"
+                              style={{
+                                backgroundColor: isAbove
+                                  ? domain.color
+                                  : "#ef4444",
+                              }}
+                            />
+                            <span className="text-gray-700">
+                              {s.student.first_name} {s.student.last_name}
+                            </span>
+                            <span className="text-xs text-gray-400">
+                              {gradeLabel(s.student.grade_applied)}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            {/* Score bar */}
+                            <div className="w-24 h-1.5 rounded-full bg-gray-200 relative">
+                              {/* Threshold marker */}
+                              <div
+                                className="absolute top-0 h-1.5 w-px bg-gray-600"
+                                style={{
+                                  left: `${Math.min(s.threshold, 100)}%`,
+                                }}
+                              />
+                              {/* Score fill */}
+                              <div
+                                className="h-full rounded-full"
+                                style={{
+                                  width: `${Math.min(s.score, 100)}%`,
+                                  backgroundColor: isAbove
+                                    ? domain.color
+                                    : "#ef4444",
+                                }}
+                              />
+                            </div>
+                            <span className="text-sm font-semibold text-gray-900 w-14 text-right">
+                              {s.score.toFixed(1)}%
+                            </span>
+                            <span
+                              className="text-xs font-medium w-12 text-right"
+                              style={{
+                                color: isAbove ? domain.color : "#ef4444",
+                              }}
+                            >
+                              {isAbove ? "+" : ""}
+                              {delta.toFixed(0)}
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function SchoolDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [gradeConfigs, setGradeConfigs] = useState<GradeConfig[]>([]);
@@ -953,6 +1193,14 @@ export default function SchoolDashboard() {
           </Card>
         </div>
       </div>
+
+      
+      {/* ── Row 2.5: Academic Realms Performance ── */}
+      <DomainPerformanceCards
+        pipeline={dashboard.pipeline}
+        gradeConfigs={gradeConfigs}
+        gradeLabel={gradeLabel}
+      />
 
       {/* ── Row 3: Recent Activity + Quick Actions ── */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

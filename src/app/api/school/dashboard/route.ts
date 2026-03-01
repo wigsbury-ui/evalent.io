@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
       supabase
         .from("submissions")
         .select(
-          "id, student_id, grade, processing_status, overall_academic_pct, recommendation_band, report_sent_at, report_email_sent_at, assessor_email_used, created_at"
+          "id, student_id, grade, processing_status, overall_academic_pct, recommendation_band, report_sent_at, report_email_sent_at, assessor_email_used, created_at, english_combined, maths_combined, reasoning_pct"
         )
         .eq("school_id", schoolId)
         .order("created_at", { ascending: false }),
