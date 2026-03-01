@@ -227,10 +227,12 @@ export default function SchoolConfigPage() {
             preferences.
           </p>
         </div>
-        <Badge variant={school.is_active ? "default" : "secondary"}>
+        <div className="flex flex-col items-end gap-2">
+          <Badge variant={school.is_active ? "default" : "secondary"}>
           {school.is_active ? "Active" : "Inactive"}
         </Badge>
-        <LearnMoreLink featureId="school_config" title="School Configuration" />
+          <LearnMoreLink featureId="school_config" title="School Configuration" />
+        </div>
       </div>
 
       {/* Read-only info */}

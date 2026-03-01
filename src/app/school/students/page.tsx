@@ -538,7 +538,6 @@ export default function StudentsPage() {
             />
             Refresh
           </Button>
-              <LearnMoreLink featureId="student_registration" title="Managing Students" />
           <Link href="/school/students/new">
             <Button>
               <UserPlus className="mr-2 h-4 w-4" />
@@ -546,6 +545,7 @@ export default function StudentsPage() {
             </Button>
           </Link>
         </div>
+            <LearnMoreLink featureId="student_registration" title="Managing Students" />
       </div>
 
       {students.length === 0 ? (
