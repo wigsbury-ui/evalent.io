@@ -414,17 +414,18 @@ export default function AssessorsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Page header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">
-          Assessors
-        </h1>
-        <p className="mt-1 text-gray-500">
-          Assessors receive admissions reports and make admission decisions.
-          Set a universal assessor or customise per grade.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">
+            Assessors
+          </h1>
+          <p className="mt-1 text-gray-500">
+            Assessors receive admissions reports and make admission decisions.
+            Set a universal assessor or customise per grade.
+          </p>
+        </div>
+        <LearnMoreLink featureId="assessors" title="Managing Assessors" />
       </div>
-      <LearnMoreLink featureId="assessors" title="Managing Assessors" />
 
       {/* ─── RESPONSE TIME METRICS ────────────────────────────── */}
       {responseMetrics.length > 0 && uniqueAssessors.length > 0 && (
