@@ -1115,9 +1115,10 @@ export default function SchoolDashboard() {
       </div>
 
       {/* ── Row 2: Grade chart (2/3) + Donut & Thresholds stacked (1/3) ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* ── Row 2: Grade chart (full width) ── */}
+<div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Grade-by-grade bar chart — 2/3 width */}
-        <Card className="border-0 shadow-sm lg:col-span-2">
+        <Card className="border-0 shadow-sm lg:">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold" style={{ color: "#1a2b6b" }}>
               Applications by Grade
@@ -1180,6 +1181,9 @@ export default function SchoolDashboard() {
           </Card>
         </div>
       </div>
+
+      {/* ── Row 2b: Recommendations (50%) + Thresholds (50%) ── */}
+      
 
       
       {/* ── Row 2.5: Academic Realms Performance ── */}
