@@ -488,6 +488,7 @@ export default function StudentsPage() {
           </h1>
           <p className="mt-1 text-gray-500">
             Manage registered students and track assessment progress.
+          <LearnMoreLink featureId="student_registration" title="Managing Students" />
           </p>
         </div>
         <div className="flex items-center gap-3">
