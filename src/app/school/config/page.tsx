@@ -25,6 +25,7 @@ import {
   ShieldCheck,
   User,
 } from "lucide-react";
+import { LearnMoreLink } from "@/components/ui/learn-more-link";
 
 interface SchoolConfig {
   id: string;
@@ -226,7 +227,7 @@ export default function SchoolConfigPage() {
             preferences.
           </p>
         </div>
-        <Badge variant={school.is_active ? "default" : "secondary"}>
+        <div className="flex flex-col items-end gap-2"><Badge variant={school.is_active ? "default" : "secondary"}>
           {school.is_active ? "Active" : "Inactive"}
         </Badge>
       </div>

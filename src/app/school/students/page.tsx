@@ -28,6 +28,7 @@ import {
   Trash2,
   RotateCcw,
 } from "lucide-react";
+import { LearnMoreLink } from "@/components/ui/learn-more-link";
 
 interface StudentData {
   id: string;

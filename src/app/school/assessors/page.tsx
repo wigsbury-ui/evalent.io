@@ -23,6 +23,7 @@ import {
   Zap,
   AlertTriangle,
 } from "lucide-react";
+import { LearnMoreLink } from "@/components/ui/learn-more-link";
 
 /* ─── Types ─────────────────────────────────────────────────── */
 
