@@ -226,8 +226,9 @@ export default function SchoolConfigPage() {
             Configure your school&apos;s curriculum, locale, and display
             preferences.
           </p>
+          <LearnMoreLink featureId="school_config" title="School Configuration" />
         </div>
-        <div className="flex flex-col items-end gap-2"><Badge variant={school.is_active ? "default" : "secondary"}>
+        <Badge variant={school.is_active ? "default" : "secondary"}>
           {school.is_active ? "Active" : "Inactive"}
         </Badge>
       </div>
@@ -278,11 +279,13 @@ export default function SchoolConfigPage() {
               <ShieldCheck className="h-5 w-5 text-evalent-600" />
             </div>
             <div>
-              <CardTitle className="text-lg">Admissions Team Leader</CardTitle>
+              <CardTitle className="text-lg">
+                Admissions Team Leader
+              </CardTitle>
               <CardDescription>
-                This person is notified when an assessor fails to respond within
-                72 hours. They can follow up directly or review the report
-                themselves.
+                This person is notified when an assessor fails to respond
+                within 72 hours. They can follow up directly or review the
+                report themselves.
               </CardDescription>
             </div>
           </div>
@@ -318,9 +321,10 @@ export default function SchoolConfigPage() {
           </div>
           <div className="rounded-lg border border-evalent-100 bg-evalent-50 p-3">
             <p className="text-xs text-evalent-800">
-              <strong>Reminder schedule:</strong> After a report is emailed to an
-              assessor, Evalent will send a reminder at <strong>48 hours</strong>.
-              If still no response, a <strong>final reminder</strong> is sent at{" "}
+              <strong>Reminder schedule:</strong> After a report is emailed
+              to an assessor, Evalent will send a reminder at{" "}
+              <strong>48 hours</strong>. If still no response, a{" "}
+              <strong>final reminder</strong> is sent at{" "}
               <strong>72 hours</strong> along with an escalation email to the
               admissions team leader above.
             </p>
@@ -333,8 +337,8 @@ export default function SchoolConfigPage() {
         <CardHeader>
           <CardTitle className="text-lg">Curriculum &amp; Display</CardTitle>
           <CardDescription>
-            These settings affect how reports are generated, the language used in
-            AI narratives, and how grade levels are displayed.
+            These settings affect how reports are generated, the language used
+            in AI narratives, and how grade levels are displayed.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -397,8 +401,8 @@ export default function SchoolConfigPage() {
               ))}
             </select>
             <p className="mt-1 text-xs text-gray-400">
-              UK/British schools typically use &quot;Year&quot; (Year 4 = Grade
-              3 + 1). IB and American schools use &quot;Grade&quot;.
+              UK/British schools typically use &quot;Year&quot; (Year 4 =
+              Grade 3 + 1). IB and American schools use &quot;Grade&quot;.
             </p>
           </div>
 
@@ -444,7 +448,9 @@ export default function SchoolConfigPage() {
               <option value="America/New_York">
                 Eastern (New York)
               </option>
-              <option value="America/Chicago">Central (Chicago)</option>
+              <option value="America/Chicago">
+                Central (Chicago)
+              </option>
               <option value="America/Los_Angeles">
                 Pacific (LA)
               </option>
