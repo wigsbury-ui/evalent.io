@@ -1416,7 +1416,7 @@ export default function SchoolDashboard() {
                                 </Button>
                               </Link>
                             )}
-                            {s.jotform_link && (
+                            {s.jotform_link && !["complete", "report_sent", "decided"].includes(s.pipeline_status) && (
                               <Button
                                 variant="ghost"
                                 size="sm"
