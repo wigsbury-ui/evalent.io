@@ -156,7 +156,7 @@ function GradeChart({ data, gradeNaming }: { data: GradeBarData[]; gradeNaming: 
     { key: "error", color: "#ef4444", label: "Error" },
   ];
 
-  const gradeLabel = (g: number) => formatGrade(g, data?.school?.curriculum);
+  const gradeLabel = (g: number) => (gradeNaming === "year" ? "Y" + (g + 1) : "G" + g);
 
   // When a segment is active, show that segment's count above each bar instead of total
   const getBarLabel = (d: GradeBarData) => {
@@ -930,9 +930,7 @@ export default function SchoolDashboard() {
   }
 
   const { stats, pipeline, school } = data;
-  const gradeNaming = school?.grade_naming || "grade";
-  const gradeLabel = (g: number) => (gradeNaming === "year" ? "Year " + g : "Grade " + g);
-  const gradeLabelShort = (g: number) => (gradeNaming === "year" ? "Y" + g : "G" + g);
+  const gradeNaming = school?.grade_naming || "gconst gradeLabel = (g: number) => formatGrade(g, data?.school?.curriculum);
 
   /* ── Computed metrics ── */
 
