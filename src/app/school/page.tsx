@@ -930,7 +930,8 @@ export default function SchoolDashboard() {
   }
 
   const { stats, pipeline, school } = data;
-  const gradeNaming = school?.grade_naming || "gconst gradeLabel = (g: number) => formatGrade(g, data?.school?.curriculum);
+    const gradeNaming = school?.grade_naming || "grade";
+    const gradeLabel = (g: number) => formatGrade(g, school?.curriculum);
 
   /* ── Computed metrics ── */
 
