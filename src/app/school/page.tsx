@@ -160,7 +160,7 @@ function GradeChart({ data, gradeNaming }: { data: GradeBarData[]; gradeNaming: 
 
   // When a segment is active, show that segment's count above each bar instead of total
   const getBarLabel = (d: GradeBarData) => {
-    if (!activeSegment) return d.total;
+    if (!activeSegment) return d.total > 0 ? d.total : "";
     const val = d[activeSegment as keyof GradeBarData] as number;
     return val > 0 ? val : "";
   };
@@ -169,41 +169,49 @@ function GradeChart({ data, gradeNaming }: { data: GradeBarData[]; gradeNaming: 
     <div>
       <div className="flex items-end gap-3" style={{ height: 200 }}>
         {data.map((d) => {
-          const barHeight = (d.total / maxTotal) * 180;
+          const barHeight = d.total > 0 ? (d.total / maxTotal) * 180 : 0;
           let cumulative = 0;
           return (
             <div key={d.grade} className="flex-1 flex flex-col items-center gap-1">
               <span className="text-xs font-medium text-gray-500 tabular-nums">
                 {getBarLabel(d)}
               </span>
-              <div
-                className="w-full rounded-t-md overflow-hidden relative"
-                style={{ height: barHeight, minHeight: d.total > 0 ? 8 : 0 }}
-              >
-                {segments.map((seg) => {
-                  const val = d[seg.key] as number;
-                  if (val === 0) return null;
-                  const pct = (val / d.total) * 100;
-                  const bottom = (cumulative / d.total) * 100;
-                  cumulative += val;
-                  const isActive = activeSegment === seg.key;
-                  const isFaded = activeSegment != null && !isActive;
-                  return (
-                    <div
-                      key={seg.key}
-                      className="absolute left-0 right-0 transition-all duration-300 ease-out"
-                      style={{
-                        backgroundColor: seg.color,
-                        bottom: bottom + "%",
-                        height: pct + "%",
-                        opacity: isFaded ? 0.15 : 1,
-                        filter: isActive ? "brightness(1.1)" : "none",
-                      }}
-                      title={seg.label + ": " + val}
-                    />
-                  );
-                })}
-              </div>
+              {d.total > 0 ? (
+                <div
+                  className="w-full rounded-t-md overflow-hidden relative"
+                  style={{ height: barHeight, minHeight: 8 }}
+                >
+                  {segments.map((seg) => {
+                    const val = d[seg.key] as number;
+                    if (val === 0) return null;
+                    const pct = (val / d.total) * 100;
+                    const bottom = (cumulative / d.total) * 100;
+                    cumulative += val;
+                    const isActive = activeSegment === seg.key;
+                    const isFaded = activeSegment != null && !isActive;
+                    return (
+                      <div
+                        key={seg.key}
+                        className="absolute left-0 right-0 transition-all duration-300 ease-out"
+                        style={{
+                          backgroundColor: seg.color,
+                          bottom: bottom + "%",
+                          height: pct + "%",
+                          opacity: isFaded ? 0.15 : 1,
+                          filter: isActive ? "brightness(1.1)" : "none",
+                        }}
+                        title={seg.label + ": " + val}
+                      />
+                    );
+                  })}
+                </div>
+              ) : (
+                /* Empty grade placeholder — subtle dashed outline */
+                <div
+                  className="w-full rounded-t-md border-2 border-dashed border-gray-200"
+                  style={{ height: 24 }}
+                />
+              )}
               <span className="text-xs font-semibold" style={{ color: "#1a2b6b" }}>
                 {gradeLabel(d.grade)}
               </span>
@@ -956,7 +964,20 @@ export default function SchoolDashboard() {
     totalDecisions > 0 ? Math.round((admittedCount / totalDecisions) * 100) : null;
 
   /* ── Grade-by-grade chart data ── */
+  /* Always seed grades 3-10 so all columns appear even with zero students */
   const gradeMap = new Map<number, GradeBarData>();
+  for (let g = 3; g <= 10; g++) {
+    gradeMap.set(g, {
+      grade: g,
+      registered: 0,
+      submitted: 0,
+      scored: 0,
+      reportSent: 0,
+      decided: 0,
+      error: 0,
+      total: 0,
+    });
+  }
   for (const s of pipeline) {
     const g = s.grade_applied;
     if (!gradeMap.has(g)) {
@@ -1114,10 +1135,9 @@ export default function SchoolDashboard() {
         </Card>
       </div>
 
-      {/* ── Row 2: Grade chart (2/3) + Donut & Thresholds stacked (1/3) ── */}
-            {/* ── Row 2: Grade chart (full width) ── */}
-<div className="space-y-6">
-        {/* Grade-by-grade bar chart — 2/3 width */}
+      {/* ── Row 2: Grade chart (full width) ── */}
+      <div className="space-y-6">
+        {/* Grade-by-grade bar chart */}
         <Card className="border-0 shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold" style={{ color: "#1a2b6b" }}>
@@ -1182,10 +1202,6 @@ export default function SchoolDashboard() {
         </div>
       </div>
 
-      {/* ── Row 2b: Recommendations (50%) + Thresholds (50%) ── */}
-      
-
-      
       {/* ── Row 2.5: Academic Realms Performance ── */}
       <DomainPerformanceCards
         pipeline={data?.pipeline || []}
