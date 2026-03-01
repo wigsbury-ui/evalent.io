@@ -1116,9 +1116,9 @@ export default function SchoolDashboard() {
 
       {/* ── Row 2: Grade chart (2/3) + Donut & Thresholds stacked (1/3) ── */}
             {/* ── Row 2: Grade chart (full width) ── */}
-<div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+<div className="space-y-6">
         {/* Grade-by-grade bar chart — 2/3 width */}
-        <Card className="border-0 shadow-sm lg:">
+        <Card className="border-0 shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold" style={{ color: "#1a2b6b" }}>
               Applications by Grade
