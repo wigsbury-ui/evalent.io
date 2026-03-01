@@ -16,11 +16,11 @@ import {
 
 const navItems = [
   { href: "/school", label: "Dashboard", icon: LayoutDashboard },
+
+  { href: "/school/students", label: "Students", icon: UserPlus },
   { href: "/school/config", label: "School Settings", icon: Settings },
   { href: "/school/grades", label: "Pass Thresholds", icon: GraduationCap },
-  { href: "/school/assessors", label: "Assessors", icon: Users },
-  { href: "/school/students", label: "Students", icon: UserPlus },
-];
+  { href: "/school/assessors", label: "Assessors", icon: Users },];
 
 export function SchoolSidebar() {
   const pathname = usePathname();
