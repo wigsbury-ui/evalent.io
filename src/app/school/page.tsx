@@ -25,6 +25,7 @@ import {
   ChevronRight,
   AlertCircle,
 } from "lucide-react";
+import { gradeLabel as formatGrade } from "@/lib/utils/grade-label";
 import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 /* ──────────────────────────────────────────────
@@ -155,8 +156,7 @@ function GradeChart({ data, gradeNaming }: { data: GradeBarData[]; gradeNaming: 
     { key: "error", color: "#ef4444", label: "Error" },
   ];
 
-  const gradeLabel = (g: number) =>
-    gradeNaming === "year" ? "Y" + g : "G" + g;
+  const gradeLabel = (g: number) => formatGrade(g, data?.school?.curriculum);
 
   // When a segment is active, show that segment's count above each bar instead of total
   const getBarLabel = (d: GradeBarData) => {
@@ -374,7 +374,7 @@ function ThresholdLineChart({
   }
 
   const sorted = [...configs].sort((a, b) => a.grade - b.grade);
-  const gradeLabel = (g: number) => (gradeNaming === "year" ? "Y" + g : "G" + g);
+  const gradeLabel = (g: number) => (gradeNaming === "year" ? "Y" + (g + 1) : "G" + g);
 
   // Chart dimensions
   const w = 400;
