@@ -1197,7 +1197,7 @@ export default function SchoolDashboard() {
       
       {/* ── Row 2.5: Academic Realms Performance ── */}
       <DomainPerformanceCards
-        pipeline={dashboard.pipeline}
+        pipeline={data.pipeline}
         gradeConfigs={gradeConfigs}
         gradeLabel={gradeLabel}
       />
