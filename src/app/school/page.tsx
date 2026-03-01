@@ -12,6 +12,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
   Users,
   FileText,
   Clock,
@@ -813,76 +814,63 @@ function DomainPerformanceCards({
               </button>
 
               {/* Expanded detail — individual student list */}
-              {isExpanded && (
-                <div
-                  className="border-t px-5 py-3 space-y-1.5 max-h-64 overflow-y-auto"
-                  style={{ backgroundColor: domain.bgLight }}
-                >
-                  {scores
-                    .sort((a, b) => b.score - a.score)
-                    .map((s, i) => {
-                      const delta = s.score - s.threshold;
-                      const isAbove = delta >= 0;
-                      return (
-                        <div
-                          key={i}
-                          className="flex items-center justify-between py-1.5 text-sm"
-                        >
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-2 h-2 rounded-full"
-                              style={{
-                                backgroundColor: isAbove
-                                  ? domain.color
-                                  : "#ef4444",
-                              }}
-                            />
-                            <span className="text-gray-700">
-                              {s.student.first_name} {s.student.last_name}
-                            </span>
-                            <span className="text-xs text-gray-400">
-                              {gradeLabel(s.student.grade_applied)}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            {/* Score bar */}
-                            <div className="w-24 h-1.5 rounded-full bg-gray-200 relative">
-                              {/* Threshold marker */}
-                              <div
-                                className="absolute top-0 h-1.5 w-px bg-gray-600"
-                                style={{
-                                  left: `${Math.min(s.threshold, 100)}%`,
-                                }}
-                              />
-                              {/* Score fill */}
-                              <div
-                                className="h-full rounded-full"
-                                style={{
-                                  width: `${Math.min(s.score, 100)}%`,
-                                  backgroundColor: isAbove
-                                    ? domain.color
-                                    : "#ef4444",
-                                }}
-                              />
-                            </div>
-                            <span className="text-sm font-semibold text-gray-900 w-14 text-right">
-                              {s.score.toFixed(1)}%
-                            </span>
-                            <span
-                              className="text-xs font-medium w-12 text-right"
-                              style={{
-                                color: isAbove ? domain.color : "#ef4444",
-                              }}
-                            >
-                              {isAbove ? "+" : ""}
-                              {delta.toFixed(0)}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                </div>
-              )}
+              {isExpanded && (() => {
+                  // Build per-grade data: avg score + threshold
+                  const gradeMap: Record<number, { scores: number[]; threshold: number }> = {};
+                  for (const s of scores) {
+                    const g = s.student.grade_applied;
+                    if (!gradeMap[g]) gradeMap[g] = { scores: [], threshold: s.threshold };
+                    gradeMap[g].scores.push(s.score);
+                  }
+                  const chartData = Object.entries(gradeMap)
+                    .map(([g, d]) => ({
+                      grade: gradeLabel(Number(g)),
+                      gradeNum: Number(g),
+                      avg: Math.round(d.scores.reduce((a, b) => a + b, 0) / d.scores.length * 10) / 10,
+                      threshold: d.threshold,
+                      count: d.scores.length,
+                    }))
+                    .sort((a, b) => a.gradeNum - b.gradeNum);
+
+                  const hasEnoughData = chartData.some(d => d.count >= 2);
+
+                  if (!hasEnoughData) {
+                    return (
+                      <div className="border-t px-5 py-6 flex flex-col items-center justify-center text-center" style={{ backgroundColor: domain.bgLight }}>
+                        <svg className="h-8 w-8 text-gray-300 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
+                        </svg>
+                        <p className="text-sm text-gray-400">Not enough data yet</p>
+                        <p className="text-xs text-gray-300 mt-0.5">At least 2 students per grade needed</p>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="border-t px-4 py-4" style={{ backgroundColor: domain.bgLight }}>
+                      <div className="text-xs text-gray-500 mb-2 flex items-center justify-between">
+                        <span>Avg student score vs entrance threshold by grade</span>
+                        <span className="text-gray-400">{scores.length} students</span>
+                      </div>
+                      <ResponsiveContainer width="100%" height={160}>
+                        <ComposedChart data={chartData} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+                          <XAxis dataKey="grade" tick={{ fontSize: 11, fill: "#6b7280" }} axisLine={false} tickLine={false} />
+                          <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: "#9ca3af" }} axisLine={false} tickLine={false} tickFormatter={(v: number) => v + "%"} />
+                          <Tooltip
+                            contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e5e7eb", boxShadow: "0 2px 8px rgba(0,0,0,0.08)" }}
+                            formatter={(value: number, name: string) => [
+                              value.toFixed(1) + "%",
+                              name === "avg" ? "Avg Score" : "Threshold",
+                            ]}
+                          />
+                          <Bar dataKey="avg" fill={domain.color} radius={[4, 4, 0, 0]} barSize={28} opacity={0.85} name="avg" />
+                          <Line dataKey="threshold" type="monotone" stroke="#ef4444" strokeWidth={2} strokeDasharray="6 3" dot={{ r: 3, fill: "#ef4444" }} name="threshold" />
+                        </ComposedChart>
+                      </ResponsiveContainer>
+                    </div>
+                  );
+                })()}
             </div>
           );
         })}
