@@ -488,7 +488,6 @@ export default function StudentsPage() {
           </h1>
           <p className="mt-1 text-gray-500">
             Manage registered students and track assessment progress.
-          <LearnMoreLink featureId="student_registration" title="Managing Students" />
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -539,6 +538,7 @@ export default function StudentsPage() {
             />
             Refresh
           </Button>
+              <LearnMoreLink featureId="student_registration" title="Managing Students" />
           <Link href="/school/students/new">
             <Button>
               <UserPlus className="mr-2 h-4 w-4" />

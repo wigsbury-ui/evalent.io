@@ -226,11 +226,11 @@ export default function SchoolConfigPage() {
             Configure your school&apos;s curriculum, locale, and display
             preferences.
           </p>
-          <LearnMoreLink featureId="school_config" title="School Configuration" />
         </div>
         <Badge variant={school.is_active ? "default" : "secondary"}>
           {school.is_active ? "Active" : "Inactive"}
         </Badge>
+        <LearnMoreLink featureId="school_config" title="School Configuration" />
       </div>
 
       {/* Read-only info */}

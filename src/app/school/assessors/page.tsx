@@ -422,9 +422,9 @@ export default function AssessorsPage() {
         <p className="mt-1 text-gray-500">
           Assessors receive admissions reports and make admission decisions.
           Set a universal assessor or customise per grade.
-        <LearnMoreLink featureId="assessors" title="Managing Assessors" />
         </p>
       </div>
+      <LearnMoreLink featureId="assessors" title="Managing Assessors" />
 
       {/* ─── RESPONSE TIME METRICS ────────────────────────────── */}
       {responseMetrics.length > 0 && uniqueAssessors.length > 0 && (
