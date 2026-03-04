@@ -1068,7 +1068,8 @@ export default function SchoolDashboard() {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2 cursor-help" title="Total registered students across all grades">
+            <div className="flex items-center justify-between mb-2 cursor-help relative group">
+              <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-800 px-3 py-1.5 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 z-50">Total registered students across all grades</span>
               <span className="text-xs text-gray-500 uppercase tracking-wide">Students</span>
               <Users className="w-4 h-4 text-gray-400" />
             </div>
@@ -1082,7 +1083,8 @@ export default function SchoolDashboard() {
 
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2 cursor-help" title="Average time from registration to assessor decision">
+            <div className="flex items-center justify-between mb-2 cursor-help relative group">
+              <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-800 px-3 py-1.5 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 z-50">Average time from registration to assessor decision</span>
               <span className="text-xs text-gray-500 uppercase tracking-wide">Turnaround</span>
               <Timer className="w-4 h-4 text-indigo-500" />
             </div>
@@ -1094,7 +1096,8 @@ export default function SchoolDashboard() {
 
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2 cursor-help" title="Reports sent to assessors awaiting a decision">
+            <div className="flex items-center justify-between mb-2 cursor-help relative group">
+              <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-800 px-3 py-1.5 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 z-50">Reports sent to assessors awaiting a decision</span>
               <span className="text-xs text-gray-500 uppercase tracking-wide">Awaiting</span>
               <Clock className="w-4 h-4 text-amber-500" />
             </div>
@@ -1106,7 +1109,8 @@ export default function SchoolDashboard() {
 
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2 cursor-help" title="Students with a final admissions decision">
+            <div className="flex items-center justify-between mb-2 cursor-help relative group">
+              <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-800 px-3 py-1.5 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 z-50">Students with a final admissions decision</span>
               <span className="text-xs text-gray-500 uppercase tracking-wide">Decided</span>
               <CheckCircle2 className="w-4 h-4 text-emerald-500" />
             </div>
@@ -1118,7 +1122,8 @@ export default function SchoolDashboard() {
 
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2 cursor-help" title="Mean overall academic score across all scored students">
+            <div className="flex items-center justify-between mb-2 cursor-help relative group">
+              <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-800 px-3 py-1.5 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 z-50">Mean overall academic score across all scored students</span>
               <span className="text-xs text-gray-500 uppercase tracking-wide">Avg Score</span>
               <TrendingUp className="w-4 h-4 text-blue-500" />
             </div>
@@ -1130,7 +1135,8 @@ export default function SchoolDashboard() {
 
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
-            <div className="flex items-center justify-between mb-2 cursor-help" title="Percentage of decided students who were accepted">
+            <div className="flex items-center justify-between mb-2 cursor-help relative group">
+              <span className="pointer-events-none absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded bg-gray-800 px-3 py-1.5 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 z-50">Percentage of decided students who were accepted</span>
               <span className="text-xs text-gray-500 uppercase tracking-wide">Accept %</span>
               <BarChart3 className="w-4 h-4 text-emerald-500" />
             </div>
