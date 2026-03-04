@@ -61,7 +61,8 @@ type SortKey =
   | "status"
   | "score"
   | "recommendation"
-  | "decision";
+  | "decision"
+  | "date";
 type SortDir = "asc" | "desc";
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -164,6 +165,8 @@ function getSortValue(
       }
       return 0;
     }
+    case "date":
+      return s.created_at || "";
     case "decision":
       return student.decision?.decision || "zzz";
     default:
@@ -230,8 +233,8 @@ export default function StudentsPage() {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const [sortKey, setSortKey] = useState<SortKey>("name");
-  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [sortKey, setSortKey] = useState<SortKey>("date");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [showExport, setShowExport] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
