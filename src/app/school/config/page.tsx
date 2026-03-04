@@ -15,6 +15,7 @@ import {
   MessageSquare,
   ImageIcon,
   PartyPopper,
+  Upload,
   Globe,
   Mail,
   Clock,
