@@ -88,7 +88,6 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   processing: { label: "Processing", color: "bg-amber-100 text-amber-700" },
   complete: { label: "Scored", color: "bg-emerald-100 text-emerald-700" },
   report_sent: { label: "Report Sent", color: "bg-indigo-100 text-indigo-700" },
-  ,
   error: { label: "Error", color: "bg-red-100 text-red-700" },
 };
 
