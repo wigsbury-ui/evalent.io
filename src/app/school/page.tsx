@@ -1083,11 +1083,11 @@ export default function SchoolDashboard() {
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-gray-500 uppercase tracking-wide">Avg Time</span>
+              <span className="text-xs text-gray-500 uppercase tracking-wide">Turnaround</span>
               <Timer className="w-4 h-4 text-indigo-500" />
             </div>
             <div className="text-2xl font-bold" style={{ color: "#1a2b6b" }}>
-              {avgPipelineDays != null ? avgPipelineDays.toFixed(0) + "d" : "—"}
+              {avgPipelineDays != null ? (avgPipelineDays < 2 ? Math.round(avgPipelineDays * 24) + "h" : avgPipelineDays.toFixed(0) + "d") : "—"}
             </div>
           </CardContent>
         </Card>
