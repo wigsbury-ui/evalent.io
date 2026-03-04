@@ -1137,6 +1137,7 @@ export default function SchoolDashboard() {
               Application outcomes per grade level
             </CardDescription>
           </CardHeader>
+          <div className="h-3" />
           <CardContent>
             {gradeChartData.length > 0 ? (
               <GradeChart data={gradeChartData} gradeNaming={gradeNaming} />
