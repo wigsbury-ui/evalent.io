@@ -82,12 +82,13 @@ interface GradeConfig {
  * ────────────────────────────────────────────── */
 
 const statusConfig: Record<string, { label: string; color: string }> = {
-  in_pipeline: { label: "In Pipeline", color: "bg-gray-100 text-gray-700" },
-  accepted: { label: "Accepted", color: "bg-green-100 text-green-700" },
+  registered: { label: "Registered", color: "bg-gray-100 text-gray-700" },
+  submitted: { label: "Submitted", color: "bg-blue-100 text-blue-700" },
   pending: { label: "Pending", color: "bg-blue-100 text-blue-700" },
   processing: { label: "Processing", color: "bg-amber-100 text-amber-700" },
   complete: { label: "Scored", color: "bg-emerald-100 text-emerald-700" },
   report_sent: { label: "Report Sent", color: "bg-indigo-100 text-indigo-700" },
+  decided: { label: "Decided", color: "bg-green-100 text-green-700" },
   error: { label: "Error", color: "bg-red-100 text-red-700" },
 };
 
