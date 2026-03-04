@@ -103,14 +103,7 @@ export function SchoolSidebar() {
 
       {/* Footer */}
       <div className="border-t border-gray-200 p-3">
-        {/* Powered by Evalent */}
-        <div className="flex items-center gap-1.5 px-3 py-2">
-          <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-evalent-600">
-            <span className="text-[9px] font-bold text-white">E</span>
-          </div>
-          <span className="text-[11px] text-gray-400">Powered by Evalent</span>
-        </div>
-        <div className="border-t border-gray-200 my-2"></div>
+
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
           className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900"
@@ -118,6 +111,12 @@ export function SchoolSidebar() {
           <LogOut className="h-5 w-5 text-gray-400" />
           Sign out
         </button>
+        <div className="flex items-center justify-center gap-1.5 pt-3 pb-1">
+          <div className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded bg-gray-300">
+            <span className="text-[8px] font-bold text-white">E</span>
+          </div>
+          <span className="text-[10px] text-gray-300">Powered by Evalent</span>
+        </div>
       </div>
     </aside>
   );
