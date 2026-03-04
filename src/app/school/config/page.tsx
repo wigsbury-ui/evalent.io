@@ -126,6 +126,7 @@ export default function SchoolConfigPage() {
   // Completion page settings
   const [completionMessage, setCompletionMessage] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     fetch("/api/school/dashboard")
@@ -153,6 +154,8 @@ export default function SchoolConfigPage() {
           }
           setLeadName(s.admissions_lead_name || "");
           setLeadEmail(s.admissions_lead_email || "");
+          setCompletionMessage(s.completion_message || "");
+          setLogoUrl(s.logo_url || "");
         }
         setLoading(false);
       })
@@ -207,6 +210,49 @@ export default function SchoolConfigPage() {
     }
   };
 
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !school) return;
+
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      alert("Please select an image file (PNG, JPG, SVG, etc.)");
+      return;
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      alert("Logo must be smaller than 2MB");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("school_id", school.id);
+
+      const res = await fetch("/api/school/logo-upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const { url } = await res.json();
+        setLogoUrl(url);
+      } else {
+        const err = await res.json();
+        alert(err.error || "Failed to upload logo");
+      }
+    } catch (err) {
+      console.error("Logo upload failed:", err);
+      alert("Failed to upload logo");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -246,39 +292,93 @@ export default function SchoolConfigPage() {
         </div>
       </div>
 
-      {/* Read-only info */}
+      {/* School identity — name, contact, logo */}
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">{school.name}</CardTitle>
           <CardDescription>Slug: {school.slug}</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="flex items-start gap-3 rounded-lg border border-gray-100 p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-50">
-                <Building2 className="h-5 w-5 text-gray-500" />
+          <div className="grid gap-4 sm:grid-cols-3">
+            {/* Left 2/3: School name & contact */}
+            <div className="sm:col-span-2 space-y-4">
+              <div className="flex items-start gap-3 rounded-lg border border-gray-100 p-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-50">
+                  <Building2 className="h-5 w-5 text-gray-500" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">
+                    School Name
+                  </p>
+                  <p className="mt-0.5 text-sm font-semibold text-gray-900">
+                    {school.name}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500">
-                  School Name
-                </p>
-                <p className="mt-0.5 text-sm font-semibold text-gray-900">
-                  {school.name}
-                </p>
+              <div className="flex items-start gap-3 rounded-lg border border-gray-100 p-4">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-50">
+                  <Mail className="h-5 w-5 text-gray-500" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-500">
+                    Contact Email
+                  </p>
+                  <p className="mt-0.5 text-sm font-semibold text-gray-900">
+                    {school.contact_email}
+                  </p>
+                </div>
               </div>
             </div>
-            <div className="flex items-start gap-3 rounded-lg border border-gray-100 p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-50">
-                <Mail className="h-5 w-5 text-gray-500" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500">
-                  Contact Email
-                </p>
-                <p className="mt-0.5 text-sm font-semibold text-gray-900">
-                  {school.contact_email}
-                </p>
-              </div>
+
+            {/* Right 1/3: School logo */}
+            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50 p-4 min-h-[140px]">
+              {logoUrl ? (
+                <div className="flex flex-col items-center gap-3">
+                  <img
+                    src={logoUrl}
+                    alt="School logo"
+                    className="max-h-16 max-w-[160px] object-contain"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = "none";
+                    }}
+                  />
+                  <label className="cursor-pointer text-xs text-evalent-600 hover:text-evalent-700 font-medium">
+                    {uploading ? "Uploading..." : "Change logo"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLogoUpload}
+                      className="hidden"
+                      disabled={uploading}
+                    />
+                  </label>
+                </div>
+              ) : (
+                <label className="cursor-pointer flex flex-col items-center gap-2 text-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white border border-gray-200">
+                    {uploading ? (
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-evalent-600 border-t-transparent" />
+                    ) : (
+                      <Upload className="h-5 w-5 text-gray-400" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">
+                      {uploading ? "Uploading..." : "Upload logo"}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      PNG, JPG or SVG
+                    </p>
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                    disabled={uploading}
+                  />
+                </label>
+              )}
             </div>
           </div>
         </CardContent>
@@ -556,34 +656,6 @@ export default function SchoolConfigPage() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-gray-700">
-              <ImageIcon className="mr-1.5 inline h-4 w-4" />
-              School Logo URL
-            </label>
-            <input
-              type="text"
-              value={logoUrl}
-              onChange={(e) => setLogoUrl(e.target.value)}
-              placeholder="https://yourschool.edu/logo.png"
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-evalent-500 focus:outline-none focus:ring-1 focus:ring-evalent-500"
-            />
-            <p className="mt-1 text-xs text-gray-400">
-              Paste a direct link to your school logo image. It will appear at the top of the completion page. Leave blank to show just your school name.
-            </p>
-            {logoUrl && (
-              <div className="mt-3 flex items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50 p-4">
-                <img
-                  src={logoUrl}
-                  alt="Logo preview"
-                  className="max-h-16 max-w-[200px] object-contain"
-                  onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = "none";
-                  }}
-                />
-              </div>
-            )}
-          </div>
           <div>
             <label className="mb-1.5 block text-sm font-medium text-gray-700">
               <MessageSquare className="mr-1.5 inline h-4 w-4" />

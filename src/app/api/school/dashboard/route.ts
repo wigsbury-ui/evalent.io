@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
       supabase
         .from("schools")
         .select(
-          "id, name, slug, curriculum, locale, contact_email, timezone, is_active, subscription_plan, grade_naming, default_assessor_email, default_assessor_first_name, default_assessor_last_name, admissions_lead_name, admissions_lead_email, admission_terms, custom_presets"
+          "id, name, slug, curriculum, locale, contact_email, timezone, is_active, subscription_plan, grade_naming, default_assessor_email, default_assessor_first_name, default_assessor_last_name, admissions_lead_name, admissions_lead_email, admission_terms, custom_presets, logo_url, completion_message"
         )
         .eq("id", schoolId)
         .single(),
