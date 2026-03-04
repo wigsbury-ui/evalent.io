@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Script from "next/script";
 import { Figtree, Open_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -41,7 +42,7 @@ export default function RootLayout({
       lang="en"
       className={`${figtree.variable} ${openSans.variable} ${jetbrainsMono.variable}`}
     >
-      <body className="min-h-screen font-sans">{children}</body>
+      <body className="min-h-screen font-sans">{children}<Script src="https://cdn.jotfor.ms/agent/embedjs/019c176d198c7a97a0b3b9b05ba3de8e8bb3/embed.js" strategy="lazyOnload" /></body>
     </html>
   );
 }
