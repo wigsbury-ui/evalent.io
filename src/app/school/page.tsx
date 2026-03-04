@@ -976,12 +976,10 @@ export default function SchoolDashboard() {
     if (!gradeMap.has(g)) {
       gradeMap.set(g, {
         grade: g,
-        registered: 0,
-        submitted: 0,
-        scored: 0,
-        reportSent: 0,
-        decided: 0,
-        error: 0,
+        accepted: 0,
+        waitlisted: 0,
+        rejected: 0,
+        in_pipeline: 0,
         total: 0,
       });
     }
