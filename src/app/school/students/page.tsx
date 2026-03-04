@@ -166,7 +166,7 @@ function getSortValue(
       return 0;
     }
     case "date":
-      return s.created_at || "";
+      return student.created_at || "";
     case "decision":
       return student.decision?.decision || "zzz";
     default:
