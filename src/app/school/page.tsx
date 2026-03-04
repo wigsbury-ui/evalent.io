@@ -1066,8 +1066,8 @@ export default function SchoolDashboard() {
 
       {/* ── Row 1: KPI Cards ── */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <Card className="border-0 shadow-sm" title="Total registered students across all grades">
-          <CardContent className="p-4">
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-4" title="Total registered students across all grades">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs text-gray-500 uppercase tracking-wide">Students</span>
               <Users className="w-4 h-4 text-gray-400" />
@@ -1080,8 +1080,8 @@ export default function SchoolDashboard() {
 
 
 
-        <Card className="border-0 shadow-sm" title="Average time from registration to assessor decision">
-          <CardContent className="p-4">
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-4" title="Average time from registration to assessor decision">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs text-gray-500 uppercase tracking-wide">Turnaround</span>
               <Timer className="w-4 h-4 text-indigo-500" />
@@ -1092,8 +1092,8 @@ export default function SchoolDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-sm" title="Reports sent to assessors awaiting a decision">
-          <CardContent className="p-4">
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-4" title="Reports sent to assessors awaiting a decision">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs text-gray-500 uppercase tracking-wide">Awaiting</span>
               <Clock className="w-4 h-4 text-amber-500" />
@@ -1104,8 +1104,8 @@ export default function SchoolDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-sm" title="Students with a final admissions decision">
-          <CardContent className="p-4">
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-4" title="Students with a final admissions decision">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs text-gray-500 uppercase tracking-wide">Decided</span>
               <CheckCircle2 className="w-4 h-4 text-emerald-500" />
@@ -1116,8 +1116,8 @@ export default function SchoolDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-sm" title="Mean overall academic score across all scored students">
-          <CardContent className="p-4">
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-4" title="Mean overall academic score across all scored students">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs text-gray-500 uppercase tracking-wide">Avg Score</span>
               <TrendingUp className="w-4 h-4 text-blue-500" />
@@ -1128,8 +1128,8 @@ export default function SchoolDashboard() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-sm" title="Percentage of decided students who were accepted">
-          <CardContent className="p-4">
+        <Card className="border-0 shadow-sm">
+          <CardContent className="p-4" title="Percentage of decided students who were accepted">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs text-gray-500 uppercase tracking-wide">Accept %</span>
               <BarChart3 className="w-4 h-4 text-emerald-500" />
