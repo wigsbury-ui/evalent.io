@@ -1077,6 +1077,7 @@ export default function SchoolDashboard() {
             </div>
           </CardContent>
         </Card>
+        </div>
 
 
 
@@ -1091,6 +1092,7 @@ export default function SchoolDashboard() {
             </div>
           </CardContent>
         </Card>
+        </div>
 
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4" title="Reports sent to assessors awaiting a decision">
@@ -1103,6 +1105,7 @@ export default function SchoolDashboard() {
             </div>
           </CardContent>
         </Card>
+        </div>
 
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4" title="Students with a final admissions decision">
@@ -1115,6 +1118,7 @@ export default function SchoolDashboard() {
             </div>
           </CardContent>
         </Card>
+        </div>
 
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4" title="Mean overall academic score across all scored students">
@@ -1127,6 +1131,7 @@ export default function SchoolDashboard() {
             </div>
           </CardContent>
         </Card>
+        </div>
 
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4" title="Percentage of decided students who were accepted">
@@ -1139,6 +1144,7 @@ export default function SchoolDashboard() {
             </div>
           </CardContent>
         </Card>
+        </div>
       </div>
 
       {/* ── Row 2: Grade chart (full width) ── */}
