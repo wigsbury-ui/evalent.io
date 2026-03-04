@@ -964,12 +964,10 @@ export default function SchoolDashboard() {
   for (let g = 3; g <= 10; g++) {
     gradeMap.set(g, {
       grade: g,
-      registered: 0,
-      submitted: 0,
-      scored: 0,
-      reportSent: 0,
-      decided: 0,
-      error: 0,
+      accepted: 0,
+      waitlisted: 0,
+      rejected: 0,
+      in_pipeline: 0,
       total: 0,
     });
   }
@@ -990,13 +988,11 @@ export default function SchoolDashboard() {
     const row = gradeMap.get(g)!;
     row.total++;
     const st = s.pipeline_status;
-    if (st === "decided") row.decided++;
-    else if (st === "report_sent") row.reportSent++;
-    else if (st === "complete") row.scored++;
-    else if (st === "submitted" || st === "pending" || st === "processing")
-      row.submitted++;
-    else if (st === "error") row.error++;
-    else row.registered++;
+    const decision = s.decision?.decision;
+    if (st === "decided" && decision === "admit") row.accepted++;
+    else if (st === "decided" && decision === "waitlist") row.waitlisted++;
+    else if (st === "decided" && decision === "reject") row.rejected++;
+    else row.in_pipeline++;
   }
   const gradeChartData = Array.from(gradeMap.values()).sort(
     (a, b) => a.grade - b.grade
