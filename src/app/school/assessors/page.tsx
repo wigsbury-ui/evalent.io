@@ -808,13 +808,7 @@ export default function AssessorsPage() {
       {/* ─── SAVE BAR ──────────────────────────────────────────── */}
       <div className="mt-6">
         <div className="flex items-center gap-4">
-          <p className="text-xs text-gray-400">
-            {customGrades.size === 0
-              ? "All grades use the universal assessor."
-              : `${customGrades.size} grade${
-                  customGrades.size > 1 ? "s" : ""
-                } with custom assessors.`}
-          </p>
+
           <div className="flex items-center gap-3">
             {saved && (
               <span className="text-sm text-green-600 font-medium">
