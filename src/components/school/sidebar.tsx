@@ -16,17 +16,19 @@ import {
 
 const navItems = [
   { href: "/school", label: "Dashboard", icon: LayoutDashboard },
-
   { href: "/school/students", label: "Students", icon: UserPlus },
   { href: "/school/config", label: "School Settings", icon: Settings },
   { href: "/school/grades", label: "Pass Thresholds", icon: GraduationCap },
-  { href: "/school/assessors", label: "Assessors", icon: Users },];
+  { href: "/school/assessors", label: "Assessors", icon: Users },
+];
 
 export function SchoolSidebar() {
   const pathname = usePathname();
   const [schoolName, setSchoolName] = useState("School Admin");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   useEffect(() => {
+    // Fetch school name from session
     fetch("/api/auth/session")
       .then((r) => r.json())
       .then((data) => {
@@ -35,15 +37,33 @@ export function SchoolSidebar() {
         }
       })
       .catch(() => {});
+
+    // Fetch logo from dashboard API
+    fetch("/api/school/dashboard")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (data?.school?.logo_url) {
+          setLogoUrl(data.school.logo_url);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   return (
     <aside className="flex h-screen w-64 flex-col border-r border-gray-200 bg-white">
-      {/* Logo */}
+      {/* School identity */}
       <div className="flex h-16 items-center gap-3 border-b border-gray-200 px-6">
-        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-evalent-600">
-          <span className="text-lg font-bold text-white">E</span>
-        </div>
+        {logoUrl ? (
+          <img
+            src={logoUrl}
+            alt={schoolName}
+            className="h-8 w-8 shrink-0 rounded-lg object-contain"
+          />
+        ) : (
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-evalent-600">
+            <span className="text-lg font-bold text-white">E</span>
+          </div>
+        )}
         <div className="min-w-0">
           <p className="truncate text-sm font-semibold text-gray-900">
             {schoolName}
@@ -83,6 +103,13 @@ export function SchoolSidebar() {
 
       {/* Footer */}
       <div className="border-t border-gray-200 p-3">
+        {/* Powered by Evalent */}
+        <div className="mb-2 flex items-center justify-center gap-1.5 px-3 py-1.5">
+          <div className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-evalent-600">
+            <span className="text-[9px] font-bold text-white">E</span>
+          </div>
+          <span className="text-[11px] text-gray-400">Powered by Evalent</span>
+        </div>
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
           className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900"
