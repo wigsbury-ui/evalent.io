@@ -218,7 +218,7 @@ function GradeChart({ data, gradeNaming }: { data: GradeBarData[]; gradeNaming: 
       {/* Interactive Legend */}
       <div className="flex flex-wrap gap-2 mt-4 justify-center">
         {segments
-          .filter((s) => s.key !== "error")
+          .filter((s) => s.key !== ("error" as any))
           .map((seg) => {
             const isActive = activeSegment === seg.key;
             const total = data.reduce((sum, d) => sum + (d[seg.key] as number), 0);
