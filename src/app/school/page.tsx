@@ -82,13 +82,13 @@ interface GradeConfig {
  * ────────────────────────────────────────────── */
 
 const statusConfig: Record<string, { label: string; color: string }> = {
-  registered: { label: "Registered", color: "bg-gray-100 text-gray-700" },
-  submitted: { label: "Submitted", color: "bg-blue-100 text-blue-700" },
+  in_pipeline: { label: "In Pipeline", color: "bg-gray-100 text-gray-700" },
+  accepted: { label: "Accepted", color: "bg-green-100 text-green-700" },
   pending: { label: "Pending", color: "bg-blue-100 text-blue-700" },
   processing: { label: "Processing", color: "bg-amber-100 text-amber-700" },
   complete: { label: "Scored", color: "bg-emerald-100 text-emerald-700" },
   report_sent: { label: "Report Sent", color: "bg-indigo-100 text-indigo-700" },
-  decided: { label: "Decided", color: "bg-green-100 text-green-700" },
+  ,
   error: { label: "Error", color: "bg-red-100 text-red-700" },
 };
 
@@ -131,12 +131,10 @@ function timeAgo(dateStr: string): string {
 
 interface GradeBarData {
   grade: number;
-  registered: number;
-  submitted: number;
-  scored: number;
-  reportSent: number;
-  decided: number;
-  error: number;
+  accepted: number;
+  waitlisted: number;
+  rejected: number;
+  in_pipeline: number;
   total: number;
 }
 
@@ -148,12 +146,10 @@ function GradeChart({ data, gradeNaming }: { data: GradeBarData[]; gradeNaming: 
   const maxTotal = Math.max(...data.map((d) => d.total), 1);
 
   const segments: { key: keyof GradeBarData; color: string; label: string }[] = [
-    { key: "decided", color: "#059669", label: "Decided" },
-    { key: "reportSent", color: "#4f46e5", label: "Report Sent" },
-    { key: "scored", color: "#f59e0b", label: "Scored" },
-    { key: "submitted", color: "#3b82f6", label: "Submitted" },
-    { key: "registered", color: "#d1d5db", label: "Registered" },
-    { key: "error", color: "#ef4444", label: "Error" },
+    { key: "accepted", color: "#16a34a", label: "Accepted" },
+    { key: "waitlisted", color: "#f59e0b", label: "Waitlisted" },
+    { key: "rejected", color: "#ef4444", label: "Rejected" },
+    { key: "in_pipeline", color: "#d1d5db", label: "In Pipeline" },
   ];
 
   const gradeLabel = (g: number) => (gradeNaming === "year" ? "Y" + (g + 1) : "G" + g);
@@ -1141,10 +1137,10 @@ export default function SchoolDashboard() {
         <Card className="border-0 shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-base font-semibold" style={{ color: "#1a2b6b" }}>
-              Applications by Grade
+              Admissions by Grade
             </CardTitle>
             <CardDescription className="text-xs">
-              Student status breakdown per grade level
+              Application outcomes per grade level
             </CardDescription>
           </CardHeader>
           <CardContent>
