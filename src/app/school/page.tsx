@@ -317,7 +317,7 @@ function BandDonut({ bands, total }: { bands: BandCount[]; total: number }) {
             <div className="text-lg font-bold" style={{ color: "#1a2b6b" }}>
               {total}
             </div>
-            <div className="text-[10px] text-gray-400 uppercase tracking-wider">scored</div>
+            <div className="text-[10px] text-gray-400 uppercase tracking-wider">assessed</div>
           </div>
         </div>
       </div>
@@ -1177,10 +1177,10 @@ export default function SchoolDashboard() {
           <Card className="border-0 shadow-sm">
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-semibold" style={{ color: "#1a2b6b" }}>
-                Recommendations
+                AI Readiness
               </CardTitle>
               <CardDescription className="text-xs">
-                AI band distribution
+                Evalent assessment of student readiness
               </CardDescription>
             </CardHeader>
             <CardContent>
