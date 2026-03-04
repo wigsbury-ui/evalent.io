@@ -20,6 +20,7 @@ import {
   ExternalLink,
   Copy,
   TrendingUp,
+  Timer,
   BarChart3,
   Activity,
   ChevronRight,
@@ -951,6 +952,19 @@ export default function SchoolDashboard() {
         ) / scoredStudents.length
       : null;
 
+  // Average pipeline time (student created → decision made)
+  const decidedWithDates = pipeline.filter(
+    (s) => s.decision?.decided_at && s.created_at
+  );
+  const avgPipelineDays =
+    decidedWithDates.length > 0
+      ? decidedWithDates.reduce((sum, s) => {
+          const created = new Date(s.created_at).getTime();
+          const decided = new Date(s.decision.decided_at).getTime();
+          return sum + (decided - created) / (1000 * 60 * 60 * 24);
+        }, 0) / decidedWithDates.length
+      : null;
+
   // Acceptance rate
   const admittedCount = pipeline.filter((s) =>
     s.decision?.decision?.toLowerCase().includes("admit")
@@ -1064,14 +1078,16 @@ export default function SchoolDashboard() {
           </CardContent>
         </Card>
 
+
+
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs text-gray-500 uppercase tracking-wide">Reports</span>
-              <FileText className="w-4 h-4 text-gray-400" />
+              <span className="text-xs text-gray-500 uppercase tracking-wide">Avg Time</span>
+              <Timer className="w-4 h-4 text-indigo-500" />
             </div>
             <div className="text-2xl font-bold" style={{ color: "#1a2b6b" }}>
-              {stats.reports_sent}
+              {avgPipelineDays != null ? avgPipelineDays.toFixed(0) + "d" : "—"}
             </div>
           </CardContent>
         </Card>
