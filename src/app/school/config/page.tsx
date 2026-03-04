@@ -364,11 +364,12 @@ export default function SchoolConfigPage() {
                     )}
                   </div>
                   <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">School Logo</p>
                     <p className="text-sm font-medium text-gray-600">
                       {uploading ? "Uploading..." : "Upload logo"}
                     </p>
                     <p className="text-xs text-gray-400 mt-0.5">
-                      PNG, JPG or SVG
+                      PNG, JPG or SVG (max 500KB)
                     </p>
                   </div>
                   <input
