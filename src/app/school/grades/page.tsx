@@ -138,7 +138,7 @@ function ThresholdSlider({
   const clamp = (v: number) => Math.min(100, Math.max(0, Math.round(v)));
   return (
     <div className={`space-y-2 ${disabled ? "opacity-40 pointer-events-none" : ""}`}>
-      <div className="flex items-center justify-between">
+      <div className="flex items-center">
         <label className="text-sm font-medium text-gray-700">{label}</label>
         <div className="flex items-center gap-1.5">
           <input type="number" min={0} max={100} value={value}
