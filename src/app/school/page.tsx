@@ -960,7 +960,7 @@ export default function SchoolDashboard() {
     decidedWithDates.length > 0
       ? decidedWithDates.reduce((sum, s) => {
           const created = new Date(s.created_at).getTime();
-          const decided = new Date(s.decision.decided_at).getTime();
+          const decided = new Date(s.decision!.decided_at).getTime();
           return sum + (decided - created) / (1000 * 60 * 60 * 24);
         }, 0) / decidedWithDates.length
       : null;
