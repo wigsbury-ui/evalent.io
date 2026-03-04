@@ -223,8 +223,8 @@ export default function SchoolConfigPage() {
     }
 
     // Validate file size (max 2MB)
-    if (file.size > 2 * 1024 * 1024) {
-      alert("Logo must be smaller than 2MB");
+    if (file.size > 500 * 1024) {
+      alert("Logo must be smaller than 500KB");
       return;
     }
 
