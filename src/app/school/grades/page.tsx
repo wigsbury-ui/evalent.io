@@ -611,11 +611,7 @@ export default function GradeConfigPage() {
 
       {/* ─── SAVE BAR ─────────────────────────────────────── */}
       <div className="mt-6">
-        <div className="flex items-center justify-between">
-          <p className="text-xs text-gray-400">
-            {customGrades.size === 0 ? "All grades use whole-school defaults." : `${customGrades.size} grade${customGrades.size > 1 ? "s" : ""} with custom thresholds.`}
-            {activePreset && <span className="ml-2 text-evalent-600 font-medium">Preset: {allPresets.find((p) => p.id === activePreset)?.name}</span>}
-          </p>
+
           <div className="flex items-center gap-3">
             {saved && <span className="text-sm text-green-600 font-medium">Saved successfully</span>}
             <Button onClick={handleSave} disabled={saving} className="bg-evalent-700 hover:bg-evalent-600 text-white">
@@ -624,7 +620,6 @@ export default function GradeConfigPage() {
               : (<><Save className="mr-2 h-4 w-4" />Save All Changes</>)}
             </Button>
           </div>
-        </div>
       </div>
 
       {showSaveModal && <SavePresetModal onSave={saveCustomPreset} onCancel={() => setShowSaveModal(false)} />}
