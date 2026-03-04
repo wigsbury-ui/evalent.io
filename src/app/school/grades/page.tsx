@@ -610,7 +610,7 @@ export default function GradeConfigPage() {
       </Card>
 
       {/* ─── SAVE BAR ─────────────────────────────────────── */}
-      <div className="sticky bottom-0 z-10 border-t border-gray-200 bg-white/95 backdrop-blur px-4 py-3 -mx-4 sm:-mx-6 lg:-mx-8">
+      <div className="mt-6">
         <div className="flex items-center justify-between">
           <p className="text-xs text-gray-400">
             {customGrades.size === 0 ? "All grades use whole-school defaults." : `${customGrades.size} grade${customGrades.size > 1 ? "s" : ""} with custom thresholds.`}
