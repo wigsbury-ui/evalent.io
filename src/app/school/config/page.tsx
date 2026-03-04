@@ -12,6 +12,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Settings,
+  MessageSquare,
+  ImageIcon,
+  PartyPopper,
   Globe,
   Mail,
   Clock,
@@ -41,6 +44,8 @@ interface SchoolConfig {
   admission_terms: string[] | null;
   admissions_lead_name: string | null;
   admissions_lead_email: string | null;
+  logo_url: string | null;
+  completion_message: string | null;
 }
 
 const CURRICULUM_OPTIONS = [
@@ -118,6 +123,10 @@ export default function SchoolConfigPage() {
   const [leadName, setLeadName] = useState("");
   const [leadEmail, setLeadEmail] = useState("");
 
+  // Completion page settings
+  const [completionMessage, setCompletionMessage] = useState("");
+  const [logoUrl, setLogoUrl] = useState("");
+
   useEffect(() => {
     fetch("/api/school/dashboard")
       .then((r) => {
@@ -181,6 +190,8 @@ export default function SchoolConfigPage() {
           admission_terms: admissionTerms,
           admissions_lead_name: leadName,
           admissions_lead_email: leadEmail,
+          completion_message: completionMessage || null,
+          logo_url: logoUrl || null,
         }),
       });
       if (res.ok) {
@@ -525,7 +536,74 @@ export default function SchoolConfigPage() {
         </CardContent>
       </Card>
 
-      {/* Save button */}
+      {/* Completion Page */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-evalent-50">
+              <PartyPopper className="h-5 w-5 text-evalent-600" />
+            </div>
+            <div>
+              <CardTitle className="text-lg">
+                Assessment Completion Page
+              </CardTitle>
+              <CardDescription>
+                When a student finishes their assessment, they see a celebration page
+                with your school logo and a custom message. This replaces the default
+                Jotform thank-you page.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              <ImageIcon className="mr-1.5 inline h-4 w-4" />
+              School Logo URL
+            </label>
+            <input
+              type="text"
+              value={logoUrl}
+              onChange={(e) => setLogoUrl(e.target.value)}
+              placeholder="https://yourschool.edu/logo.png"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-evalent-500 focus:outline-none focus:ring-1 focus:ring-evalent-500"
+            />
+            <p className="mt-1 text-xs text-gray-400">
+              Paste a direct link to your school logo image. It will appear at the top of the completion page. Leave blank to show just your school name.
+            </p>
+            {logoUrl && (
+              <div className="mt-3 flex items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50 p-4">
+                <img
+                  src={logoUrl}
+                  alt="Logo preview"
+                  className="max-h-16 max-w-[200px] object-contain"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = "none";
+                  }}
+                />
+              </div>
+            )}
+          </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              <MessageSquare className="mr-1.5 inline h-4 w-4" />
+              Custom Completion Message
+            </label>
+            <textarea
+              value={completionMessage}
+              onChange={(e) => setCompletionMessage(e.target.value)}
+              placeholder="Now let the person in charge know that you have finished"
+              rows={3}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-evalent-500 focus:outline-none focus:ring-1 focus:ring-evalent-500"
+            />
+            <p className="mt-1 text-xs text-gray-400">
+              This message appears on the celebration page after a student submits their assessment. Leave blank for the default message: &quot;Now let the person in charge know that you have finished&quot;
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+            {/* Save button */}
       <div className="flex items-center gap-3">
         <Button
           onClick={handleSave}

@@ -41,6 +41,8 @@ export async function PATCH(req: NextRequest) {
     admissions_lead_name,
     admissions_lead_email,
     custom_presets,
+    completion_message,
+    logo_url,
   } = body;
 
   if (grade_naming && !["grade", "year"].includes(grade_naming)) {
@@ -115,6 +117,9 @@ export async function PATCH(req: NextRequest) {
   if (admissions_lead_email !== undefined)
     updates.admissions_lead_email = admissions_lead_email;
   if (custom_presets !== undefined) updates.custom_presets = custom_presets;
+
+  if (completion_message !== undefined) updates.completion_message = completion_message;
+  if (logo_url !== undefined) updates.logo_url = logo_url;
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json(
