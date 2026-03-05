@@ -1022,7 +1022,7 @@ export default function SchoolDashboard() {
     if (s.admission_term && s.admission_year) {
       const termMatch = s.admission_term.match(/\(([^)]+)\)/);
       const shortTerm = termMatch ? termMatch[1].slice(0, 3) : s.admission_term.slice(0, 3);
-      const key = `${shortTerm} ${s.admission_year}`;
+      const key = shortTerm.toLowerCase() === "now" ? "Now" : `${shortTerm} ${s.admission_year}`;
       const existing = intakeMap.get(key);
       if (existing) {
         existing.count++;
