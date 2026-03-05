@@ -1345,7 +1345,7 @@ export default function SchoolDashboard() {
         {/* Right column: Donut + Threshold stacked */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* AI Insights */}
-          <Card className="border-0 shadow-sm">
+          <Card className="border border-evalent-200 shadow-sm">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <div>
