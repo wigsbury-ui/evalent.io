@@ -60,7 +60,7 @@ interface PipelineStudent {
 }
 
 interface DashboardData {
-  school: { name: string; curriculum: string; grade_naming: string } | null;
+  school: { name: string; curriculum: string; grade_naming: string; chart_retention_weeks: number | null } | null;
   stats: {
     total_students: number;
     reports_sent: number;
