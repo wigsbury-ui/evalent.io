@@ -241,6 +241,8 @@ export default function StudentsPage() {
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [rescoring, setRescoring] = useState<string | null>(null);
   const [editingAdmission, setEditingAdmission] = useState<string | null>(null);
+  const [resendingReport, setResendingReport] = useState<string | null>(null);
+  const [resent, setResent] = useState<string | null>(null);
   const [admissionTerms, setAdmissionTerms] = useState<string[]>([]);
 
   const fetchStudents = async () => {
@@ -276,6 +278,24 @@ export default function StudentsPage() {
       console.error("Failed to update admission:", e);
     }
     setEditingAdmission(null);
+  };
+
+  const resendReport = async (submissionId: string) => {
+    setResendingReport(submissionId);
+    try {
+      const res = await fetch("/api/send-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ submission_id: submissionId }),
+      });
+      if (res.ok) {
+        setResent(submissionId);
+        setTimeout(() => setResent(null), 3000);
+      }
+    } catch (e) {
+      console.error("Failed to resend report:", e);
+    }
+    setResendingReport(null);
   };
 
   useEffect(() => {
@@ -787,6 +807,18 @@ export default function StudentsPage() {
                                 student.decision.decision
                               )}
                             </Badge>
+                          ) : student.submission && ["complete", "report_sent"].includes(student.pipeline_status) ? (
+                            resent === student.submission.id ? (
+                              <span className="text-xs text-green-600 font-medium">Sent ✓</span>
+                            ) : (
+                              <button
+                                onClick={() => resendReport(student.submission!.id)}
+                                disabled={resendingReport === student.submission.id}
+                                className="text-xs text-gray-400 hover:text-evalent-600 transition-colors cursor-pointer"
+                              >
+                                {resendingReport === student.submission.id ? "Sending…" : "Resend"}
+                              </button>
+                            )
                           ) : (
                             <span className="text-gray-400">
                               —
