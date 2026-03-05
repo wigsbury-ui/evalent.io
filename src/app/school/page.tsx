@@ -725,7 +725,7 @@ function DomainPerformanceCards({
       <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
         Academic Realms — Student Performance vs Thresholds
       </h3>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
         {domains.map((domain) => {
           const isExpanded = expandedDomain === domain.key;
 
