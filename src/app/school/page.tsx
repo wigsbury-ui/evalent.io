@@ -1408,7 +1408,7 @@ export default function SchoolDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-base font-semibold" style={{ color: "#1a2b6b" }}>
-                    Pass Thresholds
+                    Your School's Pass Thresholds
                   </CardTitle>
                   <CardDescription className="text-xs">
                     Pass marks by subject across grades
