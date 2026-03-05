@@ -1085,6 +1085,7 @@ export default function SchoolDashboard() {
     const st = s.pipeline_status;
     const decision = s.decision?.decision;
     if (st === "decided" && decision === "admit") row.accepted++;
+    else if (st === "decided" && decision === "admit_with_support") row.accepted_support++;
     else if (st === "decided" && decision === "waitlist") row.waitlisted++;
     else if (st === "decided" && decision === "reject") row.rejected++;
     else row.in_pipeline++;
