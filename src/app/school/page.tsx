@@ -892,6 +892,9 @@ export default function SchoolDashboard() {
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [intakeFilter, setIntakeFilter] = useState<string>("all");
+  const [insights, setInsights] = useState<string[]>([]);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const [insightsError, setInsightsError] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -1117,6 +1120,60 @@ export default function SchoolDashboard() {
   /* ── Pipeline table (most recent 10) ── */
   const recentPipeline = pipeline.slice(0, 10);
 
+  /* ── AI Insights generator ── */
+  const generateInsights = async () => {
+    setInsightsLoading(true);
+    setInsightsError(null);
+    try {
+      // Build a data summary for the AI
+      const summary = {
+        school_name: school?.name,
+        total_students: stats.total_students,
+        reports_sent: stats.reports_sent,
+        awaiting_decision: stats.awaiting_decision,
+        decisions_made: stats.decisions_made,
+        avg_score: avgScore != null ? avgScore.toFixed(1) + "%" : null,
+        acceptance_rate: acceptanceRate != null ? acceptanceRate + "%" : null,
+        turnaround: avgPipelineDays != null ? (avgPipelineDays < 2 ? Math.round(avgPipelineDays * 24) + "h" : avgPipelineDays.toFixed(0) + "d") : null,
+        grades: gradeChartData.map((g) => ({
+          grade: g.grade,
+          total: g.total,
+          accepted: g.accepted,
+          accepted_support: g.accepted_support,
+          waitlisted: g.waitlisted,
+          rejected: g.rejected,
+          in_pipeline: g.in_pipeline,
+        })),
+        band_distribution: bandData.map((b) => ({ band: b.band, count: b.count })),
+        domain_averages: {
+          english: pipeline.filter((s) => s.submission?.english_combined != null).length > 0
+            ? (pipeline.reduce((sum, s) => sum + (s.submission?.english_combined || 0), 0) / pipeline.filter((s) => s.submission?.english_combined != null).length).toFixed(1)
+            : null,
+          maths: pipeline.filter((s) => s.submission?.maths_combined != null).length > 0
+            ? (pipeline.reduce((sum, s) => sum + (s.submission?.maths_combined || 0), 0) / pipeline.filter((s) => s.submission?.maths_combined != null).length).toFixed(1)
+            : null,
+          reasoning: pipeline.filter((s) => s.submission?.reasoning_pct != null).length > 0
+            ? (pipeline.reduce((sum, s) => sum + (s.submission?.reasoning_pct || 0), 0) / pipeline.filter((s) => s.submission?.reasoning_pct != null).length).toFixed(1)
+            : null,
+        },
+        intake_periods: intakePeriods.map((ip) => ip.label),
+      };
+
+      const res = await fetch("/api/school/insights", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ summary }),
+      });
+
+      if (!res.ok) throw new Error("Failed to generate insights");
+      const data = await res.json();
+      setInsights(data.insights || []);
+    } catch (e: any) {
+      setInsightsError("Could not generate insights. Please try again.");
+    }
+    setInsightsLoading(false);
+  };
+
   /* ── Copy link helper ── */
   const copyLink = (link: string, id: string) => {
     navigator.clipboard.writeText(link);
@@ -1287,18 +1344,61 @@ export default function SchoolDashboard() {
 
         {/* Right column: Donut + Threshold stacked */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Recommendation band donut */}
+          {/* AI Insights */}
           <Card className="border-0 shadow-sm">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base font-semibold" style={{ color: "#1a2b6b" }}>
-                AI Readiness
-              </CardTitle>
-              <CardDescription className="text-xs">
-                Evalent assessment of student readiness
-              </CardDescription>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-base font-semibold" style={{ color: "#1a2b6b" }}>
+                    AI Insights
+                  </CardTitle>
+                  <CardDescription className="text-xs">
+                    AI-powered observations from your admissions data
+                  </CardDescription>
+                </div>
+                <button
+                  onClick={generateInsights}
+                  disabled={insightsLoading}
+                  className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium bg-evalent-600 text-white hover:bg-evalent-500 transition-colors disabled:opacity-50"
+                >
+                  {insightsLoading ? (
+                    <>
+                      <div className="h-3 w-3 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      Analysing...
+                    </>
+                  ) : insights.length > 0 ? (
+                    <>
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                      Refresh
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                      Generate
+                    </>
+                  )}
+                </button>
+              </div>
             </CardHeader>
             <CardContent>
-              <BandDonut bands={bandData} total={totalBanded} />
+              {insightsError && (
+                <p className="text-xs text-red-500 mb-2">{insightsError}</p>
+              )}
+              {insights.length > 0 ? (
+                <div className="space-y-3">
+                  {insights.map((insight, i) => (
+                    <div key={i} className="flex gap-2.5 text-sm text-gray-700">
+                      <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-evalent-50 text-[10px] font-bold text-evalent-700">{i + 1}</span>
+                      <p className="leading-relaxed">{insight}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : !insightsLoading ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <svg className="w-8 h-8 text-gray-300 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" /></svg>
+                  <p className="text-xs text-gray-400">Click Generate to get AI-powered insights<br />from your admissions data</p>
+                </div>
+              ) : null}
             </CardContent>
           </Card>
 
