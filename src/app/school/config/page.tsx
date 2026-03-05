@@ -47,6 +47,7 @@ interface SchoolConfig {
   admissions_lead_email: string | null;
   logo_url: string | null;
   completion_message: string | null;
+  chart_retention_weeks: number | null;
 }
 
 const CURRICULUM_OPTIONS = [
@@ -126,6 +127,7 @@ export default function SchoolConfigPage() {
 
   // Completion page settings
   const [completionMessage, setCompletionMessage] = useState("");
+  const [chartRetention, setChartRetention] = useState<number>(4);
   const [logoUrl, setLogoUrl] = useState("");
   const [uploading, setUploading] = useState(false);
 
@@ -156,6 +158,7 @@ export default function SchoolConfigPage() {
           setLeadName(s.admissions_lead_name || "");
           setLeadEmail(s.admissions_lead_email || "");
           setCompletionMessage(s.completion_message || "");
+          setChartRetention(s.chart_retention_weeks ?? 4);
           setLogoUrl(s.logo_url || "");
         }
         setLoading(false);
@@ -195,6 +198,7 @@ export default function SchoolConfigPage() {
           admissions_lead_name: leadName,
           admissions_lead_email: leadEmail,
           completion_message: completionMessage || null,
+          chart_retention_weeks: chartRetention,
           logo_url: logoUrl || null,
         }),
       });
@@ -634,6 +638,29 @@ export default function SchoolConfigPage() {
               <Plus className="mr-1 h-4 w-4" />
               Add
             </Button>
+          </div>
+
+          {/* Chart retention setting */}
+          <div className="mt-4 border-t border-gray-200 pt-4">
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
+              <Clock className="mr-1.5 inline h-4 w-4" />
+              Dashboard Chart Retention
+            </label>
+            <p className="mb-2 text-xs text-gray-500">
+              How long completed intakes remain visible on the Admissions by Grade chart.
+              Students are always accessible in the Students tab.
+            </p>
+            <select
+              value={chartRetention}
+              onChange={(e) => setChartRetention(parseInt(e.target.value))}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-evalent-500 focus:outline-none focus:ring-1 focus:ring-evalent-500"
+            >
+              <option value={0}>No expiry (show all)</option>
+              <option value={1}>1 week</option>
+              <option value={2}>2 weeks</option>
+              <option value={4}>1 month (default)</option>
+              <option value={8}>2 months</option>
+            </select>
           </div>
         </CardContent>
       </Card>

@@ -974,28 +974,78 @@ export default function SchoolDashboard() {
   const acceptanceRate =
     totalDecisions > 0 ? Math.round((admittedCount / totalDecisions) * 100) : null;
 
-  /* ── Intake periods for filter pills ── */
+  /* ── Intake periods for filter pills (with expiry) ── */
+  const retentionWeeks = school?.chart_retention_weeks ?? 4;
+  const now = new Date();
+
+  // Helper: estimate an intake's reference date for expiry
+  function intakeRefDate(term: string, year: number): Date {
+    const lower = term.toLowerCase();
+    if (lower.includes("jan")) return new Date(year, 0, 31);
+    if (lower.includes("feb")) return new Date(year, 1, 28);
+    if (lower.includes("mar")) return new Date(year, 2, 31);
+    if (lower.includes("apr")) return new Date(year, 3, 30);
+    if (lower.includes("may")) return new Date(year, 4, 31);
+    if (lower.includes("jun")) return new Date(year, 5, 30);
+    if (lower.includes("jul")) return new Date(year, 6, 31);
+    if (lower.includes("aug")) return new Date(year, 7, 31);
+    if (lower.includes("sep")) return new Date(year, 8, 30);
+    if (lower.includes("oct")) return new Date(year, 9, 31);
+    if (lower.includes("nov")) return new Date(year, 10, 30);
+    if (lower.includes("dec")) return new Date(year, 11, 31);
+    return now; // fallback for "Now" or unknown
+  }
+
+  function isIntakeExpired(term: string, year: number): boolean {
+    if (retentionWeeks === 0) return false;
+    const lower = term.toLowerCase();
+    if (lower.includes("now") || lower === "now") {
+      // "Now" students: expire based on latest decision date in the group
+      const grp = pipeline.filter(
+        (s) => s.admission_term === term && s.admission_year === year
+      );
+      const latestDecision = grp.reduce((latest, s) => {
+        const d = s.decision?.decided_at ? new Date(s.decision.decided_at).getTime() : 0;
+        return d > latest ? d : latest;
+      }, 0);
+      if (latestDecision === 0) return false;
+      return now.getTime() > latestDecision + retentionWeeks * 7 * 24 * 60 * 60 * 1000;
+    }
+    // Term-dated: expire after term date + retention
+    const ref = intakeRefDate(term, year);
+    return now.getTime() > ref.getTime() + retentionWeeks * 7 * 24 * 60 * 60 * 1000;
+  }
+
   const intakePeriods: { key: string; label: string; count: number }[] = [];
-  const intakeMap = new Map<string, number>();
+  const intakeMap = new Map<string, { count: number; term: string; year: number }>();
   for (const s of pipeline) {
     if (s.admission_term && s.admission_year) {
-      // Shorten "Term 1 (September)" to "Sep" etc.
       const termMatch = s.admission_term.match(/\(([^)]+)\)/);
       const shortTerm = termMatch ? termMatch[1].slice(0, 3) : s.admission_term.slice(0, 3);
       const key = `${shortTerm} ${s.admission_year}`;
-      intakeMap.set(key, (intakeMap.get(key) || 0) + 1);
+      const existing = intakeMap.get(key);
+      if (existing) {
+        existing.count++;
+      } else {
+        intakeMap.set(key, { count: 1, term: s.admission_term, year: s.admission_year });
+      }
     }
   }
-  // Sort by year then term
   const sortedIntakes = Array.from(intakeMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  for (const [key, count] of sortedIntakes) {
-    intakePeriods.push({ key, label: key, count });
+  for (const [key, val] of sortedIntakes) {
+    if (!isIntakeExpired(val.term, val.year)) {
+      intakePeriods.push({ key, label: key, count: val.count });
+    }
   }
 
   /* ── Grade-by-grade chart data ── */
   /* Always seed grades 3-10 so all columns appear even with zero students */
   const filteredPipeline = intakeFilter === "all"
-    ? pipeline
+    ? pipeline.filter((s) => {
+        if (retentionWeeks === 0) return true;
+        if (!s.admission_term || !s.admission_year) return true;
+        return !isIntakeExpired(s.admission_term, s.admission_year);
+      })
     : pipeline.filter((s) => {
         if (!s.admission_term || !s.admission_year) return false;
         const termMatch = s.admission_term.match(/\(([^)]+)\)/);

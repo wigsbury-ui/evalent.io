@@ -42,6 +42,7 @@ export async function PATCH(req: NextRequest) {
     admissions_lead_email,
     custom_presets,
     completion_message,
+    chart_retention_weeks,
     logo_url,
   } = body;
 
@@ -119,6 +120,7 @@ export async function PATCH(req: NextRequest) {
   if (custom_presets !== undefined) updates.custom_presets = custom_presets;
 
   if (completion_message !== undefined) updates.completion_message = completion_message;
+  if (chart_retention_weeks !== undefined) updates.chart_retention_weeks = chart_retention_weeks;
   if (logo_url !== undefined) updates.logo_url = logo_url;
 
   if (Object.keys(updates).length === 0) {
