@@ -240,18 +240,42 @@ export default function StudentsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(25);
   const [rescoring, setRescoring] = useState<string | null>(null);
+  const [editingAdmission, setEditingAdmission] = useState<string | null>(null);
+  const [admissionTerms, setAdmissionTerms] = useState<string[]>([]);
 
   const fetchStudents = async () => {
     try {
       const res = await fetch("/api/school/dashboard");
       const data = await res.json();
       setStudents(data?.pipeline || []);
+      if (data?.school?.admission_terms) {
+        setAdmissionTerms(data.school.admission_terms);
+      }
     } catch {
       setStudents([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
+  };
+
+  const updateAdmission = async (studentId: string, term: string, year: number) => {
+    try {
+      await fetch(`/api/school/students/${studentId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ admission_term: term, admission_year: year }),
+      });
+      // Update local state
+      setStudents((prev) =>
+        prev.map((s) =>
+          s.id === studentId ? { ...s, admission_term: term, admission_year: year } : s
+        )
+      );
+    } catch (e) {
+      console.error("Failed to update admission:", e);
+    }
+    setEditingAdmission(null);
   };
 
   useEffect(() => {
@@ -669,12 +693,47 @@ export default function StudentsPage() {
                           G{student.grade_applied}
                         </td>
                         <td className="py-3 text-gray-600 text-xs">
-                          {student.admission_year &&
-                          student.admission_term
-                            ? `${student.admission_term} ${student.admission_year}`
-                            : student.admission_year
-                              ? String(student.admission_year)
-                              : "—"}
+                          {editingAdmission === student.id ? (
+                            <select
+                              autoFocus
+                              className="rounded border border-gray-300 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-evalent-500"
+                              defaultValue={student.admission_term && student.admission_year ? `${student.admission_term}|${student.admission_year}` : ""}
+                              onChange={(e) => {
+                                if (e.target.value === "") {
+                                  setEditingAdmission(null);
+                                  return;
+                                }
+                                const [term, yr] = e.target.value.split("|");
+                                updateAdmission(student.id, term, parseInt(yr));
+                              }}
+                              onBlur={() => setEditingAdmission(null)}
+                            >
+                              <option value="">Select…</option>
+                              {admissionTerms.flatMap((term) => {
+                                const now = new Date();
+                                const currentYear = now.getFullYear();
+                                return [currentYear, currentYear + 1, currentYear + 2].map((yr) => (
+                                  <option key={`${term}|${yr}`} value={`${term}|${yr}`}>
+                                    {term} {yr}
+                                  </option>
+                                ));
+                              })}
+                            </select>
+                          ) : (
+                            <span
+                              className="cursor-pointer hover:text-evalent-600 group inline-flex items-center gap-1"
+                              onClick={() => setEditingAdmission(student.id)}
+                            >
+                              {student.admission_year && student.admission_term
+                                ? `${student.admission_term} ${student.admission_year}`
+                                : student.admission_year
+                                  ? String(student.admission_year)
+                                  : "—"}
+                              <svg className="w-3 h-3 text-gray-300 group-hover:text-evalent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                              </svg>
+                            </span>
+                          )}
                         </td>
                         <td className="py-3">
                           <span
