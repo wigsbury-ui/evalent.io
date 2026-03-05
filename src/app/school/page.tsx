@@ -1350,7 +1350,7 @@ export default function SchoolDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-base font-semibold" style={{ color: "#1a2b6b" }}>
-                    Evalent Insights™
+                    Evalent Insights<span className="text-[8px] align-super">™</span>
                   </CardTitle>
                   <CardDescription className="text-xs">
                     AI-powered observations from your admissions data
