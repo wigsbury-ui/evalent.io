@@ -1048,6 +1048,7 @@ export default function SchoolDashboard() {
       })
     : pipeline.filter((s) => {
         if (!s.admission_term || !s.admission_year) return false;
+        if (intakeFilter === "Now") return s.admission_term.toLowerCase() === "now";
         const termMatch = s.admission_term.match(/\(([^)]+)\)/);
         const shortTerm = termMatch ? termMatch[1].slice(0, 3) : s.admission_term.slice(0, 3);
         return `${shortTerm} ${s.admission_year}` === intakeFilter;

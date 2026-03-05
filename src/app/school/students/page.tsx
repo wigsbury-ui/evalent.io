@@ -710,8 +710,14 @@ export default function StudentsPage() {
                             >
                               <option value="">Select…</option>
                               {admissionTerms.flatMap((term) => {
-                                const now = new Date();
-                                const currentYear = now.getFullYear();
+                                if (term.toLowerCase() === "now") {
+                                  return [(
+                                    <option key="now" value={`Now|${new Date().getFullYear()}`}>
+                                      Now
+                                    </option>
+                                  )];
+                                }
+                                const currentYear = new Date().getFullYear();
                                 return [currentYear, currentYear + 1, currentYear + 2].map((yr) => (
                                   <option key={`${term}|${yr}`} value={`${term}|${yr}`}>
                                     {term} {yr}
@@ -724,11 +730,13 @@ export default function StudentsPage() {
                               className="cursor-pointer hover:text-evalent-600 group inline-flex items-center gap-1"
                               onClick={() => setEditingAdmission(student.id)}
                             >
-                              {student.admission_year && student.admission_term
-                                ? `${student.admission_term} ${student.admission_year}`
-                                : student.admission_year
-                                  ? String(student.admission_year)
-                                  : "—"}
+                              {student.admission_term?.toLowerCase() === "now"
+                                ? "Now"
+                                : student.admission_year && student.admission_term
+                                  ? `${student.admission_term} ${student.admission_year}`
+                                  : student.admission_year
+                                    ? String(student.admission_year)
+                                    : "—"}
                               <svg className="w-3 h-3 text-gray-300 group-hover:text-evalent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                               </svg>
