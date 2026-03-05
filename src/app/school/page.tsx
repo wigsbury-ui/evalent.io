@@ -1046,7 +1046,7 @@ export default function SchoolDashboard() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: "#1a2b6b" }}>
+          <h1 className="text-3xl font-bold tracking-tight" style={{ color: "#1a2b6b" }}>
             {school?.name || "School"} Dashboard
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">
