@@ -133,6 +133,7 @@ function timeAgo(dateStr: string): string {
 interface GradeBarData {
   grade: number;
   accepted: number;
+  accepted_support: number;
   waitlisted: number;
   rejected: number;
   in_pipeline: number;
@@ -148,6 +149,7 @@ function GradeChart({ data, gradeNaming }: { data: GradeBarData[]; gradeNaming: 
 
   const segments: { key: keyof GradeBarData; color: string; label: string }[] = [
     { key: "accepted", color: "#16a34a", label: "Accepted" },
+    { key: "accepted_support", color: "#4ade80", label: "Accepted (Support)" },
     { key: "waitlisted", color: "#f59e0b", label: "Waitlisted" },
     { key: "rejected", color: "#ef4444", label: "Rejected" },
     { key: "in_pipeline", color: "#d1d5db", label: "In Pipeline" },
@@ -1058,6 +1060,7 @@ export default function SchoolDashboard() {
     gradeMap.set(g, {
       grade: g,
       accepted: 0,
+      accepted_support: 0,
       waitlisted: 0,
       rejected: 0,
       in_pipeline: 0,
@@ -1070,6 +1073,7 @@ export default function SchoolDashboard() {
       gradeMap.set(g, {
         grade: g,
         accepted: 0,
+        accepted_support: 0,
         waitlisted: 0,
         rejected: 0,
         in_pipeline: 0,
