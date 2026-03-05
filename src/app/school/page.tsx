@@ -1120,7 +1120,7 @@ export default function SchoolDashboard() {
   /* ── Pipeline table (most recent 10) ── */
   const recentPipeline = pipeline.slice(0, 10);
 
-  /* ── AI Insights generator ── */
+  /* ── Evalent Insights generator ── */
   const generateInsights = async () => {
     setInsightsLoading(true);
     setInsightsError(null);
@@ -1344,13 +1344,13 @@ export default function SchoolDashboard() {
 
         {/* Right column: Donut + Threshold stacked */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* AI Insights */}
+          {/* Evalent Insights */}
           <Card className="border border-evalent-200 shadow-sm">
             <CardHeader className="pb-2">
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="text-base font-semibold" style={{ color: "#1a2b6b" }}>
-                    AI Insights
+                    Evalent Insights
                   </CardTitle>
                   <CardDescription className="text-xs">
                     AI-powered observations from your admissions data
