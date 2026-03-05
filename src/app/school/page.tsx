@@ -889,6 +889,7 @@ export default function SchoolDashboard() {
   const [gradeConfigs, setGradeConfigs] = useState<GradeConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [intakeFilter, setIntakeFilter] = useState<string>("all");
 
   useEffect(() => {
     Promise.all([
@@ -973,8 +974,34 @@ export default function SchoolDashboard() {
   const acceptanceRate =
     totalDecisions > 0 ? Math.round((admittedCount / totalDecisions) * 100) : null;
 
+  /* ── Intake periods for filter pills ── */
+  const intakePeriods: { key: string; label: string; count: number }[] = [];
+  const intakeMap = new Map<string, number>();
+  for (const s of pipeline) {
+    if (s.admission_term && s.admission_year) {
+      // Shorten "Term 1 (September)" to "Sep" etc.
+      const termMatch = s.admission_term.match(/\(([^)]+)\)/);
+      const shortTerm = termMatch ? termMatch[1].slice(0, 3) : s.admission_term.slice(0, 3);
+      const key = `${shortTerm} ${s.admission_year}`;
+      intakeMap.set(key, (intakeMap.get(key) || 0) + 1);
+    }
+  }
+  // Sort by year then term
+  const sortedIntakes = Array.from(intakeMap.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  for (const [key, count] of sortedIntakes) {
+    intakePeriods.push({ key, label: key, count });
+  }
+
   /* ── Grade-by-grade chart data ── */
   /* Always seed grades 3-10 so all columns appear even with zero students */
+  const filteredPipeline = intakeFilter === "all"
+    ? pipeline
+    : pipeline.filter((s) => {
+        if (!s.admission_term || !s.admission_year) return false;
+        const termMatch = s.admission_term.match(/\(([^)]+)\)/);
+        const shortTerm = termMatch ? termMatch[1].slice(0, 3) : s.admission_term.slice(0, 3);
+        return `${shortTerm} ${s.admission_year}` === intakeFilter;
+      });
   const gradeMap = new Map<number, GradeBarData>();
   for (let g = 3; g <= 10; g++) {
     gradeMap.set(g, {
@@ -986,7 +1013,7 @@ export default function SchoolDashboard() {
       total: 0,
     });
   }
-  for (const s of pipeline) {
+  for (const s of filteredPipeline) {
     const g = s.grade_applied;
     if (!gradeMap.has(g)) {
       gradeMap.set(g, {
@@ -1152,12 +1179,43 @@ export default function SchoolDashboard() {
         {/* Grade-by-grade bar chart */}
         <Card className="border-0 shadow-sm">
           <CardHeader className="pb-2">
-            <CardTitle className="text-base font-semibold" style={{ color: "#1a2b6b" }}>
-              Admissions by Grade
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Application outcomes per grade level
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base font-semibold" style={{ color: "#1a2b6b" }}>
+                  Admissions by Grade
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Application outcomes per grade level
+                </CardDescription>
+              </div>
+              {intakePeriods.length > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setIntakeFilter("all")}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                      intakeFilter === "all"
+                        ? "bg-evalent-600 text-white"
+                        : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
+                  >
+                    All
+                  </button>
+                  {intakePeriods.map((ip) => (
+                    <button
+                      key={ip.key}
+                      onClick={() => setIntakeFilter(ip.key)}
+                      className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                        intakeFilter === ip.key
+                          ? "bg-evalent-600 text-white"
+                          : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                      }`}
+                    >
+                      {ip.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </CardHeader>
           <div className="h-3" />
           <CardContent>
