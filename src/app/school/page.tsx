@@ -892,9 +892,23 @@ export default function SchoolDashboard() {
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [intakeFilter, setIntakeFilter] = useState<string>("all");
-  const [insights, setInsights] = useState<string[]>([]);
+  const [insights, setInsights] = useState<string[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const cached = window.sessionStorage.getItem("evalent_insights");
+        return cached ? JSON.parse(cached) : [];
+      } catch { return []; }
+    }
+    return [];
+  });
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [insightsError, setInsightsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (insights.length > 0) {
+      try { window.sessionStorage.setItem("evalent_insights", JSON.stringify(insights)); } catch {}
+    }
+  }, [insights]);
 
   useEffect(() => {
     Promise.all([
