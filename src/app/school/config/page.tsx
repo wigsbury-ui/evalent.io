@@ -72,19 +72,19 @@ const TERM_PRESETS: Record<string, string[]> = {
     "Term 1 (September)",
     "Term 2 (January)",
     "Term 3 (April)",
-    "Immediate",
+    "Now",
   ],
   IGCSE: [
     "Term 1 (September)",
     "Term 2 (January)",
     "Term 3 (April)",
-    "Immediate",
+    "Now",
   ],
   IB: [
     "Term 1 (September)",
     "Term 2 (January)",
     "Term 3 (April)",
-    "Immediate",
+    "Now",
   ],
   US: [
     "Fall Semester (August)",
@@ -93,13 +93,13 @@ const TERM_PRESETS: Record<string, string[]> = {
     "Q2 (October)",
     "Q3 (January)",
     "Q4 (March)",
-    "Immediate",
+    "Now",
   ],
   Other: [
     "Term 1 (September)",
     "Term 2 (January)",
     "Term 3 (April)",
-    "Immediate",
+    "Now",
   ],
 };
 
