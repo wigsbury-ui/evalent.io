@@ -149,7 +149,7 @@ function GradeChart({ data, gradeNaming }: { data: GradeBarData[]; gradeNaming: 
 
   const segments: { key: keyof GradeBarData; color: string; label: string }[] = [
     { key: "accepted", color: "#16a34a", label: "Accepted" },
-    { key: "accepted_support", color: "#4ade80", label: "Accepted (Support)" },
+    { key: "accepted_support", color: "#86efac", label: "Accepted (Support)" },
     { key: "waitlisted", color: "#f59e0b", label: "Waitlisted" },
     { key: "rejected", color: "#ef4444", label: "Rejected" },
     { key: "in_pipeline", color: "#d1d5db", label: "In Pipeline" },
