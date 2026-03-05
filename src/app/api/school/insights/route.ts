@@ -16,6 +16,14 @@ export async function POST(req: NextRequest) {
   try {
     const { summary } = await req.json();
 
+    // Check if there's enough data to generate meaningful insights
+    const hasEnoughData = summary.total_students >= 3 && summary.decisions_made >= 1;
+    if (hasEnoughData === false) {
+      return NextResponse.json({
+        insights: ["There isn't enough admissions data yet to generate meaningful insights. Once you have a few more students scored and decisions made, Evalent will be able to identify patterns and recommendations for your team."]
+      });
+    }
+
     const message = await anthropic.messages.create({
       model: "claude-sonnet-4-20250514",
       max_tokens: 800,
