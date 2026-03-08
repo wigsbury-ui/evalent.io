@@ -56,11 +56,6 @@ function isWritingField(fieldName: string): boolean {
   // Strategy 3: _extended or _essay patterns (future-proofing)
   if (lower.indexOf("_extended") !== -1) return true;
   if (lower.indexOf("_essay") !== -1) return true;
-  // Strategy 4: motivation / why-school fields
-  if (lower.indexOf("pleasetell") !== -1) return true;
-  if (lower.indexOf("finallytell") !== -1) return true;
-  if (lower.indexOf("finallyplease") !== -1) return true;
-  if (lower.indexOf("lastlylease") !== -1) return true;
   return false;
 }
 
