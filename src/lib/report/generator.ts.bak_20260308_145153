@@ -1141,41 +1141,6 @@ function pageLens(
 }
 
 // ─── MINDSET PAGE ───────────────────────────────────────────────
-// --- MOTIVATION LENS PAGE ---
-function pageLensMotivation(
-  data: ReportInput,
-  lens: ReportInput["motivation"],
-  pageNum: number,
-  totalPages: number
-): string {
-  if (!lens) return "";
-  return (
-    '<div class="page">' +
-    pageHeader(data) +
-    '<div class="section-title">Motivation &amp; School Fit</div>' +
-    '<p style="text-align:center;font-size:10pt;color:' + COLORS.muted + ';margin-bottom:14px;">' +
-      '<em>\u201cWhy do you want to come to our school?\u201d</em>' +
-    '</p>' +
-    '<div style="text-align:center;margin:12px 0;">' +
-      '<span class="writing-band" style="background:' + bandColor(lens.band) + ';font-size:13pt;padding:5px 18px;">' +
-        lens.band + ' \u2014 ' + lens.score.toFixed(1) + ' / 4' +
-      '</span>' +
-    '</div>' +
-    '<div class="narrative">' +
-      narrativeToParagraphs(lens.narrative) +
-    '</div>' +
-    '<div class="student-writing">' +
-      '<span style="font-style:normal;font-weight:700;color:' + COLORS.primary + ';">Student\u2019s Response: </span>' +
-      (lens.response || "No written response was provided.") +
-    '</div>' +
-    '<p style="margin-top:14px;font-size:9pt;color:' + COLORS.muted + ';font-style:italic;text-align:center;">' +
-      'The Motivation lens is qualitative context for the admissions panel. It does not contribute to the overall academic score.' +
-    '</p>' +
-    pageFooter(pageNum, totalPages) +
-    '</div>'
-  );
-}
-
 function pageMindset(
   data: ReportInput,
   pageNum: number,
