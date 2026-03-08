@@ -183,7 +183,7 @@ function generateRadarChart(data: ReportInput): string {
       value: data.reasoning.mcq_pct,
       threshold: data.reasoning.threshold,
     },
-    { label: "Mindset", value: mindsetPct, threshold: 62.5 },
+    { label: "Mindset", value: mindsetPct, threshold: data.mindset.threshold },
   ];
   var n = axes.length;
   var angleStep = (2 * Math.PI) / n;
