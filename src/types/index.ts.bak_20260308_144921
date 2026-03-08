@@ -40,8 +40,7 @@ export type DomainType =
   | "reasoning"
   | "mindset"
   | "values"
-  | "creativity"
-  | "motivation";
+  | "creativity";
 
 // --- Database Tables ---
 
