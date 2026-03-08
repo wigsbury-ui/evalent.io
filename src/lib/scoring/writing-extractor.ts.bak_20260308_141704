@@ -15,7 +15,7 @@
  *   _CREA_ or _creativ → creativity
  */
 
-export type DomainType = "english" | "mathematics" | "reasoning" | "mindset" | "values" | "creativity" | "motivation";
+export type DomainType = "english" | "mathematics" | "reasoning" | "mindset" | "values" | "creativity";
 
 export interface WritingResponse {
   domain: DomainType;
@@ -42,8 +42,6 @@ function inferDomain(fieldName: string): DomainType | null {
     return "values";
   if (lower.indexOf("_crea_") !== -1 || lower.indexOf("creativ") !== -1)
     return "creativity";
-  // motivation / why-school fields (pleaseTell G3/G5-G9, finallyPlease G4, lastlyLease G10)
-  if (lower.indexOf("pleasetell") !== -1 || lower.indexOf("finallytell") !== -1 || lower.indexOf("finallyplease") !== -1 || lower.indexOf("lastlylease") !== -1) return "motivation";
   return null;
 }
 

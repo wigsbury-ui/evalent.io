@@ -439,15 +439,6 @@ export async function GET(req: NextRequest) {
               response: submission.creativity_writing_response || "",
             }
           : undefined,
-      motivation:
-        submission.motivation_score !== null && submission.motivation_score !== undefined
-          ? {
-              band: submission.motivation_band || "Developing",
-              score: submission.motivation_score || 0,
-              narrative: submission.motivation_narrative || "",
-              response: submission.motivation_response || "",
-            }
-          : undefined,
     };
 
     if (format === "json") {

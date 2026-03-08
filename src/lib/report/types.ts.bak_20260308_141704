@@ -64,8 +64,6 @@ export interface ReportInput {
 
   // Creativity lens
   creativity?: WritingLens;
-  // Motivation lens (why do you want to come to our school?)
-  motivation?: WritingLens;
 }
 
 export interface DomainReport {

@@ -100,27 +100,6 @@ RUBRIC (English focus):
 - Insufficient (0): No substantive response or response unrelated to the prompt.`;
     }
 
-  if (domainLower.includes("motivation")) {
-    return `DOMAIN-SPECIFIC EVALUATION FOCUS - MOTIVATION / SCHOOL FIT:
-This is the student's personal statement explaining why they want to attend this school.
-Evaluate based on:
-1. SPECIFICITY: Does the student mention specific aspects of the school, programme, or opportunities? Or is the response generic?
-2. SELF-AWARENESS: Does the student demonstrate understanding of their own strengths, interests, or learning goals?
-3. GENUINE ENGAGEMENT: Does the response feel considered and personal, or formulaic and coached?
-4. MATURITY OF EXPRESSION: Is the response appropriately articulate for their grade level?
-5. SCHOOL-FIT INDICATORS: Does the student articulate a plausible connection between their goals and what this school offers?
-
-RUBRIC (Motivation focus):
-- Excellent (4): Specific, personal, and well-articulated. Clear self-awareness and genuine connection to the school. Exceeds what is typical for this age.
-- Good (3): Shows genuine thought and some specificity. Meets age-appropriate expectations with minor gaps in depth or personalisation.
-- Developing (2): Somewhat generic or vague. Some effort but lacks specific detail or personal reflection.
-- Emerging (1): Very brief, formulaic, or superficial. Little evidence of genuine reflection or knowledge of the school.
-- Insufficient (0): No substantive response, or response is entirely off-topic.
-
-NOTE: Do NOT penalise younger students for less sophisticated expression - calibrate expectations to grade level.`;
-  }
-
-
     // Creativity, Values, or other domains
     return `DOMAIN-SPECIFIC EVALUATION FOCUS — ${domain.toUpperCase()}:
 Evaluate the response in the context of the ${domain} domain. Focus on the quality and depth of thinking demonstrated, relevance to the prompt, and evidence of genuine engagement with the topic.

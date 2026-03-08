@@ -370,12 +370,6 @@ export async function POST(req: NextRequest) {
       creativity_narrative: writingEvals.creativity
         ? `${writingEvals.creativity.content_narrative} ${writingEvals.creativity.writing_narrative}`
         : null,
-      motivation_response: writingResponses.find((w) => w.domain === "motivation")?.student_response || null,
-      motivation_band: writingEvals.motivation?.band || null,
-      motivation_score: writingEvals.motivation?.score ?? null,
-      motivation_narrative: writingEvals.motivation
-        ? `${writingEvals.motivation.content_narrative} ${writingEvals.motivation.writing_narrative}`
-        : null,
       // MCQ analysis narratives
       english_mcq_narrative: mcqAnalyses.english?.narrative || null,
       maths_mcq_narrative: mcqAnalyses.mathematics?.narrative || null,
