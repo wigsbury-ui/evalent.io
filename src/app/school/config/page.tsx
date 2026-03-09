@@ -54,7 +54,8 @@ const CURRICULUM_OPTIONS = [
   { value: "IB", label: "International Baccalaureate (IB)" },
   { value: "UK", label: "British / English National Curriculum" },
   { value: "US", label: "American / Common Core" },
-  { value: "IGCSE", label: "Cambridge IGCSE" },
+  { value: "Australian", label: "Australian Curriculum (ACARA)" },
+  { value: "NZ", label: "New Zealand Curriculum (NZC)" },
   { value: "Other", label: "Other / International" },
 ];
 
@@ -75,12 +76,6 @@ const TERM_PRESETS: Record<string, string[]> = {
     "Term 3 (April)",
     "Now",
   ],
-  IGCSE: [
-    "Term 1 (September)",
-    "Term 2 (January)",
-    "Term 3 (April)",
-    "Now",
-  ],
   IB: [
     "Term 1 (September)",
     "Term 2 (January)",
@@ -94,6 +89,20 @@ const TERM_PRESETS: Record<string, string[]> = {
     "Q2 (October)",
     "Q3 (January)",
     "Q4 (March)",
+    "Now",
+  ],
+  Australian: [
+    "Term 1 (February)",
+    "Term 2 (April)",
+    "Term 3 (July)",
+    "Term 4 (October)",
+    "Now",
+  ],
+  NZ: [
+    "Term 1 (February)",
+    "Term 2 (April)",
+    "Term 3 (July)",
+    "Term 4 (October)",
     "Now",
   ],
   Other: [
@@ -472,10 +481,7 @@ export default function SchoolConfigPage() {
               onChange={(e) => {
                 const newCurriculum = e.target.value;
                 setCurriculum(newCurriculum);
-                if (
-                  newCurriculum === "UK" ||
-                  newCurriculum === "IGCSE"
-                ) {
+                if (newCurriculum === "UK" || newCurriculum === "Australian" || newCurriculum === "NZ") {
                   setGradeNaming("year");
                   setLocale("en-GB");
                 } else if (newCurriculum === "US") {

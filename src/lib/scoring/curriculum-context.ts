@@ -47,12 +47,45 @@ export function getCurriculumContext(programme?: string, grade?: number): string
     );
   }
 
-  // ── BRITISH / UK ─────────────────────────────────────────────────────────
-  if (p.includes("BRITISH") || p.includes("UK") || p === "IGCSE") {
-    const ks = g <= 6 ? "Key Stage 2" : g <= 9 ? "Key Stage 3" : "Key Stage 4 / IGCSE pathway";
+    // ── BRITISH / UK / CAMBRIDGE ──────────────────────────────────────────────
+  if (p.includes("BRITISH") || p.includes("UK") || p.includes("CAMBRIDGE")) {
+    const ks = g <= 6 ? "Key Stage 2" : g <= 9 ? "Key Stage 3" : "Key Stage 4";
     return (
       `CURRICULUM: This is a British / English National Curriculum school (${ks}). ` +
       `Use Key Stage language, attainment targets, and age-related expectations throughout. `
+    );
+  }
+
+  // ── AUSTRALIAN ──────────────────────────────────────────────────────────────
+  if (p.includes("AUSTRALIAN") || p.includes("AUSTRALIA") || p === "ACARA" || p === "AC") {
+    const band = g <= 6 ? "Foundation–Year 6" : g <= 10 ? "Years 7–10" : "Years 11–12";
+    return (
+      `CURRICULUM — MANDATORY RULES (read before anything else): ` +
+      `This is an Australian Curriculum (ACARA) school (${band}). ` +
+      `THE FOLLOWING WORDS ARE BANNED — never write them under any circumstances: ` +
+      `"Key Stage", "KS1", "KS2", "KS3", "KS4", "Common Core", "SATs" (UK sense). ` +
+      `INSTEAD use Australian Curriculum language: learning areas, general capabilities, ` +
+      `cross-curriculum priorities, achievement standards, year level descriptors, ` +
+      `strand, sub-strand, elaborations, curriculum band, proficiency levels. ` +
+      `Refer to year groups as Year ${g} (not Grade ${g}). ` +
+      `Tone: practical, evidence-based, growth-oriented. `
+    );
+  }
+
+  // ── NEW ZEALAND ─────────────────────────────────────────────────────────────
+  if (p.includes("NZ") || p.includes("NEW ZEALAND") || p === "NZC") {
+    const level = g <= 4 ? "Level 1–2" : g <= 6 ? "Level 3–4" : g <= 8 ? "Level 5–6" : "Level 7–8";
+    return (
+      `CURRICULUM — MANDATORY RULES (read before anything else): ` +
+      `This is a New Zealand Curriculum (NZC) school (${level}). ` +
+      `THE FOLLOWING WORDS ARE BANNED — never write them under any circumstances: ` +
+      `"Key Stage", "KS1", "KS2", "KS3", "KS4", "Common Core", "ACARA", "SATs" (UK sense). ` +
+      `INSTEAD use New Zealand Curriculum language: learning areas, key competencies ` +
+      `(thinking; using language, symbols and texts; managing self; relating to others; ` +
+      `participating and contributing), curriculum levels, achievement objectives, ` +
+      `strands, values, NZC vision. ` +
+      `Refer to year groups as Year ${g}. ` +
+      `Tone: holistic, values-driven, inclusive, growth-oriented. `
     );
   }
 
