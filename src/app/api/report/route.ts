@@ -197,6 +197,7 @@ export async function GET(req: NextRequest) {
     let englishThreshold = 55;
     let mathsThreshold = 55;
     let reasoningThreshold = 55;
+      let mindsetThreshold = 50;
     if (submission.school_id) {
       const { data: config } = await supabase
         .from("grade_configs")
@@ -208,6 +209,7 @@ export async function GET(req: NextRequest) {
         englishThreshold = config.english_threshold || 55;
         mathsThreshold = config.maths_threshold || 55;
         reasoningThreshold = config.reasoning_threshold || 55;
+          mindsetThreshold = config.mindset_threshold || 50;
       }
     }
 
@@ -419,6 +421,7 @@ export async function GET(req: NextRequest) {
       },
       mindset: {
         score: submission.mindset_score || 0,
+        threshold: mindsetThreshold,
         narrative: submission.mindset_narrative || "",
       },
       values:
