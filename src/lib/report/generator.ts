@@ -855,6 +855,8 @@ function page1_Cover(data: ReportInput, totalPages: number): string {
     data.student_ref +
     " \u2022 " +
     gradeLabel(data.grade_applied, data.programme) +
+    " +
+    (data.programme ? " \u2022 " + curriculumLabel(data.programme) : "") +
     " \u2022 Test: " +
     data.test_date +
     " \u2022 Report: " +
