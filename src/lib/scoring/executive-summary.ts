@@ -47,6 +47,7 @@ export async function generateExecutiveSummary(
     input.student_name.split(" ")[0] || input.student_name;
 
   var systemPrompt =
+    getCurriculumContext(input.programme, input.grade) +
     "You are a senior educational assessment specialist writing an executive summary " +
     "for a school admissions report. Your audience is the Head of Admissions. " +
     "Write in third person. You MUST use the name '" +
