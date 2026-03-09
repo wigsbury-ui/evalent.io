@@ -56,6 +56,7 @@ export interface ReportInput {
   // Mindset
   mindset: {
     score: number;
+    threshold: number;
     narrative: string;
   };
 
