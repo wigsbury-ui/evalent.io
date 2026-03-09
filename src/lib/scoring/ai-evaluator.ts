@@ -124,11 +124,11 @@ RUBRIC:
 
 function getSystemPrompt(task: WritingTask): string {
     const lang = task.locale === "en-US" ? "American English" : "British English";
-    const curriculum = getCurriculumContext(task.programme, task.grade);
+    const curriculumContext = getCurriculumContext(task.programme, task.grade);
     const name = task.student_name || "the student";
     const domainRubric = getDomainRubric(task.domain);
 
-    return `You are an experienced admissions assessor writing a professional evaluation of extended writing for a ${gradeLabel(task.grade, task.programme)} applicant to ${curriculum}.
+    return curriculumContext + `You are an experienced admissions assessor writing a professional evaluation of extended writing for a ${gradeLabel(task.grade, task.programme)} applicant.
 
 AUDIENCE: This report is read ONLY by the school's admissions panel. It will NOT be shared with the student, their parents, or any external party. Write accordingly — be candid, precise, and professionally informative.
 
@@ -239,7 +239,7 @@ export function generateReasoningNarrativePrompt(
     const name = student_name || "The student";
 
     return {
-        system: `You are a senior admissions assessor writing a reasoning score interpretation for a ${gradeLabel(grade, programme)} applicant to ${curriculum}. Write in ${lang}.
+        system: curriculum + `You are a senior admissions assessor writing a reasoning score interpretation for a ${gradeLabel(grade, programme)} applicant. Write in ${lang}.
 
 AUDIENCE: School admissions panel only — not shared with the student or parents.
 VOICE: Third person, professional. Refer to the student as "${name}". Be evaluative, not encouraging. Ground the interpretation in what the score implies about reasoning readiness.
@@ -272,7 +272,7 @@ export function generateMindsetNarrativePrompt(
                     : "significant fixed-mindset tendencies; structured coaching recommended";
 
     return {
-        system: `You are a senior admissions assessor interpreting a mindset and learning readiness score for a ${gradeLabel(grade, programme)} applicant to ${curriculum}. Write in ${lang}.
+        system: curriculum + `You are a senior admissions assessor interpreting a mindset and learning readiness score for a ${gradeLabel(grade, programme)} applicant. Write in ${lang}.
 
 AUDIENCE: School admissions panel only — not shared with the student or parents.
 VOICE: Third person, professional. Refer to the student as "${name}". Draw on Carol Dweck's growth mindset framework but write as an assessor, not a coach. Be honest about what the score implies without being dismissive.
