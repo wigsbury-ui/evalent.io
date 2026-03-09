@@ -128,7 +128,31 @@ function buildMCQAnalysisPrompt(input: MCQAnalysisInput): { system: string; user
     + "Never use bullet points. Write in flowing prose.";
 
   if (input.programme) {
-    system += " The school follows the " + input.programme + " curriculum.";
+    var p = (input.programme || "").toUpperCase();
+    var curriculumContext = "";
+    if (p === "IB" || p.includes("IB")) {
+      curriculumContext = "The school follows the International Baccalaureate (IB) curriculum. " +
+        "For Grade 3-5 applicants (PYP): use IB PYP language — transdisciplinary skills, Learner Profile attributes, " +
+        "approaches to learning, Units of Inquiry. Use terms such as 'inquirer', 'communicator', 'self-manager', 'reflective', " +
+        "'concept-driven learning'. " +
+        "For Grade 6-10 applicants (MYP): use MYP language — ATL skill clusters, criterion-referenced assessment, " +
+        "interdisciplinary thinking, global contexts, Learner Profile attributes. " +
+        "IB Learner Profile attributes (use where relevant): Inquirer, Knowledgeable, Thinker, Communicator, Principled, " +
+        "Open-minded, Caring, Risk-taker, Balanced, Reflective. " +
+        "IMPORTANT: Do NOT use Key Stage, SATs, GCSEs, or English National Curriculum language. " +
+        "Tone: holistic, growth-oriented, asset-focused.";
+    } else if (p.includes("UK") || p.includes("BRITISH") || p.includes("IGCSE")) {
+      curriculumContext = "The school follows the British/English National Curriculum. " +
+        "Year 4-6 (ages 8-11) are Key Stage 2. Year 7-9 are Key Stage 3. Year 10 is Key Stage 4/IGCSE pathway. " +
+        "Use appropriate Key Stage language, attainment targets, and age-related expectations.";
+    } else if (p.includes("US") || p.includes("AMERICAN")) {
+      curriculumContext = "The school follows the American curriculum. " +
+        "Grades 3-5 are upper elementary (Common Core). Grades 6-8 are middle school. Grades 9-10 are high school. " +
+        "Use Common Core State Standards language, grade-level benchmarks, and US educational terminology.";
+    } else {
+      curriculumContext = "The school follows the " + input.programme + " curriculum.";
+    }
+    system += " " + curriculumContext;
   }
 
   var user = domainLabel + " MCQ Results for " + input.student_name + " (Grade " + input.grade + "):\n\n"
