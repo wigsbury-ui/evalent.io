@@ -798,6 +798,19 @@ function pageFooter(pageNum: number, _totalPages: number): string {
   );
 }
 
+// ─── Curriculum display label ─────────────────────────────────────
+function curriculumLabel(programme?: string): string {
+  if (!programme) return "";
+  var p = programme.toUpperCase().trim();
+  if (p === "IB") return "IB Curriculum";
+  if (p === "UK" || p === "BRITISH") return "British Curriculum";
+  if (p === "US" || p === "AMERICAN" || p === "CCSS") return "American Curriculum";
+  if (p === "AUSTRALIAN" || p === "ACARA" || p === "AC") return "Australian Curriculum";
+  if (p === "NZ" || p === "NZC" || p.includes("NEW ZEALAND")) return "New Zealand Curriculum";
+  if (p === "IGCSE") return "Cambridge IGCSE";
+  return programme;
+}
+
 // ─── PAGE 1: COVER ──────────────────────────────────────────────
 function page1_Cover(data: ReportInput, totalPages: number): string {
   var radar = generateRadarChart(data);
