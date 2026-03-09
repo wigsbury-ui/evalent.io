@@ -56,36 +56,118 @@ export function getCurriculumContext(programme?: string, grade?: number): string
     );
   }
 
-  // ── AUSTRALIAN ──────────────────────────────────────────────────────────────
-  if (p.includes("AUSTRALIAN") || p.includes("AUSTRALIA") || p === "ACARA" || p === "AC") {
-    const band = g <= 6 ? "Foundation–Year 6" : g <= 10 ? "Years 7–10" : "Years 11–12";
+  // ── AUSTRALIAN CURRICULUM (ACARA) ─────────────────────────────────────────
+  if (
+    p.includes("AUSTRALIAN") ||
+    p.includes("AUSTRALIA") ||
+    p === "ACARA" ||
+    p === "AC"
+  ) {
+    // Band split: F–6 primary, 7–10 lower secondary
+    const band =
+      g <= 6 ? "Foundation–Year 6 (primary)" : "Years 7–10 (lower secondary)";
+    const yearLabel = `Year ${g}`;
+
+    // Phase-specific language and terminology
+    const phaseTerms =
+      g <= 6
+        ? // Primary — Foundation to Year 6
+          "achievement standards, year level content descriptions, literacy and " +
+          "numeracy learning progressions, general capabilities (literacy, numeracy, " +
+          "critical and creative thinking, digital literacy, personal and social " +
+          "capability, intercultural understanding, ethical understanding), " +
+          "cross-curriculum priorities (Aboriginal and Torres Strait Islander " +
+          "histories and cultures, Asia and Australia's engagement with Asia, " +
+          "Sustainability), learning areas (English, Mathematics, Science, HASS, " +
+          "The Arts, Technologies, Health and Physical Education), strands, " +
+          "sub-strands, elaborations, proficiency strands (understanding, fluency, " +
+          "problem-solving, reasoning), phonics, reading fluency, comprehension " +
+          "strategies, text types, number sense, place value, hands-on inquiry"
+        : // Lower secondary — Years 7–10
+          "achievement standards, content descriptions, general capabilities, " +
+          "disciplinary thinking, learning areas (English, Mathematics, Science, " +
+          "HASS, The Arts, Technologies, Health and Physical Education), " +
+          "text structures and features, language for interaction, interpreting " +
+          "and evaluating texts, literacy across the curriculum, numeracy across " +
+          "the curriculum, mathematical proficiency (understanding, fluency, " +
+          "problem-solving, reasoning), algebraic reasoning, statistical literacy, " +
+          "scientific inquiry skills, evidence-based reasoning, cross-curriculum priorities";
+
     return (
-      `CURRICULUM — MANDATORY RULES (read before anything else): ` +
-      `This is an Australian Curriculum (ACARA) school (${band}). ` +
+      `CURRICULUM — MANDATORY RULES (read before anything else):\n` +
+      `This is an Australian Curriculum (ACARA) school — ${band}. ` +
+      `The student is in ${yearLabel}.\n` +
       `THE FOLLOWING WORDS ARE BANNED — never write them under any circumstances: ` +
-      `"Key Stage", "KS1", "KS2", "KS3", "KS4", "Common Core", "SATs" (UK sense). ` +
-      `INSTEAD use Australian Curriculum language: learning areas, general capabilities, ` +
-      `cross-curriculum priorities, achievement standards, year level descriptors, ` +
-      `strand, sub-strand, elaborations, curriculum band, proficiency levels. ` +
-      `Refer to year groups as Year ${g} (not Grade ${g}). ` +
-      `Tone: practical, evidence-based, growth-oriented. `
+      `"Key Stage", "KS1", "KS2", "KS3", "KS4", "National Curriculum" (UK sense), ` +
+      `"SATs" (UK sense), "GCSEs", "Common Core", "Grade" (use Year instead), ` +
+      `"attainment targets", "programmes of study". ` +
+      `Writing any banned term means your response is wrong.\n` +
+      `INSTEAD use Australian Curriculum terminology — examples: ${phaseTerms}.\n` +
+      `Always refer to year groups as "${yearLabel}" not "Grade ${g}".\n` +
+      `Tone: practical, evidence-based, growth-oriented, constructive. ` +
+      `Frame observations in terms of achievement standards and next-step learning. ` +
+      `Use specific, actionable language that a Year ${g} class teacher would recognise. `
     );
   }
 
-  // ── NEW ZEALAND ─────────────────────────────────────────────────────────────
+  // ── NEW ZEALAND CURRICULUM (NZC) ─────────────────────────────────────────
   if (p.includes("NZ") || p.includes("NEW ZEALAND") || p === "NZC") {
-    const level = g <= 4 ? "Level 1–2" : g <= 6 ? "Level 3–4" : g <= 8 ? "Level 5–6" : "Level 7–8";
+    // NZC levels map approximately: L1=Y1–2, L2=Y3–4, L3=Y5–6, L4=Y7–8, L5=Y9–10
+    const level =
+      g <= 2
+        ? "Level 1"
+        : g <= 4
+        ? "Level 2"
+        : g <= 6
+        ? "Level 3"
+        : g <= 8
+        ? "Level 4"
+        : "Level 5";
+    const yearLabel = `Year ${g}`;
+
+    // Phase-specific language
+    const phaseTerms =
+      g <= 6
+        ? // Primary — Years 1–6 (NZC Levels 1–3)
+          "achievement objectives, curriculum levels, learning areas " +
+          "(English/literacy, Mathematics and Statistics, Science, Social Sciences, " +
+          "The Arts, Health and Physical Education, Technology), " +
+          "key competencies (thinking; using language, symbols and texts; managing self; " +
+          "relating to others; participating and contributing), " +
+          "reading for meaning, written language, oral language, " +
+          "number and algebra, measurement and geometry, statistics, " +
+          "scientific thinking, inquiry learning, NZC values " +
+          "(excellence, innovation, inquiry and curiosity, diversity, equity, community, " +
+          "ecological sustainability, integrity, respect), " +
+          "student agency, culturally responsive practice, Te Tiriti o Waitangi"
+        : // Secondary — Years 7–10 (NZC Levels 4–5)
+          "achievement objectives, curriculum levels, learning areas, " +
+          "key competencies (thinking; using language, symbols and texts; managing self; " +
+          "relating to others; participating and contributing), " +
+          "disciplinary literacy, mathematical reasoning, statistical investigation, " +
+          "scientific inquiry, evidence and explanation, social inquiry, " +
+          "NZC values (excellence, innovation, inquiry and curiosity, diversity, equity, " +
+          "community, ecological sustainability, integrity, respect), " +
+          "NCEA pathway readiness, self-directed learning, student agency, " +
+          "cross-curricular connections, culturally sustaining pedagogy, " +
+          "Te Tiriti o Waitangi, mana-enhancing practice";
+
     return (
-      `CURRICULUM — MANDATORY RULES (read before anything else): ` +
-      `This is a New Zealand Curriculum (NZC) school (${level}). ` +
+      `CURRICULUM — MANDATORY RULES (read before anything else):\n` +
+      `This is a New Zealand Curriculum (NZC) school — ${level} (approximately ${yearLabel}). ` +
+      `The student is in ${yearLabel}.\n` +
       `THE FOLLOWING WORDS ARE BANNED — never write them under any circumstances: ` +
-      `"Key Stage", "KS1", "KS2", "KS3", "KS4", "Common Core", "ACARA", "SATs" (UK sense). ` +
-      `INSTEAD use New Zealand Curriculum language: learning areas, key competencies ` +
-      `(thinking; using language, symbols and texts; managing self; relating to others; ` +
-      `participating and contributing), curriculum levels, achievement objectives, ` +
-      `strands, values, NZC vision. ` +
-      `Refer to year groups as Year ${g}. ` +
-      `Tone: holistic, values-driven, inclusive, growth-oriented. `
+      `"Key Stage", "KS1", "KS2", "KS3", "KS4", "National Curriculum" (UK sense), ` +
+      `"SATs" (UK sense), "GCSEs", "Common Core", "ACARA", "Grade" (use Year instead), ` +
+      `"attainment targets", "programmes of study", "age-related expectations". ` +
+      `Writing any banned term means your response is wrong.\n` +
+      `INSTEAD use NZC language — examples: ${phaseTerms}.\n` +
+      `Always refer to year groups as "${yearLabel}" not "Grade ${g}".\n` +
+      `Tone: holistic, values-driven, inclusive, growth-oriented, strengths-based. ` +
+      `Acknowledge the whole child. Reflect NZC's emphasis on student agency and ` +
+      `lifelong learning. Where relevant, reference key competencies as a lens for ` +
+      `describing the student's approach to learning. ` +
+      `Frame next steps constructively and with cultural responsiveness in mind. `
     );
   }
 
