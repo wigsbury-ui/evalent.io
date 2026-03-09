@@ -143,15 +143,9 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Extract programme from raw_answers metadata
+    // programme comes from school DB (authoritative) not stale Jotform payload
     let programme: string | null = null;
     const rawAnswers = submission.raw_answers || {};
-    for (const k of Object.keys(rawAnswers)) {
-      if (k.includes("meta_programme")) {
-        programme = String(rawAnswers[k]);
-        break;
-      }
-    }
 
     // Fetch student
     let studentName = "Unknown Student";
@@ -189,7 +183,7 @@ export async function GET(req: NextRequest) {
       if (school) {
         schoolName = school.name;
         schoolLogoUrl = school.logo_url || undefined;
-        if (!programme && school.curriculum) programme = school.curriculum;
+        if (school.curriculum) programme = school.curriculum;
       }
     }
 
