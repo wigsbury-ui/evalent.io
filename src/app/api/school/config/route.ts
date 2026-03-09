@@ -53,7 +53,7 @@ export async function PATCH(req: NextRequest) {
     );
   }
 
-  const validCurricula = ["IB", "UK", "US", "IGCSE", "Other"];
+  const validCurricula = ["IB", "UK", "US", "IGCSE", "Australian", "NZ", "Other"];
   if (curriculum && !validCurricula.includes(curriculum)) {
     return NextResponse.json(
       { error: "Invalid curriculum value" },
