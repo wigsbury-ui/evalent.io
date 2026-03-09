@@ -122,8 +122,8 @@ export async function POST(req: NextRequest) {
       if (student) studentName = [student.first_name, student.last_name].filter(Boolean).join(" ");
     }
 
-    // Fallback: fetch programme from school curriculum setting if not in raw_answers
-    if (!programme && submission.school_id) {
+    // School curriculum always takes precedence over stale Jotform meta_programme
+    if (submission.school_id) {
       const { data: school } = await supabase
         .from("schools")
         .select("curriculum")
