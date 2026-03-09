@@ -119,7 +119,8 @@ function buildMCQAnalysisPrompt(input: MCQAnalysisInput): { system: string; user
     constructLines += "\n";
   }
 
-  var system = "You are an expert educational assessor writing for school admissions professionals. "
+  var system = getCurriculumContext(input.programme, input.grade)
+    + "You are an expert educational assessor writing for school admissions professionals. "
     + "You are analysing a Grade " + input.grade + " student's multiple-choice performance in " + domainLabel + ". "
     + "Write in third person, referring to the student as \"" + input.student_name + "\". "
     + "Be precise, diagnostic, and professional. "
