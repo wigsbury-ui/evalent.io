@@ -44,11 +44,41 @@ const RETRY_DELAYS = [1000, 3000]; // ms — keep short for Vercel serverless ti
 function getCurriculumContext(programme?: string): string {
     const p = (programme || "").toUpperCase();
     if (p === "IB" || p.includes("IB"))
-        return "an International Baccalaureate (IB) school. Use language consistent with IB pedagogy — learner profile attributes, approaches to learning, conceptual understanding, and inquiry-based expectations";
+        return `an International Baccalaureate (IB) school. Frame your narrative using IB pedagogy and terminology throughout.
+
+GRADE CONTEXT: Grades 3–5 applicants are entering the Primary Years Programme (PYP). Grades 6–10 applicants are entering the Middle Years Programme (MYP).
+
+PYP LANGUAGE (Grades 3–5): Reference transdisciplinary skills, the PYP Learner Profile, and the five essential elements (knowledge, concepts, skills, attitudes, action). Use terms such as "approaches to learning", "Units of Inquiry", "inquirer", "communicator", "self-manager", "collaborative", "reflective". Frame readiness in terms of the student's capacity to engage with open-ended, concept-driven learning. Avoid references to SATs, Key Stages, or national curriculum levels.
+
+MYP LANGUAGE (Grades 6–10): Reference the MYP Approaches to Learning (ATL) skill clusters — thinking, communication, social, self-management, and research skills. Use terms such as "criterion-referenced", "interdisciplinary thinking", "conceptual understanding", "global contexts", "Learner Profile attributes". Frame readiness in terms of the student's capacity for independent inquiry, structured academic challenge, and reflective practice. Avoid references to GCSEs unless directly relevant.
+
+IB LEARNER PROFILE ATTRIBUTES (use where genuinely relevant): Inquirer, Knowledgeable, Thinker, Communicator, Principled, Open-minded, Caring, Risk-taker, Balanced, Reflective.
+
+TONE: IB narratives are holistic, growth-oriented, and asset-focused. Frame gaps as areas for development within a supportive learning community. Avoid deficit-focused or clinical language.\``;
     if (p === "US" || p.includes("AMERICAN") || p.includes("US"))
-        return "an American-curriculum school. Use language consistent with Common Core and US educational standards — grade-level benchmarks, ELA/Math standards, and college-readiness expectations";
+        return `an American-curriculum school. Frame your narrative using US educational terminology and expectations throughout.
+
+GRADE CONTEXT: Grades 3–5 are upper elementary. Grades 6–8 are middle school. Grades 9–10 are high school (freshman/sophomore).
+
+ELEMENTARY LANGUAGE (Grades 3–5): Reference Common Core State Standards (CCSS) expectations, grade-level benchmarks, and foundational literacy and numeracy skills. Use terms such as "close reading", "text-based evidence", "mathematical reasoning", "number sense", "fluency". Frame readiness in terms of transition to upper elementary demands — increased text complexity, multi-step problem solving, and independent writing.
+
+MIDDLE SCHOOL LANGUAGE (Grades 6–8): Reference disciplinary literacy, argumentative writing, and pre-algebra through algebra readiness. Use terms such as "analytical thinking", "evidence-based writing", "abstract reasoning", "academic vocabulary". Frame readiness in terms of the shift to subject-specific instruction and independent study habits.
+
+HIGH SCHOOL LANGUAGE (Grades 9–10): Reference college-preparatory expectations, AP/honors readiness where relevant, and academic independence. Use terms such as "critical thinking", "research skills", "academic rigour", "college-readiness".
+
+TONE: US admissions narratives are direct, evidence-based, and constructive. Acknowledge strengths clearly, frame areas for growth with specific, actionable language. Avoid overly formal or bureaucratic phrasing.\``;
     if (p === "UK" || p.includes("BRITISH") || p.includes("UK") || p.includes("IGCSE"))
-        return "a British-curriculum school. Use language consistent with the English National Curriculum and Cambridge frameworks — key stage expectations and attainment targets. For primary-age students (up to Year 6), focus on Key Stage 2 progression and upper primary readiness rather than referencing GCSE or IGCSE examinations";
+        return `a British-curriculum school. Frame your narrative using English National Curriculum and Cambridge frameworks throughout.
+
+GRADE/YEAR CONTEXT: Year 4–6 (ages 8–11) are Key Stage 2. Year 7–9 (ages 11–14) are Key Stage 3. Year 10 (age 14–15) is the start of Key Stage 4 / IGCSE pathway.
+
+KS2 LANGUAGE (Year 4–6): Reference Key Stage 2 attainment targets, national curriculum programmes of study, and age-related expectations. Use terms such as "reading fluency and comprehension", "written composition", "arithmetic and reasoning", "spatial and logical thinking". Frame readiness in terms of upper KS2 demands — extended writing, formal methods in mathematics, and more complex text analysis. Do NOT reference GCSEs, IGCSEs, or A Levels.
+
+KS3 LANGUAGE (Year 7–9): Reference Key Stage 3 subject expectations, the transition from primary to secondary rigour, and disciplinary thinking. Use terms such as "analytical writing", "mathematical reasoning", "structured argument", "academic independence". Frame readiness in terms of the step up to secondary-level demands and preparation for IGCSE/GCSE pathways.
+
+KS4 LANGUAGE (Year 10): Reference IGCSE or GCSE pathway readiness, academic rigour, and subject-specific skills. Use terms such as "examination technique", "extended response writing", "conceptual depth", "independent study skills".
+
+TONE: British admissions narratives are measured, evidence-based, and professional. Strengths and areas for development should be clearly delineated. Use precise, evaluative language appropriate to a selective school context.\``;
     return "an international school. Use professionally neutral educational language appropriate for a selective admissions context";
 }
 
