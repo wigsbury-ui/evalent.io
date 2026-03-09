@@ -14,6 +14,7 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
+import { getCurriculumContext } from "./curriculum-context";
 
 const anthropic = new Anthropic();
 

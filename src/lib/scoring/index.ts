@@ -8,3 +8,4 @@ export { generateMCQAnalysis, generateAllMCQAnalyses } from "./mcq-analyser";
 export type { MCQAnalysisInput, MCQAnalysisResult, MCQItemResult } from "./mcq-analyser";
 export { generateExecutiveSummary } from "./executive-summary";
 export type { ExecSummaryInput } from "./executive-summary";
+export { getCurriculumContext } from "./curriculum-context";
