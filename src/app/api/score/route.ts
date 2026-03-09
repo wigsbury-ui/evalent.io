@@ -122,6 +122,16 @@ export async function POST(req: NextRequest) {
       if (student) studentName = [student.first_name, student.last_name].filter(Boolean).join(" ");
     }
 
+    // Fallback: fetch programme from school curriculum setting if not in raw_answers
+    if (!programme && submission.school_id) {
+      const { data: school } = await supabase
+        .from("schools")
+        .select("curriculum")
+        .eq("id", submission.school_id)
+        .single();
+      if (school?.curriculum) programme = school.curriculum;
+    }
+
     const locale = detectedLocale;
     console.log(
       `[SCORING] Metadata: name="${studentName}", programme="${programme}", locale="${locale}"`
