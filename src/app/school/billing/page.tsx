@@ -6,10 +6,12 @@ import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
 
 declare global {
-  interface Window {
-    Paddle: any
-  }
+  interface Window { Paddle: any }
 }
+
+// These are inlined at build time by Next.js — must be referenced directly, not via variable
+const PADDLE_CLIENT_TOKEN = process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN!
+const PADDLE_ENV = process.env.NEXT_PUBLIC_PADDLE_ENV ?? 'production'
 
 interface BillingInfo {
   subscription_tier: string
@@ -73,50 +75,71 @@ const STATUS_COLORS: Record<string, string> = {
   canceled:  'bg-gray-100 text-gray-500',
 }
 
+let paddleInitialised = false
+
+function initialisePaddle() {
+  if (paddleInitialised || typeof window === 'undefined') return
+  if (!window.Paddle) return
+
+  if (PADDLE_ENV === 'production') {
+    window.Paddle.Environment.set('production')
+  }
+  window.Paddle.Initialize({ token: PADDLE_CLIENT_TOKEN })
+  paddleInitialised = true
+  console.log('[Paddle] Initialised', PADDLE_ENV)
+}
+
 export default function BillingPage() {
   const sessionResult = useSession()
   const session = sessionResult?.data ?? null
+
   const [billing, setBilling] = useState<BillingInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [currency, setCurrency] = useState<'USD' | 'GBP'>('USD')
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
+  const [paddleReady, setPaddleReady] = useState(false)
 
   useEffect(() => {
     fetchBilling()
-    initPaddle()
+
+    // Load Paddle script if not already present
+    if (!document.querySelector('script[src*="paddle.js"]')) {
+      const script = document.createElement('script')
+      script.src = 'https://cdn.paddle.com/paddle/v2/paddle.js'
+      script.onload = () => {
+        initialisePaddle()
+        setPaddleReady(true)
+      }
+      document.head.appendChild(script)
+    } else {
+      // Script already loaded — init directly
+      const checkPaddle = setInterval(() => {
+        if (window.Paddle) {
+          initialisePaddle()
+          setPaddleReady(true)
+          clearInterval(checkPaddle)
+        }
+      }, 100)
+      setTimeout(() => clearInterval(checkPaddle), 5000)
+    }
   }, [])
 
   async function fetchBilling() {
     try {
       const res = await fetch('/api/school/billing')
       if (res.ok) setBilling(await res.json())
+    } catch (e) {
+      console.error('[Billing] fetch error', e)
     } finally {
       setLoading(false)
     }
   }
 
-  async function initPaddle() {
-    if (typeof window === 'undefined') return
-    if (!document.querySelector('script[src*="paddle.js"]')) {
-      const script = document.createElement('script')
-      script.src = 'https://cdn.paddle.com/paddle/v2/paddle.js'
-      script.onload = () => setupPaddle()
-      document.head.appendChild(script)
-    } else {
-      setupPaddle()
-    }
-  }
-
-  function setupPaddle() {
-    if (!window.Paddle) return
-    if (process.env.NEXT_PUBLIC_PADDLE_ENV === 'production') {
-      window.Paddle.Environment.set('production')
-    }
-    window.Paddle.Initialize({ token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN })
-  }
-
   async function handleSubscribe(plan: typeof PLANS[0]) {
-    if (!billing || !window.Paddle) return
+    if (!billing) { alert('Billing info not loaded yet. Please refresh.'); return }
+    if (!window.Paddle) { alert('Payment system not loaded. Please refresh the page.'); return }
+    if (!paddleReady) { alert('Paddle is still initialising. Please wait a moment and try again.'); return }
+
     setCheckoutLoading(plan.id)
 
     const priceId = currency === 'GBP' ? plan.priceIdGBP : plan.priceIdUSD
@@ -125,23 +148,29 @@ export default function BillingPage() {
       window.Paddle.Checkout.open({
         items: [{ priceId, quantity: 1 }],
         customData: { school_id: billing.school_id },
-        customer: { email: (session?.user as any)?.email },
+        customer: { email: (session?.user as any)?.email ?? undefined },
         settings: {
           displayMode: 'overlay',
           theme: 'light',
           successUrl: `${window.location.origin}/school/billing?success=true`,
         },
       })
+    } catch (err) {
+      console.error('[Paddle] Checkout error:', err)
+      alert('Could not open checkout. Please try again or contact team@evalent.io')
     } finally {
       setCheckoutLoading(null)
     }
   }
 
-  const usagePercent = billing
+  const usagePercent = billing && billing.tier_cap !== 9999
     ? Math.min(100, Math.round((billing.assessment_count_year / billing.tier_cap) * 100))
     : 0
 
-  const currentPlan = PLANS.find(p => p.id === billing?.subscription_tier)
+  const currentPlanIdx = PLANS.findIndex(p => p.id === billing?.subscription_tier)
+
+  const isSuccess = typeof window !== 'undefined' &&
+    new URLSearchParams(window.location.search).get('success') === 'true'
 
   if (loading) {
     return (
@@ -154,8 +183,7 @@ export default function BillingPage() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-8 space-y-8">
 
-      {/* Success banner */}
-      {typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('success') && (
+      {isSuccess && (
         <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-green-800 font-medium">
           ✅ Subscription activated! Welcome to Evalent. Your platform is ready.
         </div>
@@ -164,17 +192,13 @@ export default function BillingPage() {
       {/* Current plan summary */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <h1 className="text-xl font-bold text-gray-900 mb-4">Billing & Subscription</h1>
-
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Plan */}
           <div>
             <p className="text-sm text-gray-500 mb-1">Current plan</p>
             <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold capitalize ${TIER_COLORS[billing?.subscription_tier ?? 'trial']}`}>
               {billing?.subscription_tier ?? 'Trial'}
             </span>
           </div>
-
-          {/* Status */}
           <div>
             <p className="text-sm text-gray-500 mb-1">Status</p>
             <span className={`inline-block px-3 py-1 rounded-full text-sm font-semibold capitalize ${STATUS_COLORS[billing?.subscription_status ?? 'trialing']}`}>
@@ -184,8 +208,6 @@ export default function BillingPage() {
               <p className="text-xs text-red-500 mt-1">Cancels at period end</p>
             )}
           </div>
-
-          {/* Renewal */}
           <div>
             <p className="text-sm text-gray-500 mb-1">
               {billing?.subscription_cancel_at_period_end ? 'Access until' : 'Next renewal'}
@@ -200,13 +222,12 @@ export default function BillingPage() {
           </div>
         </div>
 
-        {/* Usage bar */}
-        {billing && billing.subscription_tier !== 'trial' && (
+        {billing && billing.tier_cap !== 9999 && (
           <div className="mt-6">
             <div className="flex justify-between text-sm mb-1">
               <span className="text-gray-600">Assessments used this year</span>
               <span className={`font-semibold ${usagePercent >= 90 ? 'text-red-600' : 'text-gray-900'}`}>
-                {billing.assessment_count_year} / {billing.tier_cap === 9999 ? 'Unlimited' : billing.tier_cap}
+                {billing.assessment_count_year} / {billing.tier_cap}
               </span>
             </div>
             <div className="w-full bg-gray-100 rounded-full h-2.5">
@@ -219,18 +240,17 @@ export default function BillingPage() {
             </div>
             {usagePercent >= 80 && (
               <p className="text-xs text-amber-600 mt-1">
-                ⚠️ You are approaching your assessment limit. Consider upgrading.
+                ⚠️ Approaching your assessment limit. Consider upgrading.
               </p>
             )}
           </div>
         )}
       </div>
 
-      {/* Past due warning */}
       {billing?.subscription_status === 'past_due' && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800">
           <p className="font-semibold">⚠️ Payment overdue</p>
-          <p className="text-sm mt-1">New student registrations are paused until payment is resolved. Please update your payment method via the button below.</p>
+          <p className="text-sm mt-1">New student registrations are paused until payment is resolved.</p>
         </div>
       )}
 
@@ -254,10 +274,9 @@ export default function BillingPage() {
 
       {/* Plan cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {PLANS.map(plan => {
+        {PLANS.map((plan, planIdx) => {
           const isCurrent = billing?.subscription_tier === plan.id
-          const isUpgrade = PLANS.findIndex(p => p.id === billing?.subscription_tier) <
-                            PLANS.findIndex(p => p.id === plan.id)
+          const isUpgrade = currentPlanIdx < planIdx
 
           return (
             <div
@@ -271,17 +290,14 @@ export default function BillingPage() {
                   Current plan
                 </span>
               )}
-
               <h3 className="text-lg font-bold text-gray-900">{plan.name}</h3>
               <p className="text-sm text-gray-500 mt-1 mb-4">{plan.description}</p>
-
               <div className="mb-6">
                 <span className="text-3xl font-bold text-gray-900">
                   {currency === 'GBP' ? plan.priceGBP : plan.priceUSD}
                 </span>
                 <span className="text-gray-500 text-sm"> / year</span>
               </div>
-
               <ul className="space-y-2 mb-6 flex-1">
                 {plan.features.map(f => (
                   <li key={f} className="flex items-start gap-2 text-sm text-gray-600">
@@ -290,16 +306,13 @@ export default function BillingPage() {
                   </li>
                 ))}
               </ul>
-
               <button
                 onClick={() => handleSubscribe(plan)}
                 disabled={isCurrent || checkoutLoading === plan.id}
                 className={`w-full py-2.5 rounded-lg font-semibold text-sm transition-colors ${
                   isCurrent
                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                    : isUpgrade || billing?.subscription_tier === 'trial'
-                    ? 'bg-blue-600 text-white hover:bg-blue-700'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    : 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'
                 }`}
               >
                 {checkoutLoading === plan.id
@@ -317,11 +330,10 @@ export default function BillingPage() {
         })}
       </div>
 
-      {/* Manage subscription */}
       {billing?.paddle_subscription_id && (
         <div className="bg-gray-50 rounded-xl border border-gray-200 p-6">
           <h2 className="font-semibold text-gray-900 mb-1">Manage your subscription</h2>
-          <p className="text-sm text-gray-500 mb-4">Update payment method, download invoices, or cancel your subscription.</p>
+          <p className="text-sm text-gray-500 mb-4">Update payment method, download invoices, or cancel.</p>
           <a
             href="https://billing.paddle.com"
             target="_blank"
@@ -333,9 +345,9 @@ export default function BillingPage() {
         </div>
       )}
 
-      {/* Contact */}
       <p className="text-center text-sm text-gray-400">
-        Questions about billing? Email <a href="mailto:team@evalent.io" className="text-blue-600 hover:underline">team@evalent.io</a>
+        Questions about billing? Email{' '}
+        <a href="mailto:team@evalent.io" className="text-blue-600 hover:underline">team@evalent.io</a>
       </p>
 
     </div>
