@@ -11,8 +11,10 @@ export const dynamic = 'force-dynamic'
 
 export default async function BillingPage() {
   const session = await getServerSession(authOptions)
+  console.log('[billing page] session:', JSON.stringify(session?.user ?? null))
   if (!session || !session.user.schoolId) {
-    redirect('/login')
+    // redirect('/login') -- removed, show fallback instead
+    return <BillingClient billing={null} />
   }
 
   const supabase = createServerClient()
