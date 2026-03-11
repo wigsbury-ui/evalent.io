@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+
+export const dynamic = 'force-dynamic'
 import { createServerClient } from "@/lib/supabase/server";
 import { generateReportHTML } from "@/lib/report";
 import type { ReportInput, ConstructScore } from "@/lib/report";
