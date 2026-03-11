@@ -97,7 +97,7 @@ export default function BillingPage() {
   const [loading, setLoading] = useState(true)
   const [currency, setCurrency] = useState<'USD' | 'GBP'>('USD')
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
-  const [paddleReady, setPaddleReady] = useState(false)
+  const [paddleReady, setPaddleReady] = useState(true) // optimistic — check window.Paddle at call time
 
   useEffect(() => {
     fetchBilling()
@@ -138,7 +138,8 @@ export default function BillingPage() {
   async function handleSubscribe(plan: typeof PLANS[0]) {
     if (!billing) { alert('Billing info not loaded yet. Please refresh.'); return }
     if (!window.Paddle) { alert('Payment system not loaded. Please refresh the page.'); return }
-    if (!paddleReady) { alert('Paddle is still initialising. Please wait a moment and try again.'); return }
+    // Ensure Paddle is initialised before opening checkout
+    initialisePaddle()
 
     setCheckoutLoading(plan.id)
 
