@@ -1,21 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createServerClient } from '@/lib/supabase/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+export const dynamic = 'force-dynamic'
 
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: 'Unauthorised' }, { status: 401 })
+  if (!session || !session.user.schoolId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
 
-  const user = session.user as any
-  const schoolId = user.schoolId
-
-  if (!schoolId) return NextResponse.json({ error: 'No school' }, { status: 400 })
+  const supabase = createServerClient()
+  const schoolId = session.user.schoolId
 
   const { data: school, error } = await supabase
     .from('schools')
