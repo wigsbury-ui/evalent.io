@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { generateStudentRef } from "@/lib/utils";
 import { z } from "zod";
+import { checkAssessmentAllowed } from "@/lib/billing/subscription-guard";
 
 const JOTFORM_IDS: Record<number, string> = {
   3: "260320999939472",
@@ -56,6 +57,15 @@ export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session || !session.user.schoolId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // ── Subscription guard — check school can register more students ──
+  const assessmentCheck = await checkAssessmentAllowed(session.user.schoolId);
+  if (!assessmentCheck.allowed) {
+    return NextResponse.json(
+      { error: assessmentCheck.reason ?? "Assessment limit reached" },
+      { status: 403 }
+    );
   }
 
   try {

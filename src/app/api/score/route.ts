@@ -403,6 +403,14 @@ export async function POST(req: NextRequest) {
       .eq("id", submission_id);
 
     if (updateError) throw updateError;
+    // ─── 9b. Increment school assessment counter ──────────────
+    if (submission.school_id) {
+      await supabase.rpc('increment_assessment_count', {
+        school_id_input: submission.school_id,
+      });
+      console.log(`[SCORING] Assessment count incremented for school ${submission.school_id}`);
+    }
+
 
     const duration = Date.now() - startTime;
     console.log(
