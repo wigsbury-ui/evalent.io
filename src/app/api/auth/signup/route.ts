@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
         slug,
         curriculum,
         website: school_website || null,
+        contact_email: email.toLowerCase(),
         subscription_tier: 'trial',
         subscription_status: 'active',
         tier_cap: 10,
