@@ -56,12 +56,12 @@ export async function POST(req: NextRequest) {
       .from('users')
       .insert({
         email: email.toLowerCase(),
-        password: hashedPassword,
-        first_name,
-        last_name,
+        name: `${first_name} ${last_name}`,
+        password_hash: hashedPassword,
         role: 'school_admin',
         job_title: role,
         school_id: school.id,
+        is_active: true,
       })
 
     if (userError) {
