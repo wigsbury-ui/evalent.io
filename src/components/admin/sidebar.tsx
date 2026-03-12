@@ -14,70 +14,62 @@ import {
   ScrollText,
   LogOut,
   Video,
+  CreditCard,
 } from "lucide-react";
-
-const navItems = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/schools", label: "Schools", icon: School },
-  { href: "/admin/answer-keys", label: "Answer Keys", icon: Key },
-  { href: "/admin/prompts", label: "AI Prompts", icon: Bot },
-  { href: "/admin/reports", label: "Report Templates", icon: FileText },
-  { href: "/admin/help-videos", label: "Help Videos", icon: Video },
-  { href: "/admin/audit", label: "Audit Log", icon: ScrollText },
-];
 
 export function AdminSidebar() {
   const pathname = usePathname();
 
+  const navItems = [
+    { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
+    { href: "/admin/schools", label: "Schools", icon: School },
+    { href: "/admin/billing", label: "Billing", icon: CreditCard },
+    { href: "/admin/answer-keys", label: "Answer Keys", icon: Key },
+    { href: "/admin/prompts", label: "AI Prompts", icon: Bot },
+    { href: "/admin/reports", label: "Report Templates", icon: FileText },
+    { href: "/admin/help-videos", label: "Help Videos", icon: Video },
+    { href: "/admin/audit", label: "Audit Log", icon: ScrollText },
+  ];
+
   return (
-    <aside className="flex h-screen w-64 flex-col border-r border-gray-200 bg-white">
-      {/* Logo */}
-      <div className="flex h-16 items-center gap-3 border-b border-gray-200 px-6">
-        <Image
-          src="/evalent-logo-dark.png"
-          alt="Evalent"
-          width={120}
-          height={32}
-          className="h-8 w-auto"
-          priority
-        />
+    <aside className="w-64 min-h-screen bg-white border-r border-gray-100 flex flex-col">
+      <div className="p-6 border-b border-gray-100">
+        <Link href="/admin">
+          <Image
+            src="/evalent-logo.png"
+            alt="Evalent"
+            width={120}
+            height={32}
+            className="h-8 w-auto"
+          />
+        </Link>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 space-y-1 px-3 py-4">
-        {navItems.map((item) => {
-          const isActive =
-            pathname === item.href ||
-            (item.href !== "/admin" && pathname.startsWith(item.href));
-
+      <nav className="flex-1 p-4 space-y-1">
+        {navItems.map(({ href, label, icon: Icon, exact }) => {
+          const active = exact ? pathname === href : pathname.startsWith(href);
           return (
             <Link
-              key={item.href}
-              href={item.href}
+              key={href}
+              href={href}
               className={cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                isActive
+                active
                   ? "bg-evalent-50 text-evalent-700"
                   : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
               )}
             >
-              <item.icon
-                className={cn(
-                  "h-5 w-5",
-                  isActive ? "text-evalent-700" : "text-gray-400"
-                )}
-              />
-              {item.label}
+              <Icon className="h-5 w-5 text-gray-400" />
+              {label}
             </Link>
           );
         })}
       </nav>
 
-      {/* Footer */}
-      <div className="border-t border-gray-200 p-3">
+      <div className="p-4 border-t border-gray-100">
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900"
+          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors w-full"
         >
           <LogOut className="h-5 w-5 text-gray-400" />
           Sign out
