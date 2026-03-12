@@ -165,6 +165,10 @@ export default function LoginPage() {
       fallback={
         <div className="flex min-h-screen items-center justify-center">
           Loading...
+                  <p className="text-center text-sm text-gray-500 mt-6">
+            Don&apos;t have an account?{' '}
+            <a href="/signup" className="text-blue-600 hover:underline font-medium">Sign up free</a>
+          </p>
         </div>
       }
     >
