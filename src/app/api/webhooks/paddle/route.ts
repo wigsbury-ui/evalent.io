@@ -1,3 +1,4 @@
+// src/app/api/webhooks/paddle/route.ts
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
@@ -6,17 +7,87 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-// Map Paddle Price IDs → tier names and caps
 const PRICE_TIER_MAP: Record<string, { tier: string; cap: number }> = {
-  'pri_01kkewsnaqf6bv6vdxqns6xb31': { tier: 'essentials',   cap: 100  }, // Essentials USD
-  'pri_01kkewydf4pdtgsjx40j4yf82j': { tier: 'essentials',   cap: 100  }, // Essentials GBP
-  'pri_01kkex5maczqnsr07rwg63wgfp': { tier: 'professional', cap: 250  }, // Professional USD
-  'pri_01kkex7n7grjvtj5ckf5mc0qb7': { tier: 'professional', cap: 250  }, // Professional GBP
-  'pri_01kkex9jph5mn28mw25tyqj4cw': { tier: 'enterprise',   cap: 9999 }, // Enterprise USD
-  'pri_01kkexbe8tk3t6z9nqyqsh1w2e': { tier: 'enterprise',   cap: 9999 }, // Enterprise GBP
+  'pri_01kkewsnaqf6bv6vdxqns6xb31': { tier: 'essentials',   cap: 100  },
+  'pri_01kkewydf4pdtgsjx40j4yf82j': { tier: 'essentials',   cap: 100  },
+  'pri_01kkex5maczqnsr07rwg63wgfp': { tier: 'professional', cap: 250  },
+  'pri_01kkex7n7grjvtj5ckf5mc0qb7': { tier: 'professional', cap: 250  },
+  'pri_01kkex9jph5mn28mw25tyqj4cw': { tier: 'enterprise',   cap: 9999 },
+  'pri_01kkexbe8tk3t6z9nqyqsh1w2e': { tier: 'enterprise',   cap: 9999 },
 }
 
-// Verify Paddle webhook signature
+// ── Email helpers ──────────────────────────────────────────────────────────────
+
+async function sendDunningEmail(schoolId: string, type: 'past_due' | 'payment_failed') {
+  try {
+    const { data: school } = await supabase
+      .from('schools')
+      .select('name, default_assessor_email, default_assessor_first_name')
+      .eq('id', schoolId)
+      .single()
+
+    if (!school?.default_assessor_email) return
+
+    const firstName = school.default_assessor_first_name || 'there'
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.evalent.io'
+
+    const subject = type === 'payment_failed'
+      ? `Action required: Payment failed for ${school.name}`
+      : `Action required: Your Evalent subscription is past due`
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head><meta charset="utf-8"></head>
+      <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f9fafb; margin: 0; padding: 40px 20px;">
+        <div style="max-width: 560px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; border: 1px solid #e5e7eb;">
+          <div style="background: #1e40af; padding: 32px 40px;">
+            <h1 style="color: white; margin: 0; font-size: 22px; font-weight: 700;">Evalent</h1>
+          </div>
+          <div style="padding: 40px;">
+            <h2 style="color: #111827; font-size: 20px; margin: 0 0 16px;">Hi ${firstName},</h2>
+            ${type === 'payment_failed'
+              ? `<p style="color: #374151; line-height: 1.6; margin: 0 0 16px;">We were unable to process the payment for your <strong>${school.name}</strong> Evalent subscription.</p>
+                 <p style="color: #374151; line-height: 1.6; margin: 0 0 24px;">Please update your payment method to avoid any interruption to your service.</p>`
+              : `<p style="color: #374151; line-height: 1.6; margin: 0 0 16px;">Your <strong>${school.name}</strong> Evalent subscription is past due.</p>
+                 <p style="color: #374151; line-height: 1.6; margin: 0 0 24px;">Please update your payment details to keep your assessments running without interruption.</p>`
+            }
+            <a href="${appUrl}/school/billing"
+               style="display: inline-block; background: #1e40af; color: white; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 15px;">
+              Update payment method →
+            </a>
+            <p style="color: #6b7280; font-size: 13px; margin: 32px 0 0; line-height: 1.6;">
+              If you need help, reply to this email or contact us at
+              <a href="mailto:support@evalent.io" style="color: #1e40af;">support@evalent.io</a>
+            </p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `
+
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.RESEND_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        from: 'Evalent <noreply@evalent.io>',
+        to: school.default_assessor_email,
+        subject,
+        html,
+      }),
+    })
+
+    console.log(`[Paddle Webhook] Dunning email sent to ${school.default_assessor_email}`)
+  } catch (err) {
+    console.error('[Paddle Webhook] Failed to send dunning email:', err)
+  }
+}
+
+// ── Signature verification ─────────────────────────────────────────────────────
+
 async function verifyPaddleSignature(request: NextRequest): Promise<string | null> {
   const signature = request.headers.get('paddle-signature')
   if (!signature) return null
@@ -24,7 +95,6 @@ async function verifyPaddleSignature(request: NextRequest): Promise<string | nul
   const secret = process.env.PADDLE_WEBHOOK_SECRET!
   const body = await request.text()
 
-  // Parse timestamp and h1 from signature header
   const parts = Object.fromEntries(
     signature.split(';').map(p => p.split('=') as [string, string])
   )
@@ -32,15 +102,13 @@ async function verifyPaddleSignature(request: NextRequest): Promise<string | nul
   const h1 = parts['h1']
   if (!ts || !h1) return null
 
-  // HMAC-SHA256 verification
   const encoder = new TextEncoder()
   const key = await crypto.subtle.importKey(
     'raw', encoder.encode(secret),
     { name: 'HMAC', hash: 'SHA-256' },
     false, ['sign']
   )
-  const signedPayload = `${ts}:${body}`
-  const sigBuffer = await crypto.subtle.sign('HMAC', key, encoder.encode(signedPayload))
+  const sigBuffer = await crypto.subtle.sign('HMAC', key, encoder.encode(`${ts}:${body}`))
   const computedHex = Array.from(new Uint8Array(sigBuffer))
     .map(b => b.toString(16).padStart(2, '0')).join('')
 
@@ -48,8 +116,9 @@ async function verifyPaddleSignature(request: NextRequest): Promise<string | nul
   return body
 }
 
+// ── Main handler ───────────────────────────────────────────────────────────────
+
 export async function POST(request: NextRequest) {
-  // Verify signature
   const body = await verifyPaddleSignature(request)
   if (!body) {
     console.error('[Paddle Webhook] Invalid signature')
@@ -70,13 +139,13 @@ export async function POST(request: NextRequest) {
   try {
     switch (eventType) {
 
-      // ── Subscription Created ────────────────────────────────────────────────
+      // ── Subscription Created ───────────────────────────────────────────────
       case 'subscription.created': {
-        const schoolId     = data.custom_data?.school_id
-        const priceId      = data.items?.[0]?.price?.id
-        const tierInfo     = PRICE_TIER_MAP[priceId] ?? { tier: 'essentials', cap: 100 }
-        const periodEnd    = data.current_billing_period?.ends_at
-        const customerId   = data.customer_id
+        const schoolId       = data.custom_data?.school_id
+        const priceId        = data.items?.[0]?.price?.id
+        const tierInfo       = PRICE_TIER_MAP[priceId] ?? { tier: 'essentials', cap: 100 }
+        const periodEnd      = data.current_billing_period?.ends_at
+        const customerId     = data.customer_id
         const subscriptionId = data.id
 
         if (!schoolId) {
@@ -87,13 +156,13 @@ export async function POST(request: NextRequest) {
         await supabase
           .from('schools')
           .update({
-            paddle_customer_id:              customerId,
-            paddle_subscription_id:          subscriptionId,
-            subscription_tier:               tierInfo.tier,
-            subscription_status:             'active',
-            subscription_current_period_end: periodEnd,
+            paddle_customer_id:               customerId,
+            paddle_subscription_id:           subscriptionId,
+            subscription_tier:                tierInfo.tier,
+            subscription_status:              'active',
+            subscription_current_period_end:  periodEnd,
             subscription_cancel_at_period_end: false,
-            tier_cap:                        tierInfo.cap,
+            tier_cap:                         tierInfo.cap,
           })
           .eq('id', schoolId)
 
@@ -101,17 +170,17 @@ export async function POST(request: NextRequest) {
         break
       }
 
-      // ── Subscription Updated (plan change, renewal) ─────────────────────────
+      // ── Subscription Updated ───────────────────────────────────────────────
       case 'subscription.updated': {
         const subscriptionId = data.id
         const priceId        = data.items?.[0]?.price?.id
         const tierInfo       = priceId ? (PRICE_TIER_MAP[priceId] ?? null) : null
         const periodEnd      = data.current_billing_period?.ends_at
-        const status         = data.status // 'active' | 'past_due' | 'paused' | 'canceled'
+        const status         = data.status
 
         const updates: Record<string, any> = {
-          subscription_status:             status === 'active' ? 'active' : status,
-          subscription_current_period_end: periodEnd,
+          subscription_status:               status,
+          subscription_current_period_end:   periodEnd,
           subscription_cancel_at_period_end: data.scheduled_change?.action === 'cancel',
         }
         if (tierInfo) {
@@ -128,11 +197,10 @@ export async function POST(request: NextRequest) {
         break
       }
 
-      // ── Subscription Cancelled ──────────────────────────────────────────────
+      // ── Subscription Cancelled ─────────────────────────────────────────────
       case 'subscription.canceled': {
         const subscriptionId = data.id
 
-        // Do NOT revoke access immediately — set flag, access ends at period_end
         await supabase
           .from('schools')
           .update({
@@ -141,34 +209,40 @@ export async function POST(request: NextRequest) {
           })
           .eq('paddle_subscription_id', subscriptionId)
 
-        console.log(`[Paddle Webhook] Subscription ${subscriptionId} marked for cancellation`)
+        console.log(`[Paddle Webhook] Subscription ${subscriptionId} cancelled`)
         break
       }
 
-      // ── Subscription Past Due ───────────────────────────────────────────────
+      // ── Subscription Past Due ──────────────────────────────────────────────
       case 'subscription.past_due': {
         const subscriptionId = data.id
+
+        const { data: school } = await supabase
+          .from('schools')
+          .select('id')
+          .eq('paddle_subscription_id', subscriptionId)
+          .single()
 
         await supabase
           .from('schools')
           .update({ subscription_status: 'past_due' })
           .eq('paddle_subscription_id', subscriptionId)
 
-        console.log(`[Paddle Webhook] Subscription ${subscriptionId} is past due`)
-        // TODO: trigger dunning email via Resend
+        if (school?.id) await sendDunningEmail(school.id, 'past_due')
+
+        console.log(`[Paddle Webhook] Subscription ${subscriptionId} past due`)
         break
       }
 
-      // ── Transaction Completed ───────────────────────────────────────────────
+      // ── Transaction Completed (renewal) ───────────────────────────────────
       case 'transaction.completed': {
         const subscriptionId = data.subscription_id
         const transactionId  = data.id
         if (!subscriptionId) break
 
-        // Append transaction ID to the JSONB array log
         const { data: school } = await supabase
           .from('schools')
-          .select('paddle_transaction_ids')
+          .select('id, paddle_transaction_ids')
           .eq('paddle_subscription_id', subscriptionId)
           .single()
 
@@ -176,26 +250,40 @@ export async function POST(request: NextRequest) {
           const existing = (school.paddle_transaction_ids as string[]) || []
           await supabase
             .from('schools')
-            .update({ paddle_transaction_ids: [...existing, transactionId] })
+            .update({
+              paddle_transaction_ids:  [...existing, transactionId],
+              // Reset annual assessment count on each renewal
+              assessment_count_year:   0,
+              subscription_status:     'active',
+            })
             .eq('paddle_subscription_id', subscriptionId)
+
+          console.log(`[Paddle Webhook] Renewal for school ${school.id} — year count reset`)
         }
 
         console.log(`[Paddle Webhook] Transaction ${transactionId} completed`)
         break
       }
 
-      // ── Payment Failed ──────────────────────────────────────────────────────
+      // ── Payment Failed ─────────────────────────────────────────────────────
       case 'transaction.payment_failed': {
         const subscriptionId = data.subscription_id
         if (!subscriptionId) break
+
+        const { data: school } = await supabase
+          .from('schools')
+          .select('id')
+          .eq('paddle_subscription_id', subscriptionId)
+          .single()
 
         await supabase
           .from('schools')
           .update({ subscription_status: 'past_due' })
           .eq('paddle_subscription_id', subscriptionId)
 
+        if (school?.id) await sendDunningEmail(school.id, 'payment_failed')
+
         console.log(`[Paddle Webhook] Payment failed for subscription ${subscriptionId}`)
-        // TODO: trigger payment failed email via Resend
         break
       }
 

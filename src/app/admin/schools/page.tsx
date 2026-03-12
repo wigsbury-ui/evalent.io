@@ -1,152 +1,145 @@
-"use client";
+// src/app/admin/schools/page.tsx
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { createServerClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+import Link from 'next/link'
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  School,
-  Plus,
-  Users,
-  FileText,
-  Globe,
-} from "lucide-react";
+export const dynamic = 'force-dynamic'
 
-interface SchoolData {
-  id: string;
-  name: string;
-  slug: string;
-  curriculum: string;
-  locale: string;
-  contact_email: string;
-  is_active: boolean;
-  student_count: number;
-  submission_count: number;
-  user_count: number;
-  created_at: string;
+const TIER_COLORS: Record<string, string> = {
+  trial:        'bg-gray-100 text-gray-600',
+  essentials:   'bg-blue-100 text-blue-700',
+  professional: 'bg-purple-100 text-purple-700',
+  enterprise:   'bg-amber-100 text-amber-700',
 }
 
-export default function SchoolsPage() {
-  const [schools, setSchools] = useState<SchoolData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const router = useRouter();
+const STATUS_COLORS: Record<string, string> = {
+  active:    'bg-green-100 text-green-700',
+  trialing:  'bg-blue-100 text-blue-700',
+  past_due:  'bg-red-100 text-red-700',
+  canceled:  'bg-gray-100 text-gray-500',
+}
 
-  useEffect(() => {
-    fetch("/api/admin/schools")
-      .then((r) => {
-        if (r.status === 401) {
-          // Session expired — redirect to login
-          router.replace("/login?callbackUrl=/admin/schools");
-          return [];
-        }
-        return r.json();
-      })
-      .then((data) => {
-        setSchools(Array.isArray(data) ? data : []);
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, [router]);
+export default async function AdminSchoolsPage() {
+  const session = await getServerSession(authOptions)
+  if (!session || session.user.role !== 'super_admin') {
+    redirect('/login')
+  }
+
+  const supabase = createServerClient()
+
+  const { data: schools } = await supabase
+    .from('schools')
+    .select(`
+      id, name, curriculum, created_at,
+      subscription_tier, subscription_status,
+      tier_cap, assessment_count_year,
+      paddle_subscription_id
+    `)
+    .order('created_at', { ascending: false })
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">
-            Schools
-          </h1>
-          <p className="mt-1 text-gray-500">
-            Manage schools and their configurations.
-          </p>
+          <h1 className="text-2xl font-bold text-gray-900">Schools</h1>
+          <p className="text-sm text-gray-400 mt-0.5">{schools?.length ?? 0} schools registered</p>
         </div>
-        <Link href="/admin/schools/new">
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Add School
-          </Button>
+        <Link
+          href="/admin/schools/new"
+          className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-blue-700 transition-colors"
+        >
+          + Add school
         </Link>
       </div>
 
-      {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-evalent-600 border-t-transparent" />
+      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-100 bg-gray-50/80">
+                <th className="text-left px-4 py-3 font-medium text-gray-500">School</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500">Curriculum</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500">Plan</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500">Status</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500">Usage (yr)</th>
+                <th className="text-left px-4 py-3 font-medium text-gray-500">Joined</th>
+                <th className="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {schools?.map(school => {
+                const cap = school.tier_cap ?? 9999
+                const used = school.assessment_count_year ?? 0
+                const unlimited = cap >= 9999
+                const pct = unlimited ? 0 : Math.min(100, Math.round((used / cap) * 100))
+                const barColor = pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-amber-400' : 'bg-blue-500'
+
+                return (
+                  <tr key={school.id} className="hover:bg-gray-50/60 transition-colors">
+                    <td className="px-4 py-3">
+                      <p className="font-medium text-gray-900">{school.name}</p>
+                      <p className="text-xs text-gray-400 font-mono">{school.id.substring(0, 8)}…</p>
+                    </td>
+                    <td className="px-4 py-3 text-gray-500 capitalize">
+                      {school.curriculum || '—'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${TIER_COLORS[school.subscription_tier] ?? TIER_COLORS.trial}`}>
+                        {school.subscription_tier ?? 'trial'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${STATUS_COLORS[school.subscription_status] ?? ''}`}>
+                        {(school.subscription_status ?? 'active').replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      {unlimited ? (
+                        <span className="text-sm text-gray-500">{used} <span className="text-gray-300">/ ∞</span></span>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <div className="w-16 bg-gray-100 rounded-full h-1.5">
+                            <div className={`h-1.5 rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
+                          </div>
+                          <span className={`text-xs font-medium tabular-nums ${pct >= 90 ? 'text-red-600' : pct >= 70 ? 'text-amber-600' : 'text-gray-600'}`}>
+                            {used}/{cap}
+                          </span>
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
+                      {new Date(school.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/admin/schools/${school.id}`}
+                          className="text-xs text-blue-600 hover:text-blue-800 font-medium px-2 py-1 rounded hover:bg-blue-50 transition-colors"
+                        >
+                          Edit
+                        </Link>
+                        <Link
+                          href={`/admin/billing?school=${school.id}`}
+                          className="text-xs text-gray-400 hover:text-gray-600 font-medium px-2 py-1 rounded hover:bg-gray-50 transition-colors"
+                        >
+                          Billing
+                        </Link>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+              {(!schools || schools.length === 0) && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-10 text-center text-gray-400">No schools yet</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
-      ) : schools.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <School className="h-12 w-12 text-gray-300" />
-            <p className="mt-3 text-sm text-gray-500">No schools yet</p>
-            <p className="mt-1 text-xs text-gray-400">
-              Add your first school to get started
-            </p>
-            <Link href="/admin/schools/new" className="mt-4">
-              <Button size="sm">
-                <Plus className="mr-2 h-4 w-4" />
-                Add School
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {schools.map((school) => (
-            <Card
-              key={school.id}
-              className="transition-shadow hover:shadow-md"
-            >
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <CardTitle className="text-base">{school.name}</CardTitle>
-                    <p className="mt-0.5 text-xs text-gray-400">
-                      {school.slug}
-                    </p>
-                  </div>
-                  <Badge
-                    variant={school.is_active ? "success" : "secondary"}
-                  >
-                    {school.is_active ? "Active" : "Inactive"}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center gap-4 text-sm text-gray-600">
-                    <div className="flex items-center gap-1.5">
-                      <Globe className="h-3.5 w-3.5 text-gray-400" />
-                      {school.curriculum}
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <Users className="h-3.5 w-3.5 text-gray-400" />
-                      {school.student_count} students
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <FileText className="h-3.5 w-3.5 text-gray-400" />
-                      {school.submission_count} reports
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
-                    <p className="text-xs text-gray-400 flex-1">
-                      {school.user_count} admin
-                      {school.user_count !== 1 ? "s" : ""}
-                    </p>
-                    <p className="text-xs text-gray-400">
-                      {school.contact_email}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+      </div>
     </div>
-  );
+  )
 }
