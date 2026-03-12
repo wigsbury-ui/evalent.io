@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { Sidebar } from '@/components/school/sidebar'
+import { SchoolSidebar as Sidebar } from "@/components/school/sidebar"
 import { EvalentChat } from '@/components/school/evalent-chat'
 import { TrialBanner } from '@/components/school/trial-banner'
 
