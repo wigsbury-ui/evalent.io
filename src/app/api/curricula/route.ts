@@ -1,25 +1,17 @@
 // src/app/api/curricula/route.ts
+// Returns the curricula supported by the platform.
+// This list must stay in sync with src/app/school/config/page.tsx CURRICULUM_OPTIONS.
 import { NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+const CURRICULUM_OPTIONS = [
+  { name: 'IB',          label: 'International Baccalaureate (IB)' },
+  { name: 'British',     label: 'British / English National Curriculum' },
+  { name: 'American',    label: 'American / Common Core' },
+  { name: 'Australian',  label: 'Australian Curriculum (ACARA)' },
+  { name: 'NewZealand',  label: 'New Zealand Curriculum (NZC)' },
+  { name: 'Other',       label: 'Other / International' },
+]
 
 export async function GET() {
-  const { data, error } = await supabase
-    .from('schools')
-    .select('curriculum')
-    .not('curriculum', 'is', null)
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-
-  const unique = Array.from(new Set(data.map((s: { curriculum: string }) => s.curriculum)))
-    .filter(Boolean)
-    .sort() as string[]
-
-  return NextResponse.json(unique.map(name => ({ name, label: name })))
+  return NextResponse.json(CURRICULUM_OPTIONS)
 }
