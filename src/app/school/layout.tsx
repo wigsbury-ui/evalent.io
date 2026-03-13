@@ -6,6 +6,8 @@ import { SchoolSidebar as Sidebar } from "@/components/school/sidebar"
 import { EvalentChat } from '@/components/school/evalent-chat'
 import { TopBar } from '@/components/school/top-bar'
 
+export const revalidate = 0
+
 export default async function SchoolLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions)
   if (!session || !session.user.schoolId) {
