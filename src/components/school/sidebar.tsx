@@ -36,8 +36,8 @@ export function SchoolSidebar({ schoolName = "School Admin", logoUrl = null }: {
         style={{ width: expanded ? 224 : 56 }}
       >
         {/* Logo */}
-        <div className="flex h-14 items-center border-b border-gray-100 shrink-0 justify-center">
-          <div className="flex items-center gap-3">
+        <div className="flex h-14 items-center border-b border-gray-100 shrink-0 px-3">
+          <div className="flex items-center gap-3 min-w-0 w-full">
             {logoUrl ? (
               <img src={logoUrl} alt={schoolName} className="h-8 w-8 shrink-0 rounded-lg object-contain" />
             ) : (
