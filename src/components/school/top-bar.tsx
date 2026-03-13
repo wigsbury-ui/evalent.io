@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, Circle } from 'lucide-react'
+import { CheckCircle2, Circle, Zap } from 'lucide-react'
 
 interface TopBarProps {
   used: number
@@ -26,90 +26,109 @@ export function TopBar({ used, cap, tier, hasGradeConfigs, hasAssessors, hasStud
   }, [])
 
   const isTrial = tier === 'trial' && cap < 9999
-  const remaining = cap - used
-  const exhausted = remaining <= 0
+  const exhausted = (cap - used) <= 0
   const showOnboarding = mounted && !dismissed
+
   const steps = [
-    { id: 'config', label: 'Configure school', href: '/school/config', done: hasGradeConfigs },
-    { id: 'assessor', label: 'Add assessor', href: '/school/assessors', done: hasAssessors },
-    { id: 'student', label: 'Register student', href: '/school/students/new', done: hasStudents },
+    { id: 'config',   label: 'Configure school',  href: '/school/config',        done: hasGradeConfigs },
+    { id: 'assessor', label: 'Add assessor',       href: '/school/assessors',     done: hasAssessors },
+    { id: 'student',  label: 'Register student',   href: '/school/students/new',  done: hasStudents },
   ]
   const completedCount = steps.filter(s => s.done).length
   const allDone = completedCount === steps.length
 
-  // Hide entirely when not trial and onboarding dismissed
   if (!isTrial && !showOnboarding) return null
 
-  // When dismissed (onboarding done), only show trial info if still on trial — compact single line
-  const showCompact = isTrial && (!showOnboarding || !mounted)
-
-  const bg = exhausted ? '#fef2f2' : '#eff6ff'
-  const borderColor = exhausted ? '#fecaca' : '#bfdbfe'
-  const pillBg = exhausted ? '#fee2e2' : '#dcfce7'
-  const pillColor = exhausted ? '#991b1b' : '#166534'
-  const ctaBg = exhausted ? '#dc2626' : '#1d4ed8'
+  const pct = Math.min(100, Math.round((used / cap) * 100))
 
   return (
-    <div style={{ backgroundColor: bg, borderBottom: '1px solid ' + borderColor }}>
-      <div style={{ padding: '0 24px', display: 'flex', alignItems: 'center', gap: 20, height: 44 }}>
+    <div style={{
+      background: exhausted ? 'linear-gradient(90deg,#fef2f2,#fee2e2)' : 'linear-gradient(90deg,#eef2ff,#eff6ff)',
+      borderBottom: '1px solid ' + (exhausted ? '#fca5a5' : '#c7d2fe'),
+      height: 52,
+      display: 'flex',
+      alignItems: 'center',
+    }}>
+      {/* Inner wrapper — matches main content exactly */}
+      <div style={{ width: '100%', maxWidth: 1400, margin: '0 auto', padding: '0 24px', display: 'flex', alignItems: 'center', gap: 0 }}>
 
-        {/* Free trial pill + progress */}
+        {/* LEFT: Trial badge + usage */}
         {isTrial && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-            <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 999, backgroundColor: pillBg, color: pillColor }}>
-              {exhausted ? 'Trial ended' : 'Free trial'}
-            </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              background: exhausted ? '#dc2626' : '#4f46e5',
+              color: 'white', borderRadius: 6,
+              padding: '3px 10px', fontSize: 11, fontWeight: 700, letterSpacing: '0.03em'
+            }}>
+              <Zap style={{ width: 11, height: 11 }} />
+              {exhausted ? 'TRIAL ENDED' : 'FREE TRIAL'}
+            </div>
             {!exhausted && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <div style={{ width: 64, height: 4, borderRadius: 999, backgroundColor: '#bfdbfe', overflow: 'hidden' }}>
-                  <div style={{ height: 4, width: Math.min(100, (used / cap) * 100) + '%', backgroundColor: '#16a34a', borderRadius: 999 }} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{ width: 80, height: 5, borderRadius: 999, background: '#c7d2fe', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: pct + '%', background: '#4f46e5', borderRadius: 999, transition: 'width 0.3s' }} />
                 </div>
-                <span style={{ fontSize: 11, color: '#374151', fontWeight: 500 }}>{used}/{cap}</span>
+                <span style={{ fontSize: 12, fontWeight: 600, color: '#3730a3' }}>{used}<span style={{ fontWeight: 400, color: '#6366f1' }}>/{cap}</span></span>
+                <span style={{ fontSize: 11, color: '#6366f1' }}>assessments used</span>
               </div>
             )}
           </div>
         )}
 
-        {/* Divider */}
-        {isTrial && showOnboarding && (
-          <div style={{ width: 1, height: 16, backgroundColor: '#bfdbfe', flexShrink: 0 }} />
-        )}
-
-        {/* Onboarding steps */}
+        {/* CENTRE: Onboarding steps */}
         {showOnboarding && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
-            <span style={{ fontSize: 11, color: '#374151', fontWeight: 500, flexShrink: 0, marginRight: 4 }}>
-              {allDone ? 'Setup complete' : 'Setup ' + completedCount + '/' + steps.length}
-            </span>
-            {steps.map((step, i) => (
-              <React.Fragment key={step.id}>
-                {i > 0 && <div style={{ width: 16, height: 1, backgroundColor: '#bfdbfe', flexShrink: 0 }} />}
+          <>
+            <div style={{ width: 1, height: 20, background: '#c7d2fe', margin: '0 20px', flexShrink: 0 }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#3730a3', marginRight: 6, flexShrink: 0 }}>
+                {allDone ? '✓ Setup complete' : `Setup ${completedCount}/${steps.length}`}
+              </span>
+              {steps.map((step, i) => (
+                <React.Fragment key={step.id}>
+                  {i > 0 && <div style={{ width: 20, height: 1, background: '#c7d2fe', flexShrink: 0 }} />}
+                  <button
+                    onClick={() => { if (!step.done) router.push(step.href) }}
+                    disabled={step.done}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 5,
+                      background: 'none', border: 'none', cursor: step.done ? 'default' : 'pointer',
+                      padding: '4px 8px', borderRadius: 5, flexShrink: 0,
+                      background: step.done ? 'transparent' : 'white',
+                      boxShadow: step.done ? 'none' : '0 1px 3px rgba(0,0,0,0.08)',
+                    }}>
+                    {step.done
+                      ? <CheckCircle2 style={{ width: 14, height: 14, color: '#4f46e5' }} />
+                      : <Circle style={{ width: 14, height: 14, color: '#a5b4fc' }} />}
+                    <span style={{ fontSize: 12, fontWeight: step.done ? 400 : 600, color: step.done ? '#6366f1' : '#1e1b4b', whiteSpace: 'nowrap' }}>
+                      {step.label}
+                    </span>
+                  </button>
+                </React.Fragment>
+              ))}
+              {allDone && (
                 <button
-                  onClick={() => { if (!step.done) router.push(step.href) }}
-                  disabled={step.done}
-                  style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', padding: '2px 0', cursor: step.done ? 'default' : 'pointer', flexShrink: 0 }}>
-                  {step.done
-                    ? <CheckCircle2 style={{ width: 13, height: 13, color: '#3b82f6' }} />
-                    : <Circle style={{ width: 13, height: 13, color: '#93c5fd' }} />}
-                  <span style={{ fontSize: 11, fontWeight: 500, color: step.done ? '#6b7280' : '#1e3a8a', whiteSpace: 'nowrap' }}>{step.label}</span>
+                  onClick={() => { localStorage.setItem(DISMISSED_KEY, 'true'); setDismissed(true) }}
+                  style={{ marginLeft: 4, fontSize: 11, color: '#818cf8', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', flexShrink: 0 }}>
+                  Dismiss
                 </button>
-              </React.Fragment>
-            ))}
-            {allDone && (
-              <button
-                onClick={() => { localStorage.setItem(DISMISSED_KEY, 'true'); setDismissed(true) }}
-                style={{ marginLeft: 8, fontSize: 11, color: '#6b7280', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
-                Dismiss
-              </button>
-            )}
-          </div>
+              )}
+            </div>
+          </>
         )}
 
-        {/* View plans CTA — always far right */}
+        {/* RIGHT: CTA */}
         {isTrial && (
-          <a href="/school/billing"
-            style={{ marginLeft: 'auto', flexShrink: 0, fontSize: 11, fontWeight: 600, padding: '5px 14px', borderRadius: 8, color: 'white', backgroundColor: ctaBg, textDecoration: 'none' }}>
-            View plans
+          <a href="/school/billing" style={{ marginLeft: 'auto', flexShrink: 0 }}>
+            <div style={{
+              background: exhausted ? '#dc2626' : '#4f46e5',
+              color: 'white', borderRadius: 8, padding: '7px 18px',
+              fontSize: 12, fontWeight: 700, letterSpacing: '0.02em',
+              boxShadow: '0 2px 8px rgba(79,70,229,0.35)',
+              cursor: 'pointer',
+            }}>
+              {exhausted ? 'Upgrade now' : 'View plans →'}
+            </div>
           </a>
         )}
       </div>
