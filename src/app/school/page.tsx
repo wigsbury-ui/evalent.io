@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { OnboardingBanner } from "@/components/school/onboarding-banner";
 import { useSearchParams } from "next/navigation";
-import { OnboardingModal } from "@/components/school/onboarding-modal";
 import Link from "next/link";
 import {
   Card,
@@ -1217,13 +1215,8 @@ export default function SchoolDashboard() {
           }}
         />
       )}
-      <div className="space-y-6 max-w-[1400px]">
+      <div className="space-y-6 max-w-[1400px] mx-auto px-6 py-6">
         {data && (
-          <OnboardingBanner
-            hasGradeConfigs={data.onboarding?.hasGradeConfigs ?? false}
-            hasAssessors={data.onboarding?.hasAssessors ?? false}
-            hasStudents={data.onboarding?.hasStudents ?? false}
-          />
         )}
       {/* Header */}
       <div className="flex items-center justify-between">
