@@ -1,17 +1,19 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, Ban } from "lucide-react";
 import Link from "next/link";
 
 export default function EditSchoolPage() {
   const params = useParams();
+  const router = useRouter();
   const id = params.id as string;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [suspending, setSuspending] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [form, setForm] = useState({
@@ -61,6 +63,24 @@ export default function EditSchoolPage() {
     } finally { setSaving(false); }
   };
 
+  const handleSuspend = async () => {
+    const action = form.is_active ? "suspend" : "reactivate";
+    if (!confirm(`Are you sure you want to ${action} ${form.name}? ${form.is_active ? "They will lose access immediately." : ""}`)) return;
+    setSuspending(true); setError(""); setSuccess("");
+    try {
+      const res = await fetch(`/api/admin/schools/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ is_active: !form.is_active }),
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Failed to update"); }
+      setForm(prev => ({ ...prev, is_active: !prev.is_active }));
+      setSuccess(form.is_active ? "School suspended." : "School reactivated.");
+    } catch (err: any) {
+      setError(err.message);
+    } finally { setSuspending(false); }
+  };
+
   const inputCls = "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500";
 
   if (loading) return (
@@ -75,14 +95,35 @@ export default function EditSchoolPage() {
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/admin/schools">
-          <Button variant="ghost" size="sm"><ArrowLeft className="mr-2 h-4 w-4" />Back</Button>
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Edit School</h1>
-          <p className="text-sm text-gray-400 mt-0.5">{form.name}</p>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Link href="/admin/schools">
+            <Button variant="ghost" size="sm"><ArrowLeft className="mr-2 h-4 w-4" />Back</Button>
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Edit School</h1>
+            <div className="flex items-center gap-2 mt-0.5">
+              <p className="text-sm text-gray-400">{form.name}</p>
+              {!form.is_active && (
+                <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Suspended</span>
+              )}
+            </div>
+          </div>
         </div>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={handleSuspend}
+          disabled={suspending}
+          className={form.is_active
+            ? "border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
+            : "border-green-200 text-green-600 hover:bg-green-50 hover:border-green-300"}
+        >
+          {suspending
+            ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            : <Ban className="mr-2 h-4 w-4" />}
+          {form.is_active ? "Suspend School" : "Reactivate School"}
+        </Button>
       </div>
 
       {error && <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>}
@@ -142,10 +183,6 @@ export default function EditSchoolPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Assessment Cap</label>
                 <input name="tier_cap" type="number" value={form.tier_cap} onChange={handleChange} className={inputCls} />
               </div>
-              <label className="flex items-center gap-2 cursor-pointer pt-2">
-                <input name="is_active" type="checkbox" checked={form.is_active} onChange={handleChange} className="h-4 w-4 rounded border-gray-300" />
-                <span className="text-sm font-medium text-gray-700">Active</span>
-              </label>
             </CardContent>
           </Card>
         </div>
