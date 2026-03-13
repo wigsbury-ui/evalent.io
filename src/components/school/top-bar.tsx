@@ -43,7 +43,7 @@ export function TopBar({ used, cap, tier, hasGradeConfigs, hasAssessors, hasStud
   const pillColor = exhausted ? '#991b1b' : '#166534'
   const ctaBg = exhausted ? '#dc2626' : '#1d4ed8'
   return (
-    <div style={{ backgroundColor: bg, borderBottom: '1px solid ' + borderColor, flexShrink: 0 }}><div style={{ maxWidth: 1400, marginLeft: 'auto', marginRight: 'auto', padding: '0 24px', display: 'flex', alignItems: 'center', gap: 24, height: 44 }}>
+    <div style={{ backgroundColor: bg, borderBottom: '1px solid ' + borderColor }}><div style={{ display: 'flex', alignItems: 'center', gap: 24, height: 44, padding: '0 24px' }}>
       {isTrial && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
           <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 999, backgroundColor: pillBg, color: pillColor }}>
