@@ -38,12 +38,12 @@ export function TopBar({ used, cap, tier, hasGradeConfigs, hasAssessors, hasStud
 
   if (!isTrial && !showOnboarding) return null
 
-  const brand = '#1a2b6b'
+  const brand = '#0d52dd'
   const pct = Math.min(100, Math.round((used / cap) * 100))
 
   return (
     <div className="w-full" style={{ background: '#eef1f8', borderBottom: '1px solid #d0d8ee', height: 48 }}>
-      <div className="max-w-[1400px] mx-auto px-6 h-full flex items-center gap-5">
+      <div className="max-w-[1400px] mx-auto px-6 h-full flex items-center gap-5 w-full">
 
         {isTrial && (
           <div className="flex items-center gap-3 shrink-0">
