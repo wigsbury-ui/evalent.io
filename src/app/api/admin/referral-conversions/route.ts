@@ -15,7 +15,7 @@ export async function GET(req: NextRequest) {
   const partnerId = new URL(req.url).searchParams.get("partner_id");
   const supabase = createServerClient();
   let query = supabase.from("referral_conversions")
-    .select("*, partners(first_name, last_name, email), schools(name)")
+    .select("*, partners(first_name, last_name, email), schools(name), referral_links(slug, label)")
     .order("created_at", { ascending: false });
   if (partnerId) query = query.eq("partner_id", partnerId);
   const { data, error } = await query;

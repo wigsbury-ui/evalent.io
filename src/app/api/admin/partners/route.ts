@@ -10,14 +10,17 @@ async function guard() {
   return session;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await guard();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const supabase = createServerClient();
-  const { data, error } = await supabase
+  const id = new URL(req.url).searchParams.get("id");
+  let query = supabase
     .from("partners")
     .select("*, partner_types(name, commission_model, commission_value, commission_scope)")
     .order("created_at", { ascending: false });
+  if (id) query = query.eq("id", id);
+  const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json(data);
 }
