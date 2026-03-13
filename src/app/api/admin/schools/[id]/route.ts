@@ -9,6 +9,20 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   const supabase = createServerClient();
   const { data, error } = await supabase.from("schools").select("*").eq("id", params.id).single();
   if (error) return NextResponse.json({ error: error.message }, { status: 404 });
+  // Audit log
+  const wasActive = body.is_active !== undefined;
+  const action = body.is_active === false ? "suspend_school"
+               : body.is_active === true ? "reactivate_school"
+               : "update_school";
+  await supabase.from("audit_log").insert({
+    actor_id: session.user.id,
+    actor_email: session.user.email,
+    action,
+    entity_type: "school",
+    entity_id: params.id,
+    details: updates,
+  }).then(() => {});
+
   return NextResponse.json(data);
 }
 
@@ -22,5 +36,19 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   for (const key of allowed) { if (body[key] !== undefined) updates[key] = body[key]; }
   const { data, error } = await supabase.from("schools").update(updates).eq("id", params.id).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  // Audit log
+  const wasActive = body.is_active !== undefined;
+  const action = body.is_active === false ? "suspend_school"
+               : body.is_active === true ? "reactivate_school"
+               : "update_school";
+  await supabase.from("audit_log").insert({
+    actor_id: session.user.id,
+    actor_email: session.user.email,
+    action,
+    entity_type: "school",
+    entity_id: params.id,
+    details: updates,
+  }).then(() => {});
+
   return NextResponse.json(data);
 }

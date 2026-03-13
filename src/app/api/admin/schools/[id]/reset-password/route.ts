@@ -36,5 +36,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (updateError)
     return NextResponse.json({ error: updateError.message }, { status: 500 });
 
+  await supabase.from("audit_log").insert({
+    actor_id: session.user.id,
+    actor_email: session.user.email,
+    action: "reset_password",
+    entity_type: "school",
+    entity_id: params.id,
+    details: { user_id: user.id },
+  }).then(() => {});
+
   return NextResponse.json({ success: true });
 }
