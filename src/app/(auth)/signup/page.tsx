@@ -144,7 +144,7 @@ export default function SignupPage() {
         redirect: false,
       })
       if (result?.ok) {
-        router.push('/school/dashboard?welcome=1')
+        router.push('/school?welcome=1')
       } else {
         router.push('/login')
       }
