@@ -15,7 +15,7 @@ import {
   LogOut,
   Video,
   CreditCard,
-  UserCheck,
+  UserCheck, Wallet,
 } from "lucide-react";
 
 export function AdminSidebar() {
@@ -30,6 +30,7 @@ export function AdminSidebar() {
     { href: "/admin/reports", label: "Report Templates", icon: FileText },
     { href: "/admin/help-videos", label: "Help Videos", icon: Video },
     { href: "/admin/partners", label: "Partners", icon: UserCheck },
+  { href: "/admin/payouts", label: "Payouts", icon: Wallet },
   { href: "/admin/audit", label: "Audit Log", icon: ScrollText },
   ];
 
