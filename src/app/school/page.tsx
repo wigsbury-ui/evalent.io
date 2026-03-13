@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { OnboardingModal } from "@/components/school/onboarding-modal";
 import Link from "next/link";
 import {
   Card,
@@ -165,7 +167,19 @@ function GradeChart({ data, gradeNaming }: { data: GradeBarData[]; gradeNaming: 
   };
 
   return (
-    <div>
+    <>
+      {showOnboarding && data && (
+        <OnboardingModal
+          schoolName={data.school_name || ''}
+          assessmentCount={data.assessment_count_year || 0}
+          tierCap={data.tier_cap || 10}
+          onClose={() => {
+            setShowOnboarding(false)
+            window.history.replaceState({}, '', '/school')
+          }}
+        />
+      )}
+      <div>
       <div className="flex items-end gap-3" style={{ height: 200 }}>
         {data.map((d) => {
           const barHeight = d.total > 0 ? (d.total / maxTotal) * 180 : 0;
@@ -299,7 +313,19 @@ function BandDonut({ bands, total }: { bands: BandCount[]; total: number }) {
   const gradient = "conic-gradient(" + stops.join(", ") + ")";
 
   return (
-    <div className="flex items-center gap-6">
+    <>
+      {showOnboarding && data && (
+        <OnboardingModal
+          schoolName={data.school_name || ''}
+          assessmentCount={data.assessment_count_year || 0}
+          tierCap={data.tier_cap || 10}
+          onClose={() => {
+            setShowOnboarding(false)
+            window.history.replaceState({}, '', '/school')
+          }}
+        />
+      )}
+      <div className="flex items-center gap-6">
       {/* Donut */}
       <div className="relative flex-shrink-0" style={{ width: 140, height: 140 }}>
         <div
@@ -418,7 +444,19 @@ function ThresholdLineChart({
   const yTicks = [0, 25, 50, 75, 100];
 
   return (
-    <div>
+    <>
+      {showOnboarding && data && (
+        <OnboardingModal
+          schoolName={data.school_name || ''}
+          assessmentCount={data.assessment_count_year || 0}
+          tierCap={data.tier_cap || 10}
+          onClose={() => {
+            setShowOnboarding(false)
+            window.history.replaceState({}, '', '/school')
+          }}
+        />
+      )}
+      <div>
       <svg
         viewBox={`0 0 ${w} ${h}`}
         className="w-full"
@@ -721,7 +759,19 @@ function DomainPerformanceCards({
   ];
 
   return (
-    <div className="space-y-3">
+    <>
+      {showOnboarding && data && (
+        <OnboardingModal
+          schoolName={data.school_name || ''}
+          assessmentCount={data.assessment_count_year || 0}
+          tierCap={data.tier_cap || 10}
+          onClose={() => {
+            setShowOnboarding(false)
+            window.history.replaceState({}, '', '/school')
+          }}
+        />
+      )}
+      <div className="space-y-3">
       <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
         Academic Realms — Student Performance vs Thresholds
       </h3>
@@ -887,6 +937,11 @@ function DomainPerformanceCards({
 }
 
 export default function SchoolDashboard() {
+  const searchParams = useSearchParams()
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  useEffect(() => {
+    if (searchParams.get('welcome') === '1') setShowOnboarding(true)
+  }, [searchParams])
   const [data, setData] = useState<DashboardData | null>(null);
   const [gradeConfigs, setGradeConfigs] = useState<GradeConfig[]>([]);
   const [loading, setLoading] = useState(true);
@@ -1196,7 +1251,19 @@ export default function SchoolDashboard() {
   };
 
   return (
-    <div className="space-y-6 max-w-[1400px]">
+    <>
+      {showOnboarding && data && (
+        <OnboardingModal
+          schoolName={data.school_name || ''}
+          assessmentCount={data.assessment_count_year || 0}
+          tierCap={data.tier_cap || 10}
+          onClose={() => {
+            setShowOnboarding(false)
+            window.history.replaceState({}, '', '/school')
+          }}
+        />
+      )}
+      <div className="space-y-6 max-w-[1400px]">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -1714,4 +1781,7 @@ export default function SchoolDashboard() {
       </Card>
     </div>
   );
+}
+    </>
+  )
 }
