@@ -1,21 +1,23 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Loader2, Ban } from "lucide-react";
+import { ArrowLeft, Loader2, Ban, KeyRound } from "lucide-react";
 import Link from "next/link";
 
 export default function EditSchoolPage() {
   const params = useParams();
-  const router = useRouter();
   const id = params.id as string;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [suspending, setSuspending] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [form, setForm] = useState({
     name: "", slug: "", curriculum: "IB", locale: "en-GB",
     contact_email: "", subscription_tier: "trial", tier_cap: 50, is_active: true,
@@ -57,7 +59,7 @@ export default function EditSchoolPage() {
         body: JSON.stringify(form),
       });
       if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Failed to update"); }
-      setSuccess("School updated successfully");
+      setSuccess("School updated successfully.");
     } catch (err: any) {
       setError(err.message);
     } finally { setSaving(false); }
@@ -65,7 +67,7 @@ export default function EditSchoolPage() {
 
   const handleSuspend = async () => {
     const action = form.is_active ? "suspend" : "reactivate";
-    if (!confirm(`Are you sure you want to ${action} ${form.name}? ${form.is_active ? "They will lose access immediately." : ""}`)) return;
+    if (!confirm(`Are you sure you want to ${action} ${form.name}?${form.is_active ? " They will lose access immediately." : ""}`)) return;
     setSuspending(true); setError(""); setSuccess("");
     try {
       const res = await fetch(`/api/admin/schools/${id}`, {
@@ -79,6 +81,26 @@ export default function EditSchoolPage() {
     } catch (err: any) {
       setError(err.message);
     } finally { setSuspending(false); }
+  };
+
+  const handlePasswordReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newPassword.length < 8) { setError("Password must be at least 8 characters."); return; }
+    if (newPassword !== confirmPassword) { setError("Passwords do not match."); return; }
+    if (!confirm(`Reset password for ${form.name} admin account?`)) return;
+    setResetting(true); setError(""); setSuccess("");
+    try {
+      const res = await fetch(`/api/admin/schools/${id}/reset-password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: newPassword }),
+      });
+      if (!res.ok) { const d = await res.json(); throw new Error(d.error || "Failed to reset password"); }
+      setNewPassword(""); setConfirmPassword("");
+      setSuccess("Password reset successfully.");
+    } catch (err: any) {
+      setError(err.message);
+    } finally { setResetting(false); }
   };
 
   const inputCls = "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500";
@@ -119,9 +141,7 @@ export default function EditSchoolPage() {
             ? "border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
             : "border-green-200 text-green-600 hover:bg-green-50 hover:border-green-300"}
         >
-          {suspending
-            ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            : <Ban className="mr-2 h-4 w-4" />}
+          {suspending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Ban className="mr-2 h-4 w-4" />}
           {form.is_active ? "Suspend School" : "Reactivate School"}
         </Button>
       </div>
@@ -195,6 +215,46 @@ export default function EditSchoolPage() {
           </Button>
         </div>
       </form>
+
+      <Card className="border-orange-100">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <KeyRound className="h-4 w-4 text-orange-500" />
+            <CardTitle className="text-lg">Reset Admin Password</CardTitle>
+          </div>
+          <CardDescription>Set a new password for this school&apos;s admin account</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handlePasswordReset} className="grid grid-cols-3 gap-4 items-end">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+              <input
+                type="password"
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                placeholder="Min 8 characters"
+                className={inputCls}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                placeholder="Repeat password"
+                className={inputCls}
+                required
+              />
+            </div>
+            <Button type="submit" disabled={resetting} variant="outline" className="border-orange-200 text-orange-700 hover:bg-orange-50">
+              {resetting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <KeyRound className="mr-2 h-4 w-4" />}
+              Reset Password
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 }
