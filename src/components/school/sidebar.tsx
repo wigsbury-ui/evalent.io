@@ -1,18 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
-import {
-  LayoutDashboard,
-  Settings,
-  GraduationCap,
-  Users,
-  UserPlus,
-  LogOut,
-} from "lucide-react";
+import { LayoutDashboard, Settings, GraduationCap, Users, UserPlus, LogOut, CreditCard } from "lucide-react";
 
 const navItems = [
   { href: "/school", label: "Dashboard", icon: LayoutDashboard },
@@ -20,113 +13,84 @@ const navItems = [
   { href: "/school/config", label: "School Settings", icon: Settings },
   { href: "/school/grades", label: "Pass Thresholds", icon: GraduationCap },
   { href: "/school/assessors", label: "Assessors", icon: Users },
+  { href: "/school/billing", label: "Billing", icon: CreditCard },
 ];
 
-export function SchoolSidebar() {
+interface SchoolSidebarProps {
+  schoolName?: string;
+  logoUrl?: string | null;
+}
+
+export function SchoolSidebar({ schoolName = "School Admin", logoUrl = null }: SchoolSidebarProps) {
   const pathname = usePathname();
-  const [schoolName, setSchoolName] = useState("School Admin");
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    // Fetch school name from session
-    fetch("/api/auth/session")
-      .then((r) => r.json())
-      .then((data) => {
-        if (data?.user?.schoolName) {
-          setSchoolName(data.user.schoolName);
-        }
-      })
-      .catch(() => {});
-
-    // Fetch logo from dashboard API
-    fetch("/api/school/dashboard")
-      .then((r) => r.ok ? r.json() : null)
-      .then((data) => {
-        if (data?.school?.logo_url) {
-          setLogoUrl(data.school.logo_url);
-        }
-      })
-      .catch(() => {});
-  }, []);
+  const [expanded, setExpanded] = useState(false);
 
   return (
-    <aside className="flex h-screen w-64 flex-col border-r border-gray-200 bg-white">
-      {/* School identity */}
-      <div className="flex h-16 items-center gap-3 border-b border-gray-200 px-6">
-        {logoUrl ? (
-          <img
-            src={logoUrl}
-            alt={schoolName}
-            className="h-8 w-8 shrink-0 rounded-lg object-contain"
-          />
-        ) : (
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-evalent-600">
-            <span className="text-lg font-bold text-white">E</span>
-          </div>
-        )}
-        <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-gray-900">
-            {schoolName}
-          </p>
-          <p className="text-xs text-gray-500">School Admin</p>
+    <aside
+      onMouseEnter={() => setExpanded(true)}
+      onMouseLeave={() => setExpanded(false)}
+      className={cn(
+        "flex h-screen flex-col border-r border-gray-100 bg-white transition-all duration-200 ease-in-out shrink-0 z-40",
+        expanded ? "w-56" : "w-14"
+      )}
+      style={{ overflow: "hidden" }}
+    >
+      <div className="flex h-14 items-center border-b border-gray-100 px-3 shrink-0">
+        <div className="flex items-center gap-3 min-w-0">
+          {logoUrl ? (
+            <img src={logoUrl} alt={schoolName} className="h-8 w-8 shrink-0 rounded-lg object-contain" />
+          ) : (
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-white font-bold text-sm" style={{ backgroundColor: "#1a2b6b", minWidth: 32 }}>
+              {schoolName.charAt(0).toUpperCase()}
+            </div>
+          )}
+          {expanded && (
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-gray-900 leading-tight">{schoolName}</p>
+              <p className="text-xs text-gray-400 leading-tight">School Admin</p>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 space-y-1 px-3 py-4">
+      <nav className="flex-1 py-3 px-2 space-y-0.5">
         {navItems.map((item) => {
-          const isActive =
-            pathname === item.href ||
-            (item.href !== "/school" && pathname.startsWith(item.href));
+          const isActive = pathname === item.href || (item.href !== "/school" && pathname.startsWith(item.href));
           return (
             <Link
               key={item.href}
               href={item.href}
+              title={!expanded ? item.label : undefined}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-evalent-50 text-evalent-700"
-                  : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                "flex items-center gap-3 rounded-lg px-2 py-2 text-sm font-medium transition-colors whitespace-nowrap",
+                isActive ? "text-white" : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
               )}
+              style={isActive ? { backgroundColor: "#1a2b6b" } : {}}
             >
-              <item.icon
-                className={cn(
-                  "h-5 w-5",
-                  isActive ? "text-evalent-600" : "text-gray-400"
-                )}
-              />
-              {item.label}
+              <item.icon className={cn("h-5 w-5 shrink-0", isActive ? "text-white" : "text-gray-400")} />
+              {expanded && <span>{item.label}</span>}
             </Link>
           );
         })}
-      
-              <a
-                href="/school/billing"
-                className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-gray-400">
-                  <path d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                </svg>
-                Billing
-              </a>
-            </nav>
+      </nav>
 
-      {/* Footer */}
-      <div className="border-t border-gray-200 p-3">
-
+      <div className="border-t border-gray-100 p-2 shrink-0">
         <button
           onClick={() => signOut({ callbackUrl: "/login" })}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-gray-600 transition-colors hover:bg-evalent-50 hover:text-evalent-700"
+          title={!expanded ? "Sign out" : undefined}
+          className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900 whitespace-nowrap"
         >
-          <LogOut className="h-5 w-5 text-gray-400" />
-          Sign out
+          <LogOut className="h-5 w-5 shrink-0 text-gray-400" />
+          {expanded && <span>Sign out</span>}
         </button>
-        <div className="flex items-center justify-center gap-1.5 pt-3 pb-1">
-          <div className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded bg-gray-300">
-            <span className="text-[8px] font-bold text-white">E</span>
+        {expanded && (
+          <div className="flex items-center justify-center gap-1.5 pt-2 pb-1">
+            <div className="flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded bg-gray-200">
+              <span className="text-[8px] font-bold text-white">E</span>
+            </div>
+            <span className="text-[10px] text-gray-300">Powered by Evalent</span>
           </div>
-          <span className="text-[10px] text-gray-300">Powered by Evalent</span>
-        </div>
+        )}
       </div>
     </aside>
   );
