@@ -36,6 +36,7 @@ export default async function SchoolLayout({ children }: { children: React.React
           hasGradeConfigs={(gradeConfigs?.length ?? 0) > 0}
           hasAssessors={!!(school?.default_assessor_email)}
           hasStudents={(students?.length ?? 0) > 0}
+          schoolId={session.user.schoolId}
         />
         <main className="flex-1 overflow-y-auto"><div className="max-w-[1400px] mx-auto px-6 py-6">
           {children}</div>

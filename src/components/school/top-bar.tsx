@@ -11,18 +11,19 @@ interface TopBarProps {
   hasGradeConfigs: boolean
   hasAssessors: boolean
   hasStudents: boolean
+  schoolId?: string
 }
 
-const DISMISSED_KEY = 'evalent_onboarding_done'
+const getDismissKey = (id?: string) => id ? `evalent_onboarding_done_${id}` : 'evalent_onboarding_done'
 
-export function TopBar({ used, cap, tier, hasGradeConfigs, hasAssessors, hasStudents }: TopBarProps) {
+export function TopBar({ used, cap, tier, hasGradeConfigs, hasAssessors, hasStudents, schoolId }: TopBarProps) {
   const router = useRouter()
   const [dismissed, setDismissed] = useState(true)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     setMounted(true)
-    setDismissed(localStorage.getItem(DISMISSED_KEY) === 'true')
+    setDismissed(localStorage.getItem(getDismissKey(schoolId)) === 'true')
   }, [])
 
   const isTrial = tier === 'trial' && cap < 9999
@@ -90,7 +91,7 @@ export function TopBar({ used, cap, tier, hasGradeConfigs, hasAssessors, hasStud
             ))}
             {allDone && (
               <button
-                onClick={() => { localStorage.setItem(DISMISSED_KEY, 'true'); setDismissed(true) }}
+                onClick={() => { localStorage.setItem(getDismissKey(schoolId), 'true'); setDismissed(true) }}
                 className="shrink-0"
                 style={{ marginLeft: 6, fontSize: 11, color: '#8b9cc8', background: 'none', border: 'none', cursor: 'pointer' }}>
                 Dismiss
