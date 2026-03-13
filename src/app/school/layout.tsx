@@ -1,11 +1,10 @@
-// src/app/school/layout.tsx
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { SchoolSidebar as Sidebar } from "@/components/school/sidebar"
 import { EvalentChat } from '@/components/school/evalent-chat'
-import { TrialBanner } from '@/components/school/trial-banner'
+import { TopBar } from '@/components/school/top-bar'
 
 export default async function SchoolLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions)
@@ -14,27 +13,33 @@ export default async function SchoolLayout({ children }: { children: React.React
   }
 
   const supabase = createServerClient()
-  const { data: school } = await supabase
-    .from('schools')
-    .select('subscription_tier, tier_cap, assessment_count_year')
-    .eq('id', session.user.schoolId)
-    .single()
+  const [{ data: school }, { data: assessors }, { data: gradeConfigs }, { data: students }] =
+    await Promise.all([
+      supabase.from('schools').select('name, logo_url, subscription_tier, tier_cap, assessment_count_year').eq('id', session.user.schoolId).single(),
+      supabase.from('assessors').select('id').eq('school_id', session.user.schoolId).limit(1),
+      supabase.from('grade_configs').select('id').eq('school_id', session.user.schoolId).limit(1),
+      supabase.from('students').select('id').eq('school_id', session.user.schoolId).limit(1),
+    ])
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
-      <Sidebar />
-      <main className="flex-1 overflow-y-auto">
-        {school && (
-          <div className="px-6 pt-6">
-            <TrialBanner
-              used={school.assessment_count_year ?? 0}
-              cap={school.tier_cap ?? 9999}
-              tier={school.subscription_tier ?? 'trial'}
-            />
-          </div>
-        )}
-        {children}
-      </main>
+      <Sidebar
+        schoolName={school?.name ?? 'School Admin'}
+        logoUrl={school?.logo_url ?? null}
+      />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <TopBar
+          used={school?.assessment_count_year ?? 0}
+          cap={school?.tier_cap ?? 9999}
+          tier={school?.subscription_tier ?? 'trial'}
+          hasGradeConfigs={(gradeConfigs?.length ?? 0) > 0}
+          hasAssessors={(assessors?.length ?? 0) > 0}
+          hasStudents={(students?.length ?? 0) > 0}
+        />
+        <main className="flex-1 overflow-y-auto">
+          {children}
+        </main>
+      </div>
       <EvalentChat />
     </div>
   )
