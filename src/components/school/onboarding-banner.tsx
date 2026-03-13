@@ -1,4 +1,3 @@
-// src/components/school/onboarding-banner.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -43,7 +42,7 @@ export function OnboardingBanner({ hasGradeConfigs, hasAssessors, hasStudents }:
         <div className="flex items-center gap-3 shrink-0">
           <div>
             <p className="text-sm font-semibold text-blue-900">{allDone ? 'Setup complete!' : 'Get started'}</p>
-            <p className="text-xs text-blue-600 mt-0.5">{allDone ? 'You're ready to run assessments' : `${completedCount} of ${steps.length} done`}</p>
+            <p className="text-xs text-blue-600 mt-0.5">{allDone ? 'You\'re ready to run assessments' : `${completedCount} of ${steps.length} done`}</p>
           </div>
           <div className="flex gap-1.5 items-center">
             {steps.map(s => (
