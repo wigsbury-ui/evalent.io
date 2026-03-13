@@ -890,7 +890,6 @@ function DomainPerformanceCards({
 
 export default function SchoolDashboard() {
   const searchParams = useSearchParams()
-  const [showOnboarding, setShowOnboarding] = useState(false)
   useEffect(() => {
     if (searchParams.get('welcome') === '1') setShowOnboarding(true)
   }, [searchParams])
@@ -1204,17 +1203,6 @@ export default function SchoolDashboard() {
 
   return (
     <>
-      {showOnboarding && data && (
-        <OnboardingModal
-          schoolName={data.school?.name || ''}
-          assessmentCount={0}
-          tierCap={10}
-          onClose={() => {
-            setShowOnboarding(false)
-            window.history.replaceState({}, '', '/school')
-          }}
-        />
-      )}
       <div className="space-y-6 max-w-[1400px] mx-auto px-6 py-6">
         {data && (
         )}

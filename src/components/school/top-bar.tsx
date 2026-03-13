@@ -40,68 +40,54 @@ export function TopBar({ used, cap, tier, hasGradeConfigs, hasAssessors, hasStud
 
   if (!isTrial && !showOnboarding) return null
 
-  const isWarning = exhausted
+  const bg = exhausted ? '#fef2f2' : '#eff6ff'
+  const border = exhausted ? '#fecaca' : '#bfdbfe'
+
+  const pillBg = exhausted ? '#fee2e2' : '#dbeafe'
+  const pillColor = exhausted ? '#991b1b' : '#1d4ed8'
+  const ctaBg = exhausted ? '#dc2626' : '#1d4ed8'
 
   return (
-    <div
-      className="flex items-center gap-6 px-6 py-0 border-b"
-      style={{
-        height: 44,
-        backgroundColor: isWarning ? '#fef2f2' : '#eff6ff',
-        borderColor: isWarning ? '#fecaca' : '#bfdbfe',
-      }}
-    >
-      {/* Left: trial status */}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 24, padding: '0 24px', height: 44, backgroundColor: bg, borderBottom: '1px solid ' + border, flexShrink: 0 }}>
+
       {isTrial && (
-        <div className="flex items-center gap-2.5 shrink-0">
-          <span
-            className="text-xs font-semibold px-2 py-0.5 rounded-full"
-            style={{ backgroundColor: isWarning ? '#fee2e2' : '#dbeafe', color: isWarning ? '#991b1b' : '#1d4ed8' }}
-          >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 999, backgroundColor: pillBg, color: pillColor }}>
             {exhausted ? 'Trial ended' : 'Free trial'}
           </span>
           {!exhausted && (
-            <div className="flex items-center gap-1.5">
-              <div className="w-16 h-1 rounded-full overflow-hidden" style={{ backgroundColor: '#bfdbfe' }}>
-                <div
-                  className="h-1 rounded-full"
-                  style={{ width: `${Math.min(100, (used / cap) * 100)}%`, backgroundColor: '#3b82f6' }}
-                />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <div style={{ width: 64, height: 4, borderRadius: 999, backgroundColor: '#bfdbfe', overflow: 'hidden' }}>
+                <div style={{ height: 4, width: Math.min(100, (used / cap) * 100) + '%', backgroundColor: '#3b82f6', borderRadius: 999 }} />
               </div>
-              <span className="text-xs" style={{ color: '#3b82f6' }}>{used}/{cap}</span>
+              <span style={{ fontSize: 11, color: '#3b82f6' }}>{used} / {cap}</span>
             </div>
           )}
         </div>
       )}
 
-      {/* Divider */}
       {isTrial && showOnboarding && (
-        <div className="h-4 w-px bg-blue-200 shrink-0" />
+        <div style={{ width: 1, height: 16, backgroundColor: '#bfdbfe', flexShrink: 0 }} />
       )}
 
-      {/* Middle: onboarding steps */}
       {showOnboarding && (
-        <div className="flex items-center gap-1 flex-1 min-w-0">
-          <span className="text-xs text-gray-400 shrink-0 mr-1">
-            {allDone ? 'Setup complete' : `Setup ${completedCount}/${steps.length}`}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 }}>
+          <span style={{ fontSize: 11, color: '#94a3b8', flexShrink: 0, marginRight: 4 }}>
+            {allDone ? 'Setup complete •' : `Setup ${completedCount}/${steps.length} •`}
           </span>
           {steps.map((step, i) => (
             <React.Fragment key={step.id}>
-              {i > 0 && <div className="w-4 h-px bg-blue-200 shrink-0" />}
+              {i > 0 && <div style={{ width: 16, height: 1, backgroundColor: '#bfdbfe', flexShrink: 0 }} />}
               <button
                 onClick={() => !step.done && router.push(step.href)}
                 disabled={step.done}
-                className="flex items-center gap-1 shrink-0 text-xs transition-all"
-                style={{ opacity: step.done ? 0.5 : 1, cursor: step.done ? 'default' : 'pointer' }}
+                style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', padding: '2px 0', cursor: step.done ? 'default' : 'pointer', opacity: step.done ? 0.5 : 1, flexShrink: 0 }}
               >
                 {step.done
-                  ? <CheckCircle2 className="w-3.5 h-3.5 shrink-0" style={{ color: '#3b82f6' }} />
-                  : <Circle className="w-3.5 h-3.5 shrink-0" style={{ color: '#93c5fd' }} />
+                  ? <CheckCircle2 style={{ width: 13, height: 13, color: '#3b82f6' }} />
+                  : <Circle style={{ width: 13, height: 13, color: '#93c5fd' }} />
                 }
-                <span
-                  className="font-medium whitespace-nowrap"
-                  style={{ color: step.done ? '#93c5fd' : '#1e3a8a' }}
-                >
+                <span style={{ fontSize: 11, fontWeight: 500, color: step.done ? '#93c5fd' : '#1e3a8a', whiteSpace: 'nowrap' }}>
                   {step.label}
                 </span>
               </button>
@@ -110,7 +96,7 @@ export function TopBar({ used, cap, tier, hasGradeConfigs, hasAssessors, hasStud
           {allDone && (
             <button
               onClick={() => { localStorage.setItem(DISMISSED_KEY, 'true'); setDismissed(true) }}
-              className="ml-2 text-xs text-blue-300 hover:text-blue-500 shrink-0"
+              style={{ marginLeft: 8, fontSize: 11, color: '#93c5fd', background: 'none', border: 'none', cursor: 'pointer' }}
             >
               Dismiss
             </button>
@@ -118,16 +104,15 @@ export function TopBar({ used, cap, tier, hasGradeConfigs, hasAssessors, hasStud
         </div>
       )}
 
-      {/* Right: CTA */}
       {isTrial && (
         
           href="/school/billing"
-          className="ml-auto shrink-0 text-xs font-semibold px-3 py-1.5 rounded-lg text-white transition-colors"
-          style={{ backgroundColor: isWarning ? '#dc2626' : '#1d4ed8' }}
+          style={{ marginLeft: 'auto', flexShrink: 0, fontSize: 11, fontWeight: 600, padding: '5px 12px', borderRadius: 8, color: 'white', backgroundColor: ctaBg, textDecoration: 'none' }}
         >
-          View plans →
+          View plans
         </a>
       )}
+
     </div>
   )
 }
