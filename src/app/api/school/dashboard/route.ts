@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
   const supabase = createServerClient();
 
   // Parallel queries for speed
-  const [studentsRes, submissionsRes, decisionsRes, schoolRes, assessorsRes, gradeConfigsRes] =
+  const [studentsRes, submissionsRes, decisionsRes, schoolRes, gradeConfigsRes] =
     await Promise.all([
       supabase
         .from("students")
@@ -67,13 +67,6 @@ export async function GET(req: NextRequest) {
         )
         .eq("id", schoolId)
         .single(),
-
-      supabase
-        .from("assessors")
-        .select("id")
-        .eq("school_id", schoolId)
-        .limit(1),
-
       supabase
         .from("grade_configs")
         .select("id")
