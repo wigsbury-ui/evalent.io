@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   Card,
@@ -889,10 +888,6 @@ function DomainPerformanceCards({
 }
 
 export default function SchoolDashboard() {
-  const searchParams = useSearchParams()
-  useEffect(() => {
-    if (searchParams.get('welcome') === '1') setShowOnboarding(true)
-  }, [searchParams])
   const [data, setData] = useState<DashboardData | null>(null);
   const [gradeConfigs, setGradeConfigs] = useState<GradeConfig[]>([]);
   const [loading, setLoading] = useState(true);
