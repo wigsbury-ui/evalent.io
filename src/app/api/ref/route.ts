@@ -10,20 +10,22 @@ export async function GET(req: NextRequest) {
   const supabase = createServerClient();
   const { data: link } = await supabase
     .from("referral_links")
-    .select("id, destination_url, is_active, partner_id")
+    .select("id, destination_url, is_active, partner_id, clicks")
     .eq("slug", slug)
     .single();
 
   if (!link || !link.is_active) return NextResponse.redirect("https://app.evalent.io/signup");
 
   // Increment click counter (fire and forget)
-  supabase.from("referral_links").update({ clicks: link.clicks + 1 }).eq("id", link.id).then(() => {});
+  supabase.from("referral_links")
+    .update({ clicks: (link.clicks ?? 0) + 1 })
+    .eq("id", link.id)
+    .then(() => {});
 
   const dest = new URL(link.destination_url || "https://app.evalent.io/signup");
   dest.searchParams.set("ref", slug);
 
   const response = NextResponse.redirect(dest.toString());
-  // 30-day cookie for attribution
   response.cookies.set("evalent_ref", slug, {
     maxAge: 60 * 60 * 24 * 30,
     path: "/",
