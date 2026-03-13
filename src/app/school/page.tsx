@@ -167,19 +167,7 @@ function GradeChart({ data, gradeNaming }: { data: GradeBarData[]; gradeNaming: 
   };
 
   return (
-    <>
-      {showOnboarding && data && (
-        <OnboardingModal
-          schoolName={data.school_name || ''}
-          assessmentCount={data.assessment_count_year || 0}
-          tierCap={data.tier_cap || 10}
-          onClose={() => {
-            setShowOnboarding(false)
-            window.history.replaceState({}, '', '/school')
-          }}
-        />
-      )}
-      <div>
+    <div>
       <div className="flex items-end gap-3" style={{ height: 200 }}>
         {data.map((d) => {
           const barHeight = d.total > 0 ? (d.total / maxTotal) * 180 : 0;
@@ -313,19 +301,7 @@ function BandDonut({ bands, total }: { bands: BandCount[]; total: number }) {
   const gradient = "conic-gradient(" + stops.join(", ") + ")";
 
   return (
-    <>
-      {showOnboarding && data && (
-        <OnboardingModal
-          schoolName={data.school_name || ''}
-          assessmentCount={data.assessment_count_year || 0}
-          tierCap={data.tier_cap || 10}
-          onClose={() => {
-            setShowOnboarding(false)
-            window.history.replaceState({}, '', '/school')
-          }}
-        />
-      )}
-      <div className="flex items-center gap-6">
+    <div className="flex items-center gap-6">
       {/* Donut */}
       <div className="relative flex-shrink-0" style={{ width: 140, height: 140 }}>
         <div
@@ -444,19 +420,7 @@ function ThresholdLineChart({
   const yTicks = [0, 25, 50, 75, 100];
 
   return (
-    <>
-      {showOnboarding && data && (
-        <OnboardingModal
-          schoolName={data.school_name || ''}
-          assessmentCount={data.assessment_count_year || 0}
-          tierCap={data.tier_cap || 10}
-          onClose={() => {
-            setShowOnboarding(false)
-            window.history.replaceState({}, '', '/school')
-          }}
-        />
-      )}
-      <div>
+    <div>
       <svg
         viewBox={`0 0 ${w} ${h}`}
         className="w-full"
@@ -759,19 +723,7 @@ function DomainPerformanceCards({
   ];
 
   return (
-    <>
-      {showOnboarding && data && (
-        <OnboardingModal
-          schoolName={data.school_name || ''}
-          assessmentCount={data.assessment_count_year || 0}
-          tierCap={data.tier_cap || 10}
-          onClose={() => {
-            setShowOnboarding(false)
-            window.history.replaceState({}, '', '/school')
-          }}
-        />
-      )}
-      <div className="space-y-3">
+    <div className="space-y-3">
       <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
         Academic Realms — Student Performance vs Thresholds
       </h3>
@@ -1780,8 +1732,6 @@ export default function SchoolDashboard() {
         </CardContent>
       </Card>
     </div>
-  );
-}
     </>
-  )
+  );
 }
