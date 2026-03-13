@@ -1204,8 +1204,6 @@ export default function SchoolDashboard() {
   return (
     <>
       <div className="space-y-6 max-w-[1400px] mx-auto px-6 py-6">
-        {data && (
-        )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
