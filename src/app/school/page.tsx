@@ -904,7 +904,7 @@ export default function SchoolDashboard() {
     if (insights.length > 0) {
       try { window.sessionStorage.setItem("evalent_insights_" + slug, JSON.stringify(insights)); } catch {}
     }
-  }, [insights, data?.school?.slug]);
+  }, [insights, data?.school?.name]);
 
   // Load cached insights once school data is available
   useEffect(() => {
@@ -914,7 +914,7 @@ export default function SchoolDashboard() {
       const cached = window.sessionStorage.getItem("evalent_insights_" + slug);
       if (cached) setInsights(JSON.parse(cached));
     } catch {}
-  }, [data?.school?.slug]);
+  }, [data?.school?.name]);
 
   useEffect(() => {
     Promise.all([
