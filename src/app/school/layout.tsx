@@ -17,7 +17,7 @@ export default async function SchoolLayout({ children }: { children: React.React
   const supabase = createServerClient()
   const [{ data: school }, { data: gradeConfigs }, { data: students }] =
     await Promise.all([
-      supabase.from('schools').select('name, logo_url, subscription_tier, tier_cap, assessment_count_year').eq('id', session.user.schoolId).single(),
+      supabase.from('schools').select('name, logo_url, subscription_tier, tier_cap, assessment_count_year, default_assessor_email').eq('id', session.user.schoolId).single(),
       supabase.from('grade_configs').select('id').eq('school_id', session.user.schoolId).limit(1),
       supabase.from('students').select('id').eq('school_id', session.user.schoolId).limit(1),
     ])
