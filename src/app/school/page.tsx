@@ -893,23 +893,28 @@ export default function SchoolDashboard() {
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [intakeFilter, setIntakeFilter] = useState<string>("all");
-  const [insights, setInsights] = useState<string[]>(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const cached = window.sessionStorage.getItem("evalent_insights");
-        return cached ? JSON.parse(cached) : [];
-      } catch { return []; }
-    }
-    return [];
-  });
+  const [insights, setInsights] = useState<string[]>([]);
   const [insightsLoading, setInsightsLoading] = useState(false);
   const [insightsError, setInsightsError] = useState<string | null>(null);
 
+  // Cache insights per school slug to avoid cross-school contamination
   useEffect(() => {
+    const slug = data?.school?.slug;
+    if (!slug) return;
     if (insights.length > 0) {
-      try { window.sessionStorage.setItem("evalent_insights", JSON.stringify(insights)); } catch {}
+      try { window.sessionStorage.setItem("evalent_insights_" + slug, JSON.stringify(insights)); } catch {}
     }
-  }, [insights]);
+  }, [insights, data?.school?.slug]);
+
+  // Load cached insights once school data is available
+  useEffect(() => {
+    const slug = data?.school?.slug;
+    if (!slug) return;
+    try {
+      const cached = window.sessionStorage.getItem("evalent_insights_" + slug);
+      if (cached) setInsights(JSON.parse(cached));
+    } catch {}
+  }, [data?.school?.slug]);
 
   useEffect(() => {
     Promise.all([
