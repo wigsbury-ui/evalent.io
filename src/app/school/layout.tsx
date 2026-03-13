@@ -36,8 +36,8 @@ export default async function SchoolLayout({ children }: { children: React.React
           hasAssessors={(assessors?.length ?? 0) > 0}
           hasStudents={(students?.length ?? 0) > 0}
         />
-        <main className="flex-1 overflow-y-auto">
-          {children}
+        <main className="flex-1 overflow-y-auto"><div className="max-w-[1400px] mx-auto px-6 py-6">
+          {children}</div>
         </main>
       </div>
       <EvalentChat />

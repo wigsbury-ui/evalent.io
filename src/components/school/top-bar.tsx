@@ -39,8 +39,8 @@ export function TopBar({ used, cap, tier, hasGradeConfigs, hasAssessors, hasStud
   if (!isTrial && !showOnboarding) return null
   const bg = exhausted ? '#fef2f2' : '#eff6ff'
   const borderColor = exhausted ? '#fecaca' : '#bfdbfe'
-  const pillBg = exhausted ? '#fee2e2' : '#dbeafe'
-  const pillColor = exhausted ? '#991b1b' : '#1d4ed8'
+  const pillBg = exhausted ? '#fee2e2' : '#dcfce7'
+  const pillColor = exhausted ? '#991b1b' : '#166534'
   const ctaBg = exhausted ? '#dc2626' : '#1d4ed8'
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 24, padding: '0 24px', height: 44, backgroundColor: bg, borderBottom: '1px solid ' + borderColor, flexShrink: 0 }}>
@@ -52,9 +52,9 @@ export function TopBar({ used, cap, tier, hasGradeConfigs, hasAssessors, hasStud
           {!exhausted && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <div style={{ width: 64, height: 4, borderRadius: 999, backgroundColor: '#bfdbfe', overflow: 'hidden' }}>
-                <div style={{ height: 4, width: Math.min(100, (used / cap) * 100) + '%', backgroundColor: '#3b82f6', borderRadius: 999 }} />
+                <div style={{ height: 4, width: Math.min(100, (used / cap) * 100) + '%', backgroundColor: '#16a34a', borderRadius: 999 }} />
               </div>
-              <span style={{ fontSize: 11, color: '#3b82f6' }}>{used}/{cap}</span>
+              <span style={{ fontSize: 11, color: '#16a34a' }}>{used}/{cap}</span>
             </div>
           )}
         </div>
