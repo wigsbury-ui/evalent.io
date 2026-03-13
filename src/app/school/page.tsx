@@ -899,7 +899,7 @@ export default function SchoolDashboard() {
 
   // Cache insights per school slug to avoid cross-school contamination
   useEffect(() => {
-    const slug = data?.school?.slug;
+    const slug = data?.school?.id;
     if (!slug) return;
     if (insights.length > 0) {
       try { window.sessionStorage.setItem("evalent_insights_" + slug, JSON.stringify(insights)); } catch {}
@@ -908,7 +908,7 @@ export default function SchoolDashboard() {
 
   // Load cached insights once school data is available
   useEffect(() => {
-    const slug = data?.school?.slug;
+    const slug = data?.school?.id;
     if (!slug) return;
     try {
       const cached = window.sessionStorage.getItem("evalent_insights_" + slug);
