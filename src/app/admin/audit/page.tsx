@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { ScrollText, ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { ScrollText, ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight, Search, X } from "lucide-react";
 
 const PAGE_SIZE = 50;
 
@@ -57,6 +57,8 @@ export default function AuditPage() {
   const [sortField, setSortField] = useState<SortField>("created_at");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   const [filterAction, setFilterAction] = useState("");
+  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
 
   const fetchLogs = useCallback(async () => {
     setLoading(true);
@@ -65,23 +67,32 @@ export default function AuditPage() {
       sort: sortField,
       dir: sortDir,
       ...(filterAction ? { action: filterAction } : {}),
+      ...(search ? { search } : {}),
     });
     const res = await fetch(`/api/admin/audit?${params}`);
     const data = await res.json();
     setLogs(data.logs ?? []);
     setTotal(data.total ?? 0);
     setLoading(false);
-  }, [page, sortField, sortDir, filterAction]);
+  }, [page, sortField, sortDir, filterAction, search]);
 
   useEffect(() => { fetchLogs(); }, [fetchLogs]);
 
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSearch(searchInput.trim());
+    setPage(0);
+  };
+
+  const clearSearch = () => {
+    setSearchInput("");
+    setSearch("");
+    setPage(0);
+  };
+
   const toggleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDir(d => d === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortDir("desc");
-    }
+    if (sortField === field) setSortDir(d => d === "asc" ? "desc" : "asc");
+    else { setSortField(field); setSortDir("desc"); }
     setPage(0);
   };
 
@@ -102,6 +113,24 @@ export default function AuditPage() {
           <h1 className="text-2xl font-bold text-gray-900">Audit Log</h1>
           <p className="text-sm text-gray-400 mt-0.5">All system actions with timestamps and actors.</p>
         </div>
+      </div>
+
+      {/* Filters row */}
+      <div className="flex items-center gap-3">
+        <form onSubmit={handleSearch} className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+          <input
+            value={searchInput}
+            onChange={e => setSearchInput(e.target.value)}
+            placeholder="Search by email or entity…"
+            className="w-full rounded-lg border border-gray-300 pl-9 pr-8 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+          />
+          {searchInput && (
+            <button type="button" onClick={clearSearch} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              <X className="h-4 w-4" />
+            </button>
+          )}
+        </form>
         <select
           value={filterAction}
           onChange={e => { setFilterAction(e.target.value); setPage(0); }}
@@ -112,6 +141,14 @@ export default function AuditPage() {
             <option key={val} value={val}>{label}</option>
           ))}
         </select>
+        {(search || filterAction) && (
+          <button
+            onClick={() => { clearSearch(); setFilterAction(""); setPage(0); }}
+            className="text-xs text-gray-400 hover:text-gray-600 underline"
+          >
+            Clear all
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -124,25 +161,17 @@ export default function AuditPage() {
         <div className="flex flex-col items-center justify-center py-24 rounded-xl border border-gray-100 bg-white">
           <ScrollText className="h-14 w-14 text-gray-300" />
           <h3 className="mt-4 text-lg font-semibold text-gray-900">No activity found</h3>
-          <p className="mt-2 text-sm text-gray-500">Try changing the filter or check back later.</p>
+          <p className="mt-2 text-sm text-gray-500">Try a different search or filter.</p>
         </div>
       ) : (
         <div className="rounded-xl border border-gray-100 bg-white overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
-                <th className={thCls} onClick={() => toggleSort("created_at")}>
-                  Time <SortIcon field="created_at" />
-                </th>
-                <th className={thCls} onClick={() => toggleSort("action")}>
-                  Action <SortIcon field="action" />
-                </th>
-                <th className={thCls} onClick={() => toggleSort("actor_email")}>
-                  Actor <SortIcon field="actor_email" />
-                </th>
-                <th className={thCls} onClick={() => toggleSort("entity_type")}>
-                  Entity <SortIcon field="entity_type" />
-                </th>
+                <th className={thCls} onClick={() => toggleSort("created_at")}>Time <SortIcon field="created_at" /></th>
+                <th className={thCls} onClick={() => toggleSort("action")}>Action <SortIcon field="action" /></th>
+                <th className={thCls} onClick={() => toggleSort("actor_email")}>Actor <SortIcon field="actor_email" /></th>
+                <th className={thCls} onClick={() => toggleSort("entity_type")}>Entity <SortIcon field="entity_type" /></th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
               </tr>
             </thead>
@@ -167,36 +196,24 @@ export default function AuditPage() {
               ))}
             </tbody>
           </table>
-
           <div className="border-t border-gray-100 px-4 py-3 flex items-center justify-between">
-            <p className="text-xs text-gray-400">
-              {total} total entries · page {page + 1} of {totalPages}
-            </p>
+            <p className="text-xs text-gray-400">{total} total · page {page + 1} of {Math.max(1, totalPages)}</p>
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => setPage(p => Math.max(0, p - 1))}
-                disabled={page === 0}
-                className="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
-              >
+              <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={page === 0}
+                className="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed">
                 <ChevronLeft className="h-4 w-4" />
               </button>
               {[...Array(Math.min(5, totalPages))].map((_, i) => {
                 const pageNum = Math.min(Math.max(page - 2, 0) + i, totalPages - 1);
                 return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setPage(pageNum)}
-                    className={`rounded-lg border px-3 py-1 text-xs ${pageNum === page ? "border-blue-500 bg-blue-50 text-blue-600 font-medium" : "border-gray-200 text-gray-500 hover:bg-gray-50"}`}
-                  >
+                  <button key={pageNum} onClick={() => setPage(pageNum)}
+                    className={`rounded-lg border px-3 py-1 text-xs ${pageNum === page ? "border-blue-500 bg-blue-50 text-blue-600 font-medium" : "border-gray-200 text-gray-500 hover:bg-gray-50"}`}>
                     {pageNum + 1}
                   </button>
                 );
               })}
-              <button
-                onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
-                disabled={page >= totalPages - 1}
-                className="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed"
-              >
+              <button onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1}
+                className="rounded-lg border border-gray-200 p-1.5 text-gray-500 hover:bg-gray-50 disabled:opacity-30 disabled:cursor-not-allowed">
                 <ChevronRight className="h-4 w-4" />
               </button>
             </div>

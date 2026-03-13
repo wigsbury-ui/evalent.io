@@ -12,16 +12,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { searchParams } = new URL(req.url);
-  const page = Math.max(0, parseInt(searchParams.get("page") ?? "0"));
-  const sort = ALLOWED_SORT.includes(searchParams.get("sort") ?? "") ? searchParams.get("sort")! : "created_at";
-  const dir = searchParams.get("dir") === "asc" ? true : false;
+  const page  = Math.max(0, parseInt(searchParams.get("page") ?? "0"));
+  const sort  = ALLOWED_SORT.includes(searchParams.get("sort") ?? "") ? searchParams.get("sort")! : "created_at";
+  const asc   = searchParams.get("dir") === "asc";
   const action = searchParams.get("action") ?? "";
+  const search = (searchParams.get("search") ?? "").trim();
 
   const supabase = createServerClient();
-
   let query = supabase.from("audit_log").select("*", { count: "exact" });
+
   if (action) query = query.eq("action", action);
-  query = query.order(sort, { ascending: dir }).range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+  if (search) query = query.or(`actor_email.ilike.%${search}%,entity_id.ilike.%${search}%,entity_type.ilike.%${search}%`);
+
+  query = query.order(sort, { ascending: asc }).range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
 
   const { data: logs, count, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
