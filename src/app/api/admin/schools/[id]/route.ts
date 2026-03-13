@@ -5,7 +5,7 @@ import { createServerClient } from "@/lib/supabase/server";
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.isSuperAdmin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session || session.user.role !== "super_admin") return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const supabase = createServerClient();
   const { data, error } = await supabase.from("schools").select("*").eq("id", params.id).single();
   if (error) return NextResponse.json({ error: error.message }, { status: 404 });
@@ -14,7 +14,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.isSuperAdmin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session || session.user.role !== "super_admin") return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = await req.json();
   const supabase = createServerClient();
   const allowed = ["name","slug","curriculum","locale","contact_email","subscription_tier","tier_cap","is_active"];
