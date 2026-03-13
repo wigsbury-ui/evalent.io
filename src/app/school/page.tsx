@@ -1206,9 +1206,9 @@ export default function SchoolDashboard() {
     <>
       {showOnboarding && data && (
         <OnboardingModal
-          schoolName={data.school_name || ''}
-          assessmentCount={data.assessment_count_year || 0}
-          tierCap={data.tier_cap || 10}
+          schoolName={data.school?.name || ''}
+          assessmentCount={0}
+          tierCap={10}
           onClose={() => {
             setShowOnboarding(false)
             window.history.replaceState({}, '', '/school')
