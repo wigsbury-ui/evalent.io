@@ -334,7 +334,7 @@ export default function PartnerEditPage() {
               <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-700">
                 <span className="font-medium">Effective rate: </span>
                 {form.override_commission_model === "fixed" ? `$${form.override_commission_value || "??"}` : `${form.override_commission_value || "??"}%`}
-                {" "}of {SCOPE_LABEL[form.override_commission_scope] ?? form.override_commission_scope || type?.commission_scope || "—"}
+                {" "}of {(SCOPE_LABEL[form.override_commission_scope] ?? form.override_commission_scope ?? type?.commission_scope) || "—"}
               </div>
             )}
           </CardContent>
