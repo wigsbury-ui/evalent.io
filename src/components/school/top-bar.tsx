@@ -92,9 +92,9 @@ export function TopBar({ used, cap, tier, hasGradeConfigs, hasAssessors, hasStud
                     disabled={step.done}
                     style={{
                       display: 'flex', alignItems: 'center', gap: 5,
-                      background: 'none', border: 'none', cursor: step.done ? 'default' : 'pointer',
-                      padding: '4px 8px', borderRadius: 5, flexShrink: 0,
                       background: step.done ? 'transparent' : 'white',
+                      border: 'none', cursor: step.done ? 'default' : 'pointer',
+                      padding: '4px 8px', borderRadius: 5, flexShrink: 0,
                       boxShadow: step.done ? 'none' : '0 1px 3px rgba(0,0,0,0.08)',
                     }}>
                     {step.done
