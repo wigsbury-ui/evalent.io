@@ -151,7 +151,7 @@ export async function GET(req: NextRequest) {
 
   const onboarding = {
     hasGradeConfigs: (gradeConfigsRes.data?.length ?? 0) > 0,
-    hasAssessors: (assessorsRes.data?.length ?? 0) > 0,
+    hasAssessors: !!(schoolRes.data?.default_assessor_email),
     hasStudents: students.length > 0,
   }
 
