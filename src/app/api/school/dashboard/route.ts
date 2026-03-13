@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
   const supabase = createServerClient();
 
   // Parallel queries for speed
-  const [studentsRes, submissionsRes, decisionsRes, schoolRes] =
+  const [studentsRes, submissionsRes, decisionsRes, schoolRes, assessorsRes, gradeConfigsRes] =
     await Promise.all([
       supabase
         .from("students")
@@ -67,6 +67,18 @@ export async function GET(req: NextRequest) {
         )
         .eq("id", schoolId)
         .single(),
+
+      supabase
+        .from("assessors")
+        .select("id")
+        .eq("school_id", schoolId)
+        .limit(1),
+
+      supabase
+        .from("grade_configs")
+        .select("id")
+        .eq("school_id", schoolId)
+        .limit(1),
     ]);
 
   const students = studentsRes.data || [];
@@ -137,5 +149,11 @@ export async function GET(req: NextRequest) {
     in_pipeline: inPipeline,
   };
 
-  return NextResponse.json({ school, stats, pipeline });
+  const onboarding = {
+    hasGradeConfigs: (gradeConfigsRes.data?.length ?? 0) > 0,
+    hasAssessors: (assessorsRes.data?.length ?? 0) > 0,
+    hasStudents: students.length > 0,
+  }
+
+  return NextResponse.json({ school, stats, pipeline, onboarding });
 }
