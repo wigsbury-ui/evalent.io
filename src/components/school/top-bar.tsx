@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, Circle, Zap } from 'lucide-react'
+import { CheckCircle2, Circle } from 'lucide-react'
 
 interface TopBarProps {
   used: number
@@ -28,109 +28,85 @@ export function TopBar({ used, cap, tier, hasGradeConfigs, hasAssessors, hasStud
   const isTrial = tier === 'trial' && cap < 9999
   const exhausted = (cap - used) <= 0
   const showOnboarding = mounted && !dismissed
-
   const steps = [
-    { id: 'config',   label: 'Configure school',  href: '/school/config',        done: hasGradeConfigs },
-    { id: 'assessor', label: 'Add assessor',       href: '/school/assessors',     done: hasAssessors },
-    { id: 'student',  label: 'Register student',   href: '/school/students/new',  done: hasStudents },
+    { id: 'config',   label: 'Configure school', href: '/school/config',       done: hasGradeConfigs },
+    { id: 'assessor', label: 'Add assessor',      href: '/school/assessors',    done: hasAssessors },
+    { id: 'student',  label: 'Register student',  href: '/school/students/new', done: hasStudents },
   ]
   const completedCount = steps.filter(s => s.done).length
   const allDone = completedCount === steps.length
 
   if (!isTrial && !showOnboarding) return null
 
+  const brand = '#1a2b6b'
   const pct = Math.min(100, Math.round((used / cap) * 100))
 
   return (
-    <div style={{
-      background: exhausted ? 'linear-gradient(90deg,#fef2f2,#fee2e2)' : 'linear-gradient(90deg,#eef2ff,#eff6ff)',
-      borderBottom: '1px solid ' + (exhausted ? '#fca5a5' : '#c7d2fe'),
-      height: 52,
-      display: 'flex',
-      alignItems: 'center',
-    }}>
-      {/* Inner wrapper — matches main content exactly */}
-      <div style={{ width: '100%', maxWidth: 1400, margin: '0 auto', padding: '0 24px', display: 'flex', alignItems: 'center', gap: 0 }}>
+    <div className="w-full" style={{ background: '#eef1f8', borderBottom: '1px solid #d0d8ee', height: 48 }}>
+      <div className="max-w-[1400px] mx-auto px-6 h-full flex items-center gap-5">
 
-        {/* LEFT: Trial badge + usage */}
         {isTrial && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 5,
-              background: exhausted ? '#dc2626' : '#4f46e5',
-              color: 'white', borderRadius: 6,
-              padding: '3px 10px', fontSize: 11, fontWeight: 700, letterSpacing: '0.03em'
-            }}>
-              <Zap style={{ width: 11, height: 11 }} />
+          <div className="flex items-center gap-3 shrink-0">
+            <span style={{ background: brand, color: 'white', fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 5, letterSpacing: '0.04em' }}>
               {exhausted ? 'TRIAL ENDED' : 'FREE TRIAL'}
-            </div>
+            </span>
             {!exhausted && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <div style={{ width: 80, height: 5, borderRadius: 999, background: '#c7d2fe', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', width: pct + '%', background: '#4f46e5', borderRadius: 999, transition: 'width 0.3s' }} />
+              <div className="flex items-center gap-2">
+                <div style={{ width: 72, height: 4, borderRadius: 99, background: '#c5cde8', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', width: pct + '%', background: brand, borderRadius: 99 }} />
                 </div>
-                <span style={{ fontSize: 12, fontWeight: 600, color: '#3730a3' }}>{used}<span style={{ fontWeight: 400, color: '#6366f1' }}>/{cap}</span></span>
-                <span style={{ fontSize: 11, color: '#6366f1' }}>assessments used</span>
+                <span style={{ fontSize: 12, color: brand, fontWeight: 600 }}>{used}/{cap}</span>
+                <span style={{ fontSize: 11, color: '#5a6a9a' }}>assessments used</span>
               </div>
             )}
           </div>
         )}
 
-        {/* CENTRE: Onboarding steps */}
-        {showOnboarding && (
-          <>
-            <div style={{ width: 1, height: 20, background: '#c7d2fe', margin: '0 20px', flexShrink: 0 }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#3730a3', marginRight: 6, flexShrink: 0 }}>
-                {allDone ? '✓ Setup complete' : `Setup ${completedCount}/${steps.length}`}
-              </span>
-              {steps.map((step, i) => (
-                <React.Fragment key={step.id}>
-                  {i > 0 && <div style={{ width: 20, height: 1, background: '#c7d2fe', flexShrink: 0 }} />}
-                  <button
-                    onClick={() => { if (!step.done) router.push(step.href) }}
-                    disabled={step.done}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 5,
-                      background: step.done ? 'transparent' : 'white',
-                      border: 'none', cursor: step.done ? 'default' : 'pointer',
-                      padding: '4px 8px', borderRadius: 5, flexShrink: 0,
-                      boxShadow: step.done ? 'none' : '0 1px 3px rgba(0,0,0,0.08)',
-                    }}>
-                    {step.done
-                      ? <CheckCircle2 style={{ width: 14, height: 14, color: '#4f46e5' }} />
-                      : <Circle style={{ width: 14, height: 14, color: '#a5b4fc' }} />}
-                    <span style={{ fontSize: 12, fontWeight: step.done ? 400 : 600, color: step.done ? '#6366f1' : '#1e1b4b', whiteSpace: 'nowrap' }}>
-                      {step.label}
-                    </span>
-                  </button>
-                </React.Fragment>
-              ))}
-              {allDone && (
-                <button
-                  onClick={() => { localStorage.setItem(DISMISSED_KEY, 'true'); setDismissed(true) }}
-                  style={{ marginLeft: 4, fontSize: 11, color: '#818cf8', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', flexShrink: 0 }}>
-                  Dismiss
-                </button>
-              )}
-            </div>
-          </>
+        {isTrial && showOnboarding && (
+          <div style={{ width: 1, height: 18, background: '#c5cde8' }} className="shrink-0" />
         )}
 
-        {/* RIGHT: CTA */}
+        {showOnboarding && (
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span style={{ fontSize: 12, fontWeight: 600, color: brand, marginRight: 6 }} className="shrink-0">
+              {allDone ? '✓ Setup complete' : `Setup ${completedCount}/${steps.length}`}
+            </span>
+            {steps.map((step, i) => (
+              <React.Fragment key={step.id}>
+                {i > 0 && <div style={{ width: 18, height: 1, background: '#c5cde8' }} className="shrink-0" />}
+                <button
+                  onClick={() => { if (!step.done) router.push(step.href) }}
+                  disabled={step.done}
+                  className="flex items-center gap-1.5 shrink-0"
+                  style={{ background: 'none', border: 'none', cursor: step.done ? 'default' : 'pointer', padding: '3px 0' }}>
+                  {step.done
+                    ? <CheckCircle2 style={{ width: 13, height: 13, color: brand }} />
+                    : <Circle style={{ width: 13, height: 13, color: '#8b9cc8' }} />}
+                  <span style={{ fontSize: 12, fontWeight: 500, color: step.done ? '#8b9cc8' : brand, whiteSpace: 'nowrap' }}>
+                    {step.label}
+                  </span>
+                </button>
+              </React.Fragment>
+            ))}
+            {allDone && (
+              <button
+                onClick={() => { localStorage.setItem(DISMISSED_KEY, 'true'); setDismissed(true) }}
+                className="shrink-0"
+                style={{ marginLeft: 6, fontSize: 11, color: '#8b9cc8', background: 'none', border: 'none', cursor: 'pointer' }}>
+                Dismiss
+              </button>
+            )}
+          </div>
+        )}
+
         {isTrial && (
-          <a href="/school/billing" style={{ marginLeft: 'auto', flexShrink: 0 }}>
-            <div style={{
-              background: exhausted ? '#dc2626' : '#4f46e5',
-              color: 'white', borderRadius: 8, padding: '7px 18px',
-              fontSize: 12, fontWeight: 700, letterSpacing: '0.02em',
-              boxShadow: '0 2px 8px rgba(79,70,229,0.35)',
-              cursor: 'pointer',
-            }}>
+          <a href="/school/billing" className="shrink-0" style={{ marginLeft: 'auto' }}>
+            <span style={{ background: brand, color: 'white', fontSize: 12, fontWeight: 600, padding: '6px 16px', borderRadius: 7, cursor: 'pointer', display: 'block' }}>
               {exhausted ? 'Upgrade now' : 'View plans →'}
-            </div>
+            </span>
           </a>
         )}
+
       </div>
     </div>
   )
