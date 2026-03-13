@@ -36,7 +36,7 @@ export function SchoolSidebar({ schoolName = "School Admin", logoUrl = null }: {
         style={{ width: expanded ? 224 : 56 }}
       >
         {/* Logo */}
-        <div className="flex h-14 items-center border-b border-gray-100 px-3 shrink-0">
+        <div className="flex h-14 items-center border-b border-gray-100 shrink-0 justify-center">
           <div className="flex items-center gap-3">
             {logoUrl ? (
               <img src={logoUrl} alt={schoolName} className="h-8 w-8 shrink-0 rounded-lg object-contain" />
@@ -65,7 +65,7 @@ export function SchoolSidebar({ schoolName = "School Admin", logoUrl = null }: {
                 href={item.href}
                 title={item.label}
                 className={cn(
-                  "flex items-center rounded-lg px-2 py-2 text-sm font-medium transition-colors whitespace-nowrap overflow-hidden",
+                  "flex items-center rounded-lg py-2 text-sm font-medium transition-colors whitespace-nowrap overflow-hidden justify-center",
                   isActive ? "text-white" : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
                 )}
                 style={isActive ? { backgroundColor: "#1a2b6b" } : {}}
@@ -87,7 +87,7 @@ export function SchoolSidebar({ schoolName = "School Admin", logoUrl = null }: {
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
             title="Sign out"
-            className="flex w-full items-center rounded-lg px-2 py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900 whitespace-nowrap overflow-hidden"
+            className="flex w-full items-center rounded-lg py-2 text-sm font-medium text-gray-500 transition-colors hover:bg-gray-50 hover:text-gray-900 whitespace-nowrap overflow-hidden justify-center"
           >
             <LogOut className="h-5 w-5 shrink-0 text-gray-400" />
             <span
