@@ -139,6 +139,6 @@ Return ONLY the JSON array.`,
     const posts = JSON.parse(clean);
     return NextResponse.json({ posts });
   } catch {
-    return NextResponse.json({ error: "Failed to parse AI response", raw: text }, { status: 500 });
+    return NextResponse.json({ posts: [], error: "parse_failed", raw: text.slice(0, 500) });
   }
 }
