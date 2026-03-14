@@ -7,7 +7,7 @@ import { Plus, Loader2, Pencil, Trash2, Eye, EyeOff, GripVertical, X, Check } fr
 const CATEGORIES = ["Product Demo", "How to Pitch", "Platform Walkthrough", "School Testimonial", "Social Media", "Training", "General"];
 const inp = "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500";
 
-const EMPTY_FORM = { title: "", vimeo_id: "", description: "", category: "General", thumbnail_url: "", is_live: false, sort_order: 0 };
+const EMPTY_FORM = { title: "", vimeo_id: "", description: "", category: "General", thumbnail_url: "", is_live: false, sort_order: 0, share_caption: "" };
 
 export default function PartnerVideosPage() {
   const [videos, setVideos] = useState<any[]>([]);
@@ -29,7 +29,7 @@ export default function PartnerVideosPage() {
   const openNew = () => { setEditing(null); setForm({ ...EMPTY_FORM }); setShowForm(true); setError(""); };
   const openEdit = (v: any) => {
     setEditing(v);
-    setForm({ title: v.title, vimeo_id: v.vimeo_id, description: v.description || "", category: v.category, thumbnail_url: v.thumbnail_url || "", is_live: v.is_live, sort_order: v.sort_order });
+    setForm({ title: v.title, vimeo_id: v.vimeo_id, description: v.description || "", category: v.category, thumbnail_url: v.thumbnail_url || "", is_live: v.is_live, sort_order: v.sort_order, share_caption: v.share_caption || "" });
     setShowForm(true); setError("");
   };
 
@@ -113,6 +113,10 @@ export default function PartnerVideosPage() {
               <div className="col-span-2">
                 <label className="block text-xs font-medium text-gray-500 mb-1">Custom Thumbnail URL <span className="text-gray-400 font-normal">(optional — leave blank to auto-fetch from Vimeo)</span></label>
                 <input value={form.thumbnail_url} onChange={e => setForm(f => ({ ...f, thumbnail_url: e.target.value }))} className={inp} placeholder="https://..." />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-gray-500 mb-1">Share Caption <span className="text-gray-400 font-normal">(auto-generated — edit to customise)</span></label>
+                <textarea value={form.share_caption} onChange={e => setForm(f => ({ ...f, share_caption: e.target.value }))} rows={3} className={inp + " resize-none"} placeholder="Auto-generated from title and description on save..." />
               </div>
               <div className="col-span-2 flex items-center gap-3">
                 <label className="flex items-center gap-2 cursor-pointer">

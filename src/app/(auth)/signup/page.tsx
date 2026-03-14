@@ -66,6 +66,15 @@ function PasswordInput({
 export default function SignupPage() {
   const router = useRouter()
   const [step, setStep] = useState(1)
+
+  // Read ?ref= from URL and store as cookie so attribution persists through signup
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+    if (ref) {
+      document.cookie = `evalent_ref=${ref}; max-age=${60 * 60 * 24 * 30}; path=/; SameSite=Lax`;
+    }
+  }, []);
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [curricula, setCurricula] = useState<Curriculum[]>([])
