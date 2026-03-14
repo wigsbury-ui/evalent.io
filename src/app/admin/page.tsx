@@ -1,11 +1,10 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-  School, Users, FileText, CheckCircle2, DollarSign,
-  TrendingUp, AlertTriangle, UserCheck, CalendarPlus, BarChart3
+  School, Users, FileText, CheckCircle2, DollarSign, TrendingUp,
+  AlertTriangle, UserCheck, CalendarPlus, BarChart3, Target, ChevronRight
 } from "lucide-react";
 import Link from "next/link";
 
@@ -18,26 +17,50 @@ interface DashboardData {
   recentSubmissions: Array<{ id: string; student_name: string; grade: number; processing_status: string; created_at: string }>;
 }
 
-const TIER_LABELS: Record<string, string> = {
-  trial: "Trial", essentials: "Essentials", professional: "Professional", enterprise: "Enterprise"
-};
-const TIER_COLOURS: Record<string, string> = {
-  trial: "bg-gray-100 text-gray-600",
-  essentials: "bg-blue-100 text-blue-700",
-  professional: "bg-purple-100 text-purple-700",
-  enterprise: "bg-amber-100 text-amber-700",
-};
+interface YearTarget { schools: number; arr: number; assessments: number; }
+interface FiveYearTargets { start_year: number; years: YearTarget[]; }
 
-function fmt(n: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n);
+const TIER_LABELS: Record<string, string> = { trial: "Trial", essentials: "Essentials", professional: "Professional", enterprise: "Enterprise" };
+const TIER_COLOURS: Record<string, string> = { trial: "bg-gray-100 text-gray-600", essentials: "bg-blue-100 text-blue-700", professional: "bg-purple-100 text-purple-700", enterprise: "bg-amber-100 text-amber-700" };
+
+function fmt(n: number) { return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 }).format(n); }
+function fmtN(n: number) { return new Intl.NumberFormat("en-US").format(n); }
+
+function ProgressRing({ pct, colour, size = 80 }: { pct: number; colour: string; size?: number }) {
+  const r = (size - 12) / 2;
+  const circ = 2 * Math.PI * r;
+  const dash = Math.min(pct / 100, 1) * circ;
+  return (
+    <svg width={size} height={size} className="-rotate-90">
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#f3f4f6" strokeWidth={10} />
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={colour} strokeWidth={10}
+        strokeDasharray={`${dash} ${circ}`} strokeLinecap="round"
+        style={{ transition: "stroke-dasharray 0.6s ease" }} />
+    </svg>
+  );
 }
 
 export default function AdminDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
+  const [targets, setTargets] = useState<FiveYearTargets | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/admin/dashboard").then(r => r.json()).then(d => { setData(d); setLoading(false); }).catch(() => setLoading(false));
+    Promise.all([
+      fetch("/api/admin/dashboard").then(r => r.json()),
+      fetch("/api/admin/platform-settings").then(r => r.json()),
+    ]).then(([dash, settings]) => {
+      setData(dash);
+      if (settings?.five_year_targets) {
+        try {
+          const t = typeof settings.five_year_targets === "string"
+            ? JSON.parse(settings.five_year_targets)
+            : settings.five_year_targets;
+          if (t?.years?.length === 5) setTargets(t);
+        } catch {}
+      }
+      setLoading(false);
+    }).catch(() => setLoading(false));
   }, []);
 
   if (loading) return (
@@ -45,12 +68,21 @@ export default function AdminDashboard() {
       <div className="animate-pulse space-y-6">
         <div className="h-8 bg-gray-200 rounded w-48" />
         <div className="grid grid-cols-4 gap-4">{[...Array(4)].map((_,i) => <div key={i} className="h-28 bg-gray-100 rounded-xl" />)}</div>
-        <div className="grid grid-cols-4 gap-4">{[...Array(4)].map((_,i) => <div key={i} className="h-28 bg-gray-100 rounded-xl" />)}</div>
+        <div className="h-48 bg-gray-100 rounded-xl" />
       </div>
     </div>
   );
 
   const mrr = (data?.arr ?? 0) / 12;
+
+  // Targets calculation
+  const currentYear = new Date().getFullYear();
+  const yearIndex = targets ? Math.max(0, Math.min(4, currentYear - targets.start_year)) : 0;
+  const yearNum = yearIndex + 1;
+  const currentTargets = targets?.years[yearIndex];
+  const schoolsPct   = currentTargets && currentTargets.schools   > 0 ? Math.round(((data?.paidSchools ?? 0)  / currentTargets.schools)   * 100) : 0;
+  const arrPct       = currentTargets && currentTargets.arr       > 0 ? Math.round(((data?.arr ?? 0)          / currentTargets.arr)         * 100) : 0;
+  const assessPct    = currentTargets && currentTargets.assessments > 0 ? Math.round(((data?.submissions ?? 0) / currentTargets.assessments) * 100) : 0;
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-8">
@@ -114,6 +146,153 @@ export default function AdminDashboard() {
         </div>
       </div>
 
+      {/* ── Five-Year Progress Module ── */}
+      {targets && currentTargets && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Five-Year Plan</h2>
+            <Link href="/admin/targets" className="flex items-center gap-1 text-xs text-blue-500 hover:underline">
+              Edit targets <ChevronRight className="h-3 w-3" />
+            </Link>
+          </div>
+
+          <Card className="border-gray-100 overflow-hidden">
+            <CardContent className="p-0">
+
+              {/* Year roadmap strip */}
+              <div className="grid grid-cols-5 border-b border-gray-100">
+                {targets.years.map((y, i) => {
+                  const yr = targets.start_year + i;
+                  const isPast = i < yearIndex;
+                  const isCurrent = i === yearIndex;
+                  const isFuture = i > yearIndex;
+                  return (
+                    <div key={i}
+                      className={`px-4 py-3 text-center border-r border-gray-100 last:border-r-0 relative ${isCurrent ? "bg-[#0d52dd]" : isPast ? "bg-gray-50" : "bg-white"}`}>
+                      {isCurrent && (
+                        <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-[#0d52dd] border-2 border-white" />
+                      )}
+                      <p className={`text-xs font-semibold ${isCurrent ? "text-blue-100" : isFuture ? "text-gray-300" : "text-gray-400"}`}>
+                        YEAR {i + 1}
+                      </p>
+                      <p className={`text-sm font-bold mt-0.5 ${isCurrent ? "text-white" : isFuture ? "text-gray-300" : "text-gray-500"}`}>
+                        {yr}
+                      </p>
+                      <p className={`text-xs mt-1 font-mono ${isCurrent ? "text-blue-200" : isFuture ? "text-gray-200" : "text-gray-400"}`}>
+                        {y.schools} schools
+                      </p>
+                      <p className={`text-xs font-mono ${isCurrent ? "text-blue-200" : isFuture ? "text-gray-200" : "text-gray-400"}`}>
+                        ${y.arr >= 1000000 ? `${(y.arr/1000000).toFixed(1)}M` : y.arr >= 1000 ? `${Math.round(y.arr/1000)}K` : y.arr}
+                      </p>
+                      {isPast && (
+                        <div className="mt-1">
+                          <CheckCircle2 className="h-3.5 w-3.5 text-gray-300 mx-auto" />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Current year progress */}
+              <div className="p-6">
+                <div className="flex items-center gap-2 mb-5">
+                  <Target className="h-4 w-4 text-[#0d52dd]" />
+                  <h3 className="text-sm font-semibold text-gray-900">
+                    Year {yearNum} Progress — {currentYear}
+                  </h3>
+                  <span className="text-xs text-gray-400">targets set for end of year</span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-6">
+                  {[
+                    {
+                      label: "Paid Schools",
+                      current: data?.paidSchools ?? 0,
+                      target: currentTargets.schools,
+                      pct: schoolsPct,
+                      colour: "#0d52dd",
+                      format: (n: number) => fmtN(n),
+                    },
+                    {
+                      label: "ARR",
+                      current: data?.arr ?? 0,
+                      target: currentTargets.arr,
+                      pct: arrPct,
+                      colour: "#16a34a",
+                      format: (n: number) => fmt(n),
+                    },
+                    {
+                      label: "Assessments",
+                      current: data?.submissions ?? 0,
+                      target: currentTargets.assessments,
+                      pct: assessPct,
+                      colour: "#7c3aed",
+                      format: (n: number) => fmtN(n),
+                    },
+                  ].map(({ label, current, target, pct, colour, format }) => (
+                    <div key={label} className="flex items-center gap-5">
+                      {/* Ring */}
+                      <div className="relative flex-shrink-0">
+                        <ProgressRing pct={pct} colour={colour} size={88} />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <span className="text-sm font-bold text-gray-900">{Math.min(pct, 100)}%</span>
+                        </div>
+                      </div>
+                      {/* Text */}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">{label}</p>
+                        <p className="text-xl font-bold text-gray-900 mt-0.5">{format(current)}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          of <span className="font-medium text-gray-600">{format(target)}</span> target
+                        </p>
+                        {/* Mini bar */}
+                        <div className="mt-2 h-1.5 w-full rounded-full bg-gray-100">
+                          <div className="h-1.5 rounded-full transition-all"
+                            style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: colour }} />
+                        </div>
+                        {pct >= 100 && (
+                          <p className="text-xs text-green-600 font-medium mt-1 flex items-center gap-1">
+                            <CheckCircle2 className="h-3 w-3" /> Target reached!
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Five year ARR trajectory */}
+                <div className="mt-6 pt-5 border-t border-gray-50">
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-3">ARR Trajectory</p>
+                  <div className="flex items-end gap-2 h-16">
+                    {targets.years.map((y, i) => {
+                      const maxArr = Math.max(...targets.years.map(y => y.arr));
+                      const heightPct = (y.arr / maxArr) * 100;
+                      const isCurrent = i === yearIndex;
+                      const isPast = i < yearIndex;
+                      return (
+                        <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                          <div className="w-full rounded-t-md transition-all"
+                            style={{
+                              height: `${heightPct}%`,
+                              backgroundColor: isCurrent ? "#0d52dd" : isPast ? "#93c5fd" : "#e5e7eb",
+                            }} />
+                          <span className="text-xs text-gray-400">
+                            {y.arr >= 1000000 ? `$${(y.arr/1000000).toFixed(1)}M` : `$${Math.round(y.arr/1000)}K`}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Bottom 3 cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Tier breakdown */}
         <Card>
@@ -137,10 +316,8 @@ export default function AdminDashboard() {
                   </div>
                 </div>
                 <div className="h-1.5 w-full rounded-full bg-gray-100">
-                  <div
-                    className={`h-1.5 rounded-full ${t.tier === "trial" ? "bg-gray-300" : t.tier === "essentials" ? "bg-blue-400" : t.tier === "professional" ? "bg-purple-400" : "bg-amber-400"}`}
-                    style={{ width: `${data?.schools ? Math.round((t.count / (data.schools + (data.trialSchools ?? 0))) * 100) : 0}%` }}
-                  />
+                  <div className={`h-1.5 rounded-full ${t.tier === "trial" ? "bg-gray-300" : t.tier === "essentials" ? "bg-blue-400" : t.tier === "professional" ? "bg-purple-400" : "bg-amber-400"}`}
+                    style={{ width: `${data?.schools ? Math.round((t.count / (data.schools + (data.trialSchools ?? 0))) * 100) : 0}%` }} />
                 </div>
               </div>
             ))}
