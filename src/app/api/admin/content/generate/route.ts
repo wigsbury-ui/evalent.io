@@ -126,12 +126,16 @@ Return ONLY the JSON array.`,
     headers: { "Content-Type": "application/json", "Authorization": `Bearer ${process.env.ANTHROPIC_API_KEY}`, "anthropic-version": "2023-06-01" },
     body: JSON.stringify({
       model: "claude-sonnet-4-20250514",
-      max_tokens: 4000,
+      max_tokens: 8000,
       messages: [{ role: "user", content: prompt }],
     }),
   });
 
   const data = await response.json();
+  console.log("[GENERATE] HTTP status:", response.status);
+  console.log("[GENERATE] stop reason:", data.stop_reason);
+  console.log("[GENERATE] content length:", data.content?.[0]?.text?.length);
+  console.log("[GENERATE] first 200 chars:", data.content?.[0]?.text?.slice(0,200));
   const text = data.content?.[0]?.text || "[]";
 
   try {
