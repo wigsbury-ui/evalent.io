@@ -15,7 +15,7 @@ import {
   LogOut,
   Video,
   CreditCard,
-  UserCheck, Wallet, Target,
+  UserCheck, Wallet, Target, PenSquare,
 } from "lucide-react";
 
 export function AdminSidebar() {
