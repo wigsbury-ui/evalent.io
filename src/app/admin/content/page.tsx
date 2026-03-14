@@ -445,6 +445,7 @@ export default function ContentStudioPage() {
               { key: "partner",  label: "Partner" },
               { key: "whatsapp", label: "WhatsApp" },
               { key: "video_script", label: "Video Script" },
+            { key: "video_script", label: "Video Script" },
             { key: "shared",   label: "Shared with Partners" },
             ].map(f => (
               <button key={f.key} onClick={() => setQueueFilter(f.key)}
