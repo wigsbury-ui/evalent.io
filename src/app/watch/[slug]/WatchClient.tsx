@@ -201,7 +201,7 @@ export default function WatchClient({ video, refSlug }: Props) {
         </div>
 
         {/* Inline Signup Box */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
+        <div className="max-w-md mx-auto bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
           <div className="text-center mb-6">
             <Link href="https://evalent.io">
               <img src="/evalent-logo.png" alt="Evalent" className="h-8 w-auto mx-auto mb-3" />
