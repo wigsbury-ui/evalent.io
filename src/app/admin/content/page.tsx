@@ -117,6 +117,8 @@ export default function ContentStudioPage() {
     if (res.ok) {
       setSaved(post._id);
       setTimeout(() => setSaved(null), 2500);
+      setTab("queue");
+      loadQueue();
     }
     setSaving(null);
   };
