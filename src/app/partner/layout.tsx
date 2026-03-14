@@ -4,7 +4,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   LayoutDashboard, Link2, TrendingUp, DollarSign,
-  BookOpen, LogOut, Menu, X, PlayCircle
+  BookOpen, LogOut, Menu, X, PlayCircle, PenSquare
 } from "lucide-react";
 
 const nav = [
@@ -13,6 +13,7 @@ const nav = [
   { href: "/partner/conversions",  label: "Conversions",  icon: TrendingUp },
   { href: "/partner/payouts",      label: "Payouts",      icon: DollarSign },
   { href: "/partner/videos",       label: "Videos",       icon: PlayCircle },
+  { href: "/partner/posts",        label: "Post Ideas",   icon: PenSquare },
   { href: "/partner/resources",    label: "Resources",    icon: BookOpen },
 ];
 

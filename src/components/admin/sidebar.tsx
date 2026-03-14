@@ -26,6 +26,7 @@ export function AdminSidebar() {
     { href: "/admin/schools", label: "Schools", icon: School },
     { href: "/admin/billing", label: "Billing", icon: CreditCard },
   { href: "/admin/targets", label: "Targets", icon: Target },
+  { href: "/admin/content", label: "Content Studio", icon: PenSquare },
     { href: "/admin/answer-keys", label: "Answer Keys", icon: Key },
     { href: "/admin/prompts", label: "AI Prompts", icon: Bot },
     { href: "/admin/reports", label: "Report Templates", icon: FileText },
