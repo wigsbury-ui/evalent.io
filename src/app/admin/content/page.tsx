@@ -444,9 +444,9 @@ export default function ContentStudioPage() {
               { key: "blog",     label: "Blog" },
               { key: "partner",  label: "Partner" },
               { key: "whatsapp", label: "WhatsApp" },
-              { key: "video_script", label: "Video Script" },
+
             { key: "video_script", label: "Video Script" },
-            { key: "shared",   label: "Shared with Partners" },
+              { key: "shared",   label: "Shared with Partners" },
             ].map(f => (
               <button key={f.key} onClick={() => setQueueFilter(f.key)}
                 className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${queueFilter === f.key ? "bg-[#0d52dd] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
