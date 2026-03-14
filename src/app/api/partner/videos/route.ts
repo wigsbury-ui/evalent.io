@@ -6,7 +6,6 @@ export async function GET(req: NextRequest) {
   const payload = await getPartnerFromCookie(req);
   if (!payload) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Also get partner\'s first referral link slug for building share URLs
   const supabase = createServerClient();
   const [videosRes, linksRes] = await Promise.all([
     supabase.from("partner_videos")

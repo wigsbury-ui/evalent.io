@@ -30,7 +30,7 @@ export function AdminSidebar() {
     { href: "/admin/reports", label: "Report Templates", icon: FileText },
     { href: "/admin/help-videos", label: "Help Videos", icon: Video },
     { href: "/admin/partners", label: "Partners", icon: UserCheck },
-  { href: "/admin/partner-videos", label: "Partner Videos", icon: Video },
+  { href: "/admin/partner-videos", label: "Media Library", icon: Video },
   { href: "/admin/payouts", label: "Payouts", icon: Wallet },
   { href: "/admin/audit", label: "Audit Log", icon: ScrollText },
   ];

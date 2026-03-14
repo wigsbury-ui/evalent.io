@@ -15,12 +15,21 @@ export async function GET(req: NextRequest) {
 
   if (error || !partner) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  const [linksRes, conversionsRes, payoutsRes, videosRes] = await Promise.all([
+  const [linksRes, conversionsRes, payoutsRes, videosRes, welcomeSettingRes] = await Promise.all([
     supabase.from("referral_links").select("id, slug, label, clicks, created_at").eq("partner_id", payload.partnerId).order("created_at"),
     supabase.from("referral_conversions").select("id, school_id, status, commission_amount: commission_earned, plan: subscription_tier, created_at, schools(name)").eq("partner_id", payload.partnerId).order("created_at", { ascending: false }),
     supabase.from("partner_payouts").select("id, amount, currency, status, payment_method, payment_reference, created_at, paid_at").eq("partner_id", payload.partnerId).order("created_at", { ascending: false }),
-    supabase.from("partner_videos").select("id, title, vimeo_id, description, category, share_slug").eq("is_live", true).order("sort_order", { ascending: true }).limit(1),
+    supabase.from("partner_videos").select("id, title, vimeo_id, description, category, share_slug").eq("is_live", true).order("sort_order", { ascending: true }),
+    supabase.from("platform_settings").select("key, value").eq("key", "partner_welcome_video_id").single(),
   ]);
+
+  // jsonb value — unwrap to plain string
+  const rawVal = welcomeSettingRes.data?.value;
+  const welcomeVideoId = (rawVal && rawVal !== "" && rawVal !== '""') ? String(rawVal).replace(/^"|"$/g, "") : null;
+
+  // Also get partner slug for share URLs
+  const linksForSlug = linksRes.data || [];
+  const partnerSlug = linksForSlug[0]?.slug || null;
 
   return NextResponse.json({
     partner,
@@ -28,5 +37,7 @@ export async function GET(req: NextRequest) {
     conversions: conversionsRes.data || [],
     payouts: payoutsRes.data || [],
     videos: videosRes.data || [],
+    welcomeVideoId,
+    partnerSlug,
   });
 }
