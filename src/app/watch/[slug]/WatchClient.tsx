@@ -1,7 +1,8 @@
 "use client";
-import { useEffect } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { useRouter } from "next/navigation";
+import { Loader2 } from "lucide-react";
 
 interface Props {
   video: {
@@ -16,13 +17,131 @@ interface Props {
   refSlug?: string;
 }
 
+const ROLES = [
+  "Admissions Director",
+  "Admissions Manager",
+  "Head of School / Principal",
+  "Deputy Head",
+  "Registrar",
+  "IT Administrator",
+  "Other",
+];
+
+const HIGHLIGHTS = [
+  {
+    icon: "🎯",
+    title: "Criterion-referenced scoring",
+    desc: "Results measured against your school's own entrance thresholds — not national norms or percentiles.",
+  },
+  {
+    icon: "✍️",
+    title: "AI-evaluated writing",
+    desc: "Extended writing tasks in English, Mathematics and Creativity scored instantly with detailed narrative feedback.",
+  },
+  {
+    icon: "📊",
+    title: "Professional PDF reports",
+    desc: "Structured, school-branded reports generated within minutes of submission — ready to share with assessors.",
+  },
+  {
+    icon: "🌍",
+    title: "IB, British & American curricula",
+    desc: "Curriculum-specific language and grade-level framing throughout every report, for G3 through G10.",
+  },
+  {
+    icon: "🧠",
+    title: "Mindset & values lenses",
+    desc: "Goes beyond academic scores — captures growth mindset indicators, values alignment and creativity to give a fuller picture of each applicant.",
+  },
+  {
+    icon: "⚡",
+    title: "Built for busy admissions teams",
+    desc: "No special hardware or training needed. Register a student, share a link, receive a full report. The entire pipeline runs automatically.",
+  },
+];
+
 export default function WatchClient({ video, refSlug }: Props) {
-  // Store ref in cookie so signup attribution works even if they navigate around
+  const router = useRouter();
+  const [step, setStep] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [curricula, setCurricula] = useState<{ name: string; label: string }[]>([]);
+  const [form, setForm] = useState({
+    school_name: "",
+    school_website: "",
+    curriculum: "",
+    first_name: "",
+    last_name: "",
+    role: "",
+    email: "",
+    password: "",
+    confirm_password: "",
+  });
+
+  // Store ref cookie + fetch curricula
   useEffect(() => {
     if (refSlug) {
       document.cookie = `evalent_ref=${refSlug}; max-age=${60 * 60 * 24 * 30}; path=/; SameSite=Lax`;
     }
+    fetch("/api/curricula")
+      .then(r => r.json())
+      .then(d => setCurricula(Array.isArray(d) ? d : []))
+      .catch(() => setCurricula([
+        { name: "IB", label: "International Baccalaureate (IB)" },
+        { name: "British", label: "British / English National Curriculum" },
+        { name: "American", label: "American / Common Core" },
+      ]));
   }, [refSlug]);
+
+  const update = (field: string, value: string) => {
+    setForm(prev => ({ ...prev, [field]: value }));
+    setError("");
+  };
+
+  const step1Valid = form.school_name.trim().length > 1 && form.curriculum !== "";
+  const step2Valid =
+    form.first_name.trim().length > 0 &&
+    form.last_name.trim().length > 0 &&
+    form.role !== "" &&
+    /^[^@]+@[^@]+\.[^@]+$/.test(form.email.trim()) &&
+    form.password.length >= 8 &&
+    form.password === form.confirm_password;
+
+  const handleSubmit = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          school_name: form.school_name.trim(),
+          school_website: form.school_website.trim(),
+          curriculum: form.curriculum,
+          first_name: form.first_name.trim(),
+          last_name: form.last_name.trim(),
+          role: form.role,
+          email: form.email.trim().toLowerCase(),
+          password: form.password,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error || "Something went wrong."); return; }
+      const { signIn } = await import("next-auth/react");
+      const result = await signIn("credentials", {
+        email: form.email.trim().toLowerCase(),
+        password: form.password,
+        redirect: false,
+      });
+      router.push(result?.ok ? "/school?welcome=1" : "/login");
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const inp = "w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500";
 
   const signupUrl = `/signup${refSlug ? `?ref=${refSlug}` : ""}`;
 
@@ -59,6 +178,7 @@ export default function WatchClient({ video, refSlug }: Props) {
       </div>
 
       <div className="max-w-4xl mx-auto px-6 py-10 space-y-10">
+
         {/* Video */}
         <div>
           {video.category && (
@@ -80,53 +200,137 @@ export default function WatchClient({ video, refSlug }: Props) {
           )}
         </div>
 
-        {/* CTA / Signup section */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="bg-[#0d52dd] px-8 py-6 text-white">
-            <h2 className="text-xl font-bold">Ready to transform your admissions process?</h2>
-            <p className="text-blue-100 text-sm mt-1">
-              Start with 10 free assessments — no credit card required.
-            </p>
-          </div>
-          <div className="px-8 py-6">
-            <div className="grid grid-cols-3 gap-4 mb-6">
-              {[
-                { stat: "< 5 min", label: "Assessment time" },
-                { stat: "Instant", label: "Report generation" },
-                { stat: "G3–G10", label: "All grade levels" },
-              ].map(({ stat, label }) => (
-                <div key={label} className="text-center p-3 bg-gray-50 rounded-xl">
-                  <p className="text-lg font-bold text-[#0d52dd]">{stat}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{label}</p>
-                </div>
-              ))}
-            </div>
-            <Link
-              href={signupUrl}
-              className="block w-full bg-[#0d52dd] text-white text-center rounded-xl py-3.5 font-semibold hover:bg-blue-700 transition-colors text-sm"
-            >
-              Create your free account →
+        {/* Inline Signup Box */}
+        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-8">
+          <div className="text-center mb-6">
+            <Link href="https://evalent.io">
+              <img src="/evalent-logo.png" alt="Evalent" className="h-8 w-auto mx-auto mb-3" />
             </Link>
-            <p className="text-xs text-gray-400 text-center mt-3">
-              Already have an account?{" "}
-              <Link href="/login" className="text-blue-500 hover:underline">Sign in</Link>
-            </p>
+            <p className="text-gray-500 text-sm">AI-powered school admissions</p>
           </div>
+
+          {/* Step indicator */}
+          <div className="flex items-center mb-7">
+            {[1, 2].map((s, i) => (
+              <div key={s} className="flex items-center flex-1">
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 transition-colors ${step >= s ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-400"}`}>
+                  {step > s ? "✓" : s}
+                </div>
+                <span className={`text-xs font-medium ml-2 ${step >= s ? "text-gray-700" : "text-gray-400"}`}>
+                  {s === 1 ? "Your school" : "Your account"}
+                </span>
+                {i < 1 && <div className={`flex-1 h-0.5 mx-3 ${step > s ? "bg-blue-600" : "bg-gray-100"}`} />}
+              </div>
+            ))}
+          </div>
+
+          {step === 1 && (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Tell us about your school</h2>
+                <p className="text-sm text-gray-500 mt-0.5">10 free assessments to start — no credit card needed.</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">School name</label>
+                <input type="text" value={form.school_name} onChange={e => update("school_name", e.target.value)}
+                  placeholder="e.g. Dubai International Academy" autoFocus className={inp} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">School website <span className="text-gray-400 font-normal">(optional)</span></label>
+                <input type="url" value={form.school_website} onChange={e => update("school_website", e.target.value)}
+                  placeholder="https://yourschool.edu" className={inp} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Curriculum</label>
+                <select value={form.curriculum} onChange={e => update("curriculum", e.target.value)} className={inp + " bg-white"}>
+                  <option value="">Select curriculum…</option>
+                  {curricula.map(c => <option key={c.name} value={c.name}>{c.label}</option>)}
+                </select>
+              </div>
+              <button onClick={() => step1Valid && setStep(2)} disabled={!step1Valid}
+                className="w-full bg-blue-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                Continue →
+              </button>
+            </div>
+          )}
+
+          {step === 2 && (
+            <div className="space-y-4">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Create your account</h2>
+                <p className="text-sm text-gray-500 mt-0.5">Admin login for <span className="font-medium text-gray-700">{form.school_name}</span></p>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">First name</label>
+                  <input type="text" value={form.first_name} onChange={e => update("first_name", e.target.value)}
+                    placeholder="Jane" autoFocus className={inp} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Last name</label>
+                  <input type="text" value={form.last_name} onChange={e => update("last_name", e.target.value)}
+                    placeholder="Smith" className={inp} />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Your role</label>
+                <select value={form.role} onChange={e => update("role", e.target.value)} className={inp + " bg-white"}>
+                  <option value="">Select your role…</option>
+                  {ROLES.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Work email</label>
+                <input type="email" value={form.email} onChange={e => update("email", e.target.value)}
+                  placeholder="jane@yourschool.edu" className={inp} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
+                <input type="password" value={form.password} onChange={e => update("password", e.target.value)}
+                  placeholder="At least 8 characters" className={inp} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">Confirm password</label>
+                <input type="password" value={form.confirm_password} onChange={e => update("confirm_password", e.target.value)}
+                  placeholder="Repeat your password" className={inp} />
+              </div>
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2.5 text-sm text-red-700">{error}</div>
+              )}
+              <div className="flex gap-3">
+                <button onClick={() => setStep(1)}
+                  className="flex-1 bg-gray-100 text-gray-700 py-2.5 rounded-lg text-sm font-semibold hover:bg-gray-200 transition-colors">
+                  ← Back
+                </button>
+                <button onClick={handleSubmit} disabled={!step2Valid || loading}
+                  className="flex-1 bg-blue-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">
+                  {loading && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {loading ? "Creating account…" : "Create account"}
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 text-center">
+                By signing up you agree to our{" "}
+                <a href="https://evalent.io/terms" target="_blank" className="underline hover:text-gray-600">Terms</a>
+                {" "}and{" "}
+                <a href="https://evalent.io/privacy" target="_blank" className="underline hover:text-gray-600">Privacy Policy</a>
+              </p>
+            </div>
+          )}
+
+          <p className="text-center text-sm text-gray-500 mt-5">
+            Already have an account?{" "}
+            <Link href="/login" className="text-blue-600 hover:underline font-medium">Sign in</Link>
+          </p>
         </div>
 
-        {/* Features */}
+        {/* 6 Highlights */}
         <div className="grid grid-cols-2 gap-4">
-          {[
-            { icon: "🎯", title: "Criterion-referenced", desc: "Scored against your school's own thresholds, not national norms." },
-            { icon: "✍️", title: "AI-evaluated writing", desc: "Extended writing tasks scored instantly with detailed narrative feedback." },
-            { icon: "📊", title: "Structured reports", desc: "Professional PDF reports ready within minutes of submission." },
-            { icon: "🌍", title: "IB, British & American", desc: "Curriculum-specific language throughout every report." },
-          ].map(({ icon, title, desc }) => (
-            <div key={title} className="bg-white rounded-xl border border-gray-100 p-4 flex gap-3">
-              <span className="text-xl">{icon}</span>
+          {HIGHLIGHTS.map(({ icon, title, desc }) => (
+            <div key={title} className="bg-white rounded-xl border border-gray-100 p-5 flex gap-4">
+              <span className="text-2xl flex-shrink-0">{icon}</span>
               <div>
                 <p className="text-sm font-semibold text-gray-900">{title}</p>
-                <p className="text-xs text-gray-400 mt-0.5 leading-relaxed">{desc}</p>
+                <p className="text-xs text-gray-400 mt-1 leading-relaxed">{desc}</p>
               </div>
             </div>
           ))}
