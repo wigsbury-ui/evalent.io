@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -101,26 +101,48 @@ export default function ContentStudioPage() {
     setGenerating(false);
   };
 
+  // Use a ref-based set so saves never get blocked by stale state
+  const savingSet = useRef(new Set<string>());
+
   const handleSave = async (post: any, shareWithPartners = false) => {
-    setSaving(post._id);
-    const body = editing[post._id] || post.body;
-    const res = await fetch("/api/admin/content", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        type, title: post.title, body,
-        excerpt: post.excerpt || body.slice(0, 160),
-        status: shareWithPartners ? "shared" : "approved",
-        shared_with_partners: shareWithPartners,
-      }),
-    });
-    if (res.ok) {
-      setSaved(post._id);
-      setTimeout(() => setSaved(null), 2500);
-      setTab("queue");
-      loadQueue();
+    const key = post._id || post.id || Math.random().toString();
+    if (savingSet.current.has(key)) return; // already saving this one
+    savingSet.current.add(key);
+    setSaving(key);
+
+    const bodyText = editing[key] || editing[post._id] || post.body || "";
+    const titleText = post.title || "Untitled";
+
+    try {
+      const res = await fetch("/api/admin/content", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type,
+          title: titleText,
+          body: bodyText,
+          excerpt: post.excerpt || bodyText.slice(0, 160),
+          status: shareWithPartners ? "shared" : "approved",
+          shared_with_partners: shareWithPartners,
+        }),
+      });
+      if (res.ok) {
+        setSaved(key);
+        setTimeout(() => setSaved(null), 2500);
+        setTab("queue");
+        loadQueue();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        console.error("[SAVE] Failed:", res.status, err);
+        alert("Save failed — please try again. Status: " + res.status);
+      }
+    } catch (e) {
+      console.error("[SAVE] Error:", e);
+      alert("Save error — check your connection and try again.");
+    } finally {
+      savingSet.current.delete(key);
+      setSaving(null);
     }
-    setSaving(null);
   };
 
   const handleSendToHeygen = async (post_id: string, post_body_key: string) => {
