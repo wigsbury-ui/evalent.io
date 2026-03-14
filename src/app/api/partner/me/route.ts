@@ -1,19 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
-import { jwtVerify } from "jose";
-
-const SECRET = new TextEncoder().encode(process.env.NEXTAUTH_SECRET || "evalent-partner-secret");
-
-export async function getPartnerFromCookie(req: NextRequest) {
-  const token = req.cookies.get("evalent_partner")?.value;
-  if (!token) return null;
-  try {
-    const { payload } = await jwtVerify(token, SECRET);
-    return payload as { partnerId: string; email: string };
-  } catch {
-    return null;
-  }
-}
+import { getPartnerFromCookie } from "@/lib/partner/auth";
 
 export async function GET(req: NextRequest) {
   const payload = await getPartnerFromCookie(req);
