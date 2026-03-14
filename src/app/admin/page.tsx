@@ -40,6 +40,135 @@ function ProgressRing({ pct, colour, size = 80 }: { pct: number; colour: string;
   );
 }
 
+
+function EnrolmentChart({ targets, actualSchools }: { targets: FiveYearTargets | null; actualSchools: number }) {
+  if (!targets) {
+    return (
+      <div className="flex items-center justify-center h-32 text-gray-400 text-sm">
+        Set targets to see projection
+      </div>
+    );
+  }
+
+  const W = 280;
+  const H = 140;
+  const PAD = { top: 12, right: 16, bottom: 28, left: 32 };
+  const chartW = W - PAD.left - PAD.right;
+  const chartH = H - PAD.top - PAD.bottom;
+
+  const currentYear = new Date().getFullYear();
+  const yearIndex = Math.max(0, Math.min(4, currentYear - targets.start_year));
+
+  // X points: one per year (0..4)
+  const xs = [0, 1, 2, 3, 4].map(i => PAD.left + (i / 4) * chartW);
+
+  // Projected line = target schools per year
+  const projectedValues = targets.years.map(y => y.schools);
+  const maxVal = Math.max(...projectedValues, actualSchools, 1);
+
+  const toY = (v: number) => PAD.top + chartH - (v / maxVal) * chartH;
+
+  // Projected path (all 5 years)
+  const projPath = projectedValues
+    .map((v, i) => `${i === 0 ? "M" : "L"} ${xs[i].toFixed(1)} ${toY(v).toFixed(1)}`)
+    .join(" ");
+
+  // Actual path — grows linearly from 0 to actualSchools up to current year index
+  const actualPath = Array.from({ length: yearIndex + 1 }, (_, i) => {
+    const frac = yearIndex === 0 ? 1 : i / yearIndex;
+    const v = Math.round(frac * actualSchools);
+    return `${i === 0 ? "M" : "L"} ${xs[i].toFixed(1)} ${toY(v).toFixed(1)}`;
+  }).join(" ");
+
+  // Y axis labels
+  const yTicks = [0, Math.round(maxVal / 2), maxVal];
+
+  return (
+    <div className="w-full">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full overflow-visible">
+        {/* Y grid lines */}
+        {yTicks.map(tick => (
+          <g key={tick}>
+            <line
+              x1={PAD.left} y1={toY(tick).toFixed(1)}
+              x2={W - PAD.right} y2={toY(tick).toFixed(1)}
+              stroke="#f3f4f6" strokeWidth={1}
+            />
+            <text
+              x={PAD.left - 4} y={(toY(tick) + 4).toFixed(1)}
+              textAnchor="end" fontSize={8} fill="#9ca3af"
+            >
+              {tick}
+            </text>
+          </g>
+        ))}
+
+        {/* X axis labels */}
+        {[0, 1, 2, 3, 4].map(i => (
+          <text key={i}
+            x={xs[i].toFixed(1)} y={H - 4}
+            textAnchor="middle" fontSize={8} fill={i === yearIndex ? "#0d52dd" : "#9ca3af"}
+            fontWeight={i === yearIndex ? "600" : "400"}
+          >
+            Y{i + 1} {targets.start_year + i}
+          </text>
+        ))}
+
+        {/* Projected area fill */}
+        <path
+          d={`${projPath} L ${xs[4].toFixed(1)} ${(PAD.top + chartH).toFixed(1)} L ${xs[0].toFixed(1)} ${(PAD.top + chartH).toFixed(1)} Z`}
+          fill="#0d52dd" fillOpacity={0.06}
+        />
+
+        {/* Projected line */}
+        <path d={projPath} fill="none" stroke="#0d52dd" strokeWidth={1.5}
+          strokeDasharray="4 3" opacity={0.5} />
+
+        {/* Actual line */}
+        {yearIndex >= 0 && (
+          <path d={actualPath} fill="none" stroke="#0d52dd" strokeWidth={2}
+            strokeLinecap="round" strokeLinejoin="round" />
+        )}
+
+        {/* Projected dots */}
+        {projectedValues.map((v, i) => (
+          <circle key={i} cx={xs[i].toFixed(1)} cy={toY(v).toFixed(1)} r={2.5}
+            fill="white" stroke="#0d52dd" strokeWidth={1.5} opacity={0.5} />
+        ))}
+
+        {/* Actual dot at current position */}
+        {yearIndex >= 0 && (
+          <>
+            <circle
+              cx={xs[yearIndex].toFixed(1)} cy={toY(actualSchools).toFixed(1)} r={4}
+              fill="#0d52dd"
+            />
+            <text
+              x={(xs[yearIndex] + 7).toFixed(1)}
+              y={(toY(actualSchools) + 4).toFixed(1)}
+              fontSize={9} fill="#0d52dd" fontWeight="700"
+            >
+              {actualSchools}
+            </text>
+          </>
+        )}
+      </svg>
+
+      {/* Legend */}
+      <div className="flex items-center gap-4 mt-1 justify-center">
+        <div className="flex items-center gap-1.5">
+          <svg width="18" height="8"><line x1="0" y1="4" x2="18" y2="4" stroke="#0d52dd" strokeWidth="1.5" strokeDasharray="4 3" opacity="0.5" /></svg>
+          <span className="text-xs text-gray-400">Projected</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <svg width="18" height="8"><line x1="0" y1="4" x2="18" y2="4" stroke="#0d52dd" strokeWidth="2" strokeLinecap="round" /></svg>
+          <span className="text-xs text-gray-400">Actual</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [targets, setTargets] = useState<FiveYearTargets | null>(null);
@@ -361,36 +490,17 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        {/* Recent submissions */}
+        {/* School Enrolment — Projected vs Actual line graph */}
         <Card>
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
-              <FileText className="h-4 w-4 text-gray-400" />
-              <CardTitle className="text-base">Recent Assessments</CardTitle>
+              <TrendingUp className="h-4 w-4 text-gray-400" />
+              <CardTitle className="text-base">School Enrolment</CardTitle>
             </div>
-            <CardDescription>Latest submissions across all schools</CardDescription>
+            <CardDescription>Projected vs actual paid schools</CardDescription>
           </CardHeader>
           <CardContent>
-            {(data?.recentSubmissions?.length ?? 0) === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-center">
-                <FileText className="h-8 w-8 text-gray-200" />
-                <p className="mt-2 text-sm text-gray-400">No submissions yet</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {data!.recentSubmissions.map(sub => (
-                  <div key={sub.id} className="flex items-center justify-between rounded-lg border border-gray-50 bg-gray-50 px-3 py-2">
-                    <div>
-                      <p className="text-xs font-medium text-gray-700">{sub.student_name}</p>
-                      <p className="text-xs text-gray-400">Grade {sub.grade}</p>
-                    </div>
-                    <Badge variant={sub.processing_status === "complete" ? "success" : "secondary"} className="text-xs">
-                      {sub.processing_status}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            )}
+            <EnrolmentChart targets={targets} actualSchools={data?.paidSchools ?? 0} />
           </CardContent>
         </Card>
       </div>
