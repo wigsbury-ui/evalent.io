@@ -5,14 +5,15 @@ import { Button } from "@/components/ui/button";
 import {
   Sparkles, Loader2, Copy, Check, Save, Send, Trash2,
   Linkedin, MessageCircle, FileText, Users, ExternalLink,
-  RefreshCw, Globe, Share2, ChevronDown, ChevronUp, X
+  RefreshCw, Globe, Share2, ChevronDown, ChevronUp, X, Video, Clapperboard
 } from "lucide-react";
 
 const TYPE_CONFIG: Record<string, { label: string; icon: any; colour: string; bg: string }> = {
-  linkedin:  { label: "LinkedIn",       icon: Linkedin,       colour: "text-[#0077B5]", bg: "bg-blue-50" },
-  blog:      { label: "Blog Post",      icon: FileText,       colour: "text-purple-600", bg: "bg-purple-50" },
-  partner:   { label: "Partner Post",   icon: Users,          colour: "text-indigo-600", bg: "bg-indigo-50" },
-  whatsapp:  { label: "WhatsApp",       icon: MessageCircle,  colour: "text-green-600",  bg: "bg-green-50" },
+  linkedin:      { label: "LinkedIn",       icon: Linkedin,       colour: "text-[#0077B5]", bg: "bg-blue-50" },
+  blog:          { label: "Blog Post",      icon: FileText,       colour: "text-purple-600", bg: "bg-purple-50" },
+  partner:       { label: "Partner Post",   icon: Users,          colour: "text-indigo-600", bg: "bg-indigo-50" },
+  whatsapp:      { label: "WhatsApp",       icon: MessageCircle,  colour: "text-green-600",  bg: "bg-green-50" },
+  video_script:  { label: "Video Script",   icon: Video,          colour: "text-rose-600",   bg: "bg-rose-50" },
 };
 
 const WP_CATEGORIES = [
@@ -48,6 +49,13 @@ export default function ContentStudioPage() {
   const [saved, setSaved] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [editing, setEditing] = useState<Record<string, string>>({});
+  const [videoDuration, setVideoDuration] = useState(90);
+  const [videoPlatform, setVideoPlatform] = useState("linkedin");
+  const [avatarType, setAvatarType] = useState("real");
+  const [voiceLocale, setVoiceLocale] = useState("uk");
+  const [heygenStatus, setHeygenStatus] = useState<Record<string, string>>({});
+  const [sendingHeygen, setSendingHeygen] = useState<string | null>(null);
+  const [pushingVimeo, setPushingVimeo] = useState<string | null>(null);
 
   // Queue tab state
   const [posts, setPosts] = useState<any[]>([]);
@@ -84,7 +92,7 @@ export default function ContentStudioPage() {
     const res = await fetch("/api/admin/content/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type, topic, tone, angle }),
+      body: JSON.stringify({ type, topic, tone, angle, duration: videoDuration, platform: videoPlatform }),
     });
     const data = await res.json();
     if (data.posts) {
@@ -111,6 +119,44 @@ export default function ContentStudioPage() {
       setTimeout(() => setSaved(null), 2500);
     }
     setSaving(null);
+  };
+
+  const handleSendToHeygen = async (post_id: string, post_body_key: string) => {
+    setSendingHeygen(post_id);
+    const res = await fetch("/api/admin/content/heygen", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ post_id, avatar_type: avatarType, voice: voiceLocale }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setHeygenStatus(s => ({ ...s, [post_id]: "pending" }));
+      setPosts(p => p.map(x => x.id === post_id ? { ...x, heygen_video_id: data.video_id, heygen_status: "pending" } : x));
+    }
+    setSendingHeygen(null);
+  };
+
+  const handleCheckHeygen = async (post_id: string) => {
+    const res = await fetch(`/api/admin/content/heygen?post_id=${post_id}`);
+    const data = await res.json();
+    setHeygenStatus(s => ({ ...s, [post_id]: data.status }));
+    if (data.status === "completed") {
+      setPosts(p => p.map(x => x.id === post_id ? { ...x, heygen_status: "completed", heygen_video_url: data.video_url } : x));
+    }
+  };
+
+  const handlePushVimeo = async (post_id: string) => {
+    setPushingVimeo(post_id);
+    const res = await fetch("/api/admin/content/vimeo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ post_id }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      setPosts(p => p.map(x => x.id === post_id ? { ...x, vimeo_id: data.vimeo_id, vimeo_url: data.vimeo_url } : x));
+    }
+    setPushingVimeo(null);
   };
 
   const handleShare = async (id: string, share: boolean) => {
@@ -199,12 +245,52 @@ export default function ContentStudioPage() {
                   const Icon = cfg.icon;
                   return (
                     <button key={key} onClick={() => setType(key)}
-                      className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium border transition-all ${type === key ? `border-blue-300 bg-blue-50 text-blue-700` : "border-gray-200 text-gray-600 hover:border-gray-300"}`}>
+                      className={`flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium border transition-all ${type === key ? (key === "video_script" ? "border-rose-300 bg-rose-50 text-rose-700" : "border-blue-300 bg-blue-50 text-blue-700") : "border-gray-200 text-gray-600 hover:border-gray-300"}`}>
                       <Icon className={`h-4 w-4 ${type === key ? cfg.colour : "text-gray-400"}`} />
                       {cfg.label}
                     </button>
                   );
                 })}
+
+              {/* Video script extra options */}
+              {type === "video_script" && (
+                <div className="col-span-4 grid grid-cols-4 gap-3 pt-1 border-t border-gray-100">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Duration (seconds)</label>
+                    <select value={videoDuration} onChange={e => setVideoDuration(Number(e.target.value))} className={inp + " bg-white"}>
+                      <option value={30}>30s — Short social</option>
+                      <option value={60}>60s — LinkedIn/social</option>
+                      <option value={90}>90s — LinkedIn optimal</option>
+                      <option value={120}>2 min — Product explainer</option>
+                      <option value={180}>3 min — Deep dive</option>
+                      <option value={300}>5 min — Full explainer</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Platform</label>
+                    <select value={videoPlatform} onChange={e => setVideoPlatform(e.target.value)} className={inp + " bg-white"}>
+                      <option value="linkedin">LinkedIn</option>
+                      <option value="youtube">YouTube</option>
+                      <option value="instagram">Instagram Reels</option>
+                      <option value="general">General / HeyGen</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">HeyGen Avatar</label>
+                    <select value={avatarType} onChange={e => setAvatarType(e.target.value)} className={inp + " bg-white"}>
+                      <option value="real">Real Clara</option>
+                      <option value="animated">Animated Clara</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Voice</label>
+                    <select value={voiceLocale} onChange={e => setVoiceLocale(e.target.value)} className={inp + " bg-white"}>
+                      <option value="uk">🇬🇧 UK English</option>
+                      <option value="us">🇺🇸 US English</option>
+                    </select>
+                  </div>
+                </div>
+              )}
               </div>
 
               {/* Topic */}
@@ -294,8 +380,31 @@ export default function ContentStudioPage() {
                       </div>
                     )}
 
+                    {/* Video script metadata */}
+                    {type === "video_script" && post.metadata && (
+                      <div className="rounded-lg bg-rose-50 border border-rose-100 p-3 text-xs space-y-1.5">
+                        <div className="flex flex-wrap gap-3">
+                          <span className="text-rose-700"><span className="font-medium">Duration:</span> ~{post.metadata.duration_seconds}s</span>
+                          {post.metadata.thumbnail_text && <span className="text-rose-700"><span className="font-medium">Thumbnail:</span> "{post.metadata.thumbnail_text}"</span>}
+                        </div>
+                        {post.metadata.chapters?.length > 0 && (
+                          <div className="text-rose-600"><span className="font-medium">Chapters:</span> {post.metadata.chapters.join(" · ")}</div>
+                        )}
+                        {post.target_keywords?.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {post.target_keywords?.map((kw: string) => (
+                              <span key={kw} className="bg-rose-100 text-rose-700 rounded-full px-2 py-0.5">{kw}</span>
+                            ))}
+                          </div>
+                        )}
+                        {post.metadata.hashtags?.length > 0 && (
+                          <div className="text-rose-500">{post.metadata.hashtags?.join(" ")}</div>
+                        )}
+                      </div>
+                    )}
+
                     {/* Actions */}
-                    <div className="flex items-center gap-2 pt-1">
+                    <div className="flex items-center gap-2 pt-1 flex-wrap">
                       <Button size="sm" variant="outline" onClick={() => handleSave(post)} disabled={saving === post._id}>
                         {saving === post._id ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <Save className="h-3.5 w-3.5 mr-1.5" />}
                         Save to Queue
@@ -410,6 +519,35 @@ export default function ContentStudioPage() {
                                   {pushingWP === post.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Globe className="h-3.5 w-3.5" />}
                                   Push to WP
                                 </button>
+                              )}
+                              {post.type === "video_script" && !post.heygen_video_id && (
+                                <button onClick={() => handleSendToHeygen(post.id, post.id)} disabled={sendingHeygen === post.id}
+                                  className="flex items-center gap-1 text-xs rounded-lg px-2 py-1.5 text-rose-600 bg-rose-50 hover:bg-rose-100 transition-colors"
+                                  title="Send to HeyGen to create video">
+                                  {sendingHeygen === post.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Clapperboard className="h-3.5 w-3.5" />}
+                                  Create Video
+                                </button>
+                              )}
+                              {post.type === "video_script" && post.heygen_video_id && post.heygen_status !== "completed" && (
+                                <button onClick={() => handleCheckHeygen(post.id)}
+                                  className="flex items-center gap-1 text-xs rounded-lg px-2 py-1.5 text-orange-500 bg-orange-50 hover:bg-orange-100 transition-colors">
+                                  <RefreshCw className="h-3.5 w-3.5" />
+                                  Check ({heygenStatus[post.id] || post.heygen_status || "pending"})
+                                </button>
+                              )}
+                              {post.type === "video_script" && post.heygen_status === "completed" && !post.vimeo_id && (
+                                <button onClick={() => handlePushVimeo(post.id)} disabled={pushingVimeo === post.id}
+                                  className="flex items-center gap-1 text-xs rounded-lg px-2 py-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors"
+                                  title="Push to Vimeo and Media Library">
+                                  {pushingVimeo === post.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Video className="h-3.5 w-3.5" />}
+                                  → Vimeo
+                                </button>
+                              )}
+                              {post.vimeo_id && (
+                                <a href={`https://vimeo.com/${post.vimeo_id}`} target="_blank" rel="noopener noreferrer"
+                                  className="flex items-center gap-1 text-xs text-blue-500 hover:underline">
+                                  <Video className="h-3.5 w-3.5" />Vimeo ↗
+                                </a>
                               )}
                               {(post.type === "linkedin" || post.type === "partner" || post.type === "whatsapp") && (
                                 <button onClick={() => handleShare(post.id, !post.shared_with_partners)}
