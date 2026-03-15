@@ -61,6 +61,7 @@ export default function ContentStudioPage() {
   const [heygenStatus, setHeygenStatus] = useState<Record<string, string>>({});
   const [sendingHeygen, setSendingHeygen] = useState<string | null>(null);
   const [pushingVimeo, setPushingVimeo] = useState<string | null>(null);
+  const [vimeoSuccess, setVimeoSuccess] = useState<string | null>(null);
 
   // Queue tab state
   const [posts, setPosts] = useState<any[]>([]);
@@ -260,6 +261,10 @@ export default function ContentStudioPage() {
     const data = await res.json();
     if (res.ok) {
       setPosts(p => p.map(x => x.id === post_id ? { ...x, vimeo_id: data.vimeo_id, vimeo_url: data.vimeo_url } : x));
+      // Reload media library so the new draft video appears immediately
+      loadMedia();
+      setVimeoSuccess(post_id);
+      setTimeout(() => setVimeoSuccess(null), 5000);
     }
     setPushingVimeo(null);
   };
@@ -647,16 +652,22 @@ export default function ContentStudioPage() {
                               {post.type === "video_script" && post.heygen_status === "completed" && !post.vimeo_id && (
                                 <button onClick={() => handlePushVimeo(post.id)} disabled={pushingVimeo === post.id}
                                   className="flex items-center gap-1 text-xs rounded-lg px-2 py-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 transition-colors"
-                                  title="Push to Vimeo and Media Library">
+                                  title="Push to Vimeo and add to Media Library">
                                   {pushingVimeo === post.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Video className="h-3.5 w-3.5" />}
                                   → Vimeo
                                 </button>
                               )}
-                              {post.vimeo_id && (
+                              {post.vimeo_id && !vimeoSuccess && (
                                 <a href={`https://vimeo.com/${post.vimeo_id}`} target="_blank" rel="noopener noreferrer"
                                   className="flex items-center gap-1 text-xs text-blue-500 hover:underline">
                                   <Video className="h-3.5 w-3.5" />Vimeo ↗
                                 </a>
+                              )}
+                              {vimeoSuccess === post.id && (
+                                <button onClick={() => setTab("media")}
+                                  className="flex items-center gap-1 text-xs rounded-lg px-2 py-1.5 text-green-700 bg-green-50 hover:bg-green-100 transition-colors font-medium">
+                                  <Check className="h-3.5 w-3.5" /> In Media Library →
+                                </button>
                               )}
                               {(post.type === "linkedin" || post.type === "partner" || post.type === "whatsapp") && (
                                 <button onClick={() => handleShare(post.id, !post.shared_with_partners)}

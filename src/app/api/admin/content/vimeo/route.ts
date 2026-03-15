@@ -57,12 +57,51 @@ export async function POST(req: NextRequest) {
 
   if (!vimeoId) return NextResponse.json({ error: "Vimeo upload failed", detail: vimeoRes }, { status: 500 });
 
-  // Save Vimeo ID back to post
+  // Save Vimeo ID back to content post
   await supabase.from("content_posts").update({
     vimeo_id: vimeoId,
     vimeo_url: vimeoLink,
     updated_at: new Date().toISOString(),
   }).eq("id", post_id);
 
-  return NextResponse.json({ vimeo_id: vimeoId, vimeo_url: vimeoLink });
+  // Auto-create a partner_videos entry (draft) so it appears in Media Library
+  // Generate a share slug from the title
+  const shareSlug = post.title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 50) + "-" + Math.random().toString(36).slice(2, 6);
+
+  // Get current max sort order
+  const { data: maxSort } = await supabase
+    .from("partner_videos")
+    .select("sort_order")
+    .order("sort_order", { ascending: false })
+    .limit(1)
+    .single();
+
+  const nextOrder = (maxSort?.sort_order ?? 0) + 1;
+
+  const { data: newVideo } = await supabase.from("partner_videos").insert({
+    title:         post.title,
+    vimeo_id:      vimeoId,
+    description:   post.excerpt || "",
+    category:      "Product Demo",
+    is_live:       false,          // draft — admin reviews before publishing
+    sort_order:    nextOrder,
+    share_slug:    shareSlug,
+    share_caption: post.body
+      ? post.body.slice(0, 280).replace(/\[PAUSE\]|\[EMPHASIS\]/g, "").trim()
+      : post.title,
+    thumbnail_url: `https://vumbnail.com/${vimeoId}.jpg`,
+    created_at:    new Date().toISOString(),
+    updated_at:    new Date().toISOString(),
+  }).select().single();
+
+  return NextResponse.json({
+    vimeo_id:         vimeoId,
+    vimeo_url:        vimeoLink,
+    partner_video_id: newVideo?.id || null,
+    media_library:    "Video added to Media Library as draft — publish it from the Media tab",
+  });
 }
