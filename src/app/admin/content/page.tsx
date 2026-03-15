@@ -1,11 +1,13 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+import { useSearchParams, useRouter as useNextRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
   Sparkles, Loader2, Copy, Check, Save, Send, Trash2,
   Linkedin, MessageCircle, FileText, Users, ExternalLink,
-  RefreshCw, Globe, Share2, ChevronDown, ChevronUp, X, Video, Clapperboard
+  RefreshCw, Globe, Share2, ChevronDown, ChevronUp, X, Video, Clapperboard,
+  Star, Eye, EyeOff, Pencil, Plus
 } from "lucide-react";
 
 const TYPE_CONFIG: Record<string, { label: string; icon: any; colour: string; bg: string }> = {
@@ -36,7 +38,10 @@ const TOPIC_SUGGESTIONS = [
 const inp = "w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500";
 
 export default function ContentStudioPage() {
-  const [tab, setTab] = useState<"generate" | "queue" | "partners">("generate");
+  const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+  const [tab, setTab] = useState<"generate" | "queue" | "partners" | "media">(
+    (searchParams?.get("tab") as any) || "generate"
+  );
 
   // Generate tab state
   const [type, setType] = useState("linkedin");
@@ -68,9 +73,25 @@ export default function ContentStudioPage() {
   // Partner tab state
   const [partnerPosts, setPartnerPosts] = useState<any[]>([]);
 
+  // Media tab state
+  const [mediaVideos, setMediaVideos]       = useState<any[]>([]);
+  const [mediaLoading, setMediaLoading]     = useState(false);
+  const [welcomeId, setWelcomeId]           = useState<string>("");
+  const [savingWelcome, setSavingWelcome]   = useState(false);
+  const [welcomeSaved, setWelcomeSaved]     = useState(false);
+  const [showVideoForm, setShowVideoForm]   = useState(false);
+  const [editingVideo, setEditingVideo]     = useState<any>(null);
+  const [videoForm, setVideoForm]           = useState({ title: "", vimeo_id: "", description: "", category: "General", thumbnail_url: "", is_live: false, sort_order: 0, share_caption: "" });
+  const [savingVideo, setSavingVideo]       = useState(false);
+  const [videoError, setVideoError]         = useState("");
+  const [previewVimeo, setPreviewVimeo]     = useState<string | null>(null);
+  const [expandedVideoId, setExpandedVideo] = useState<string | null>(null);
+  const VIDEO_CATEGORIES = ["Product Demo","How to Pitch","Platform Walkthrough","School Testimonial","Social Media","Training","General"];
+
   useEffect(() => {
     if (tab === "queue") loadQueue();
     if (tab === "partners") loadPartnerPosts();
+    if (tab === "media") loadMedia();
   }, [tab]);
 
   const loadQueue = () => {
@@ -84,6 +105,66 @@ export default function ContentStudioPage() {
     fetch("/api/admin/content?type=partner").then(r => r.json()).then(d => {
       setPartnerPosts(Array.isArray(d) ? d.filter((p: any) => p.shared_with_partners) : []);
     });
+  };
+
+  const loadMedia = () => {
+    setMediaLoading(true);
+    Promise.all([
+      fetch("/api/admin/partner-videos").then(r => r.json()),
+      fetch("/api/admin/platform-settings").then(r => r.json()),
+    ]).then(([vids, settings]) => {
+      setMediaVideos(Array.isArray(vids) ? vids : []);
+      setWelcomeId(settings?.partner_welcome_video_id || "");
+      setMediaLoading(false);
+    });
+  };
+
+  const saveWelcomeVideo = async () => {
+    setSavingWelcome(true);
+    await fetch("/api/admin/platform-settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ partner_welcome_video_id: welcomeId || "" }),
+    });
+    setSavingWelcome(false); setWelcomeSaved(true);
+    setTimeout(() => setWelcomeSaved(false), 2500);
+  };
+
+  const openNewVideo = () => {
+    setEditingVideo(null);
+    setVideoForm({ title: "", vimeo_id: "", description: "", category: "General", thumbnail_url: "", is_live: false, sort_order: 0, share_caption: "" });
+    setShowVideoForm(true); setVideoError(""); setPreviewVimeo(null);
+  };
+
+  const openEditVideo = (v: any) => {
+    setEditingVideo(v);
+    setVideoForm({ title: v.title, vimeo_id: v.vimeo_id, description: v.description || "", category: v.category, thumbnail_url: v.thumbnail_url || "", is_live: v.is_live, sort_order: v.sort_order, share_caption: v.share_caption || "" });
+    setShowVideoForm(true); setVideoError(""); setPreviewVimeo(null);
+  };
+
+  const handleSaveVideo = async (e: React.FormEvent) => {
+    e.preventDefault(); setSavingVideo(true); setVideoError("");
+    const method = editingVideo ? "PATCH" : "POST";
+    const body = editingVideo ? { id: editingVideo.id, ...videoForm } : videoForm;
+    const res = await fetch("/api/admin/partner-videos", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const data = await res.json();
+    if (!res.ok) { setVideoError(data.error || "Save failed"); setSavingVideo(false); return; }
+    if (editingVideo) setMediaVideos(v => v.map(x => x.id === data.id ? data : x));
+    else setMediaVideos(v => [data, ...v]);
+    setShowVideoForm(false); setSavingVideo(false); setEditingVideo(null);
+  };
+
+  const handleDeleteVideo = async (id: string) => {
+    if (!confirm("Delete this video?")) return;
+    await fetch("/api/admin/partner-videos", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    setMediaVideos(v => v.filter(x => x.id !== id));
+    if (welcomeId === id) setWelcomeId("");
+  };
+
+  const toggleVideoLive = async (video: any) => {
+    const res = await fetch("/api/admin/partner-videos", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: video.id, is_live: !video.is_live }) });
+    const data = await res.json();
+    if (res.ok) setMediaVideos(v => v.map(x => x.id === data.id ? data : x));
   };
 
   const handleGenerate = async () => {
@@ -191,6 +272,7 @@ export default function ContentStudioPage() {
     });
     setPosts(p => p.map(x => x.id === id ? { ...x, shared_with_partners: share, status: share ? "shared" : "approved" } : x));
     if (tab === "partners") loadPartnerPosts();
+    if (tab === "media") loadMedia();
   };
 
   const handleDelete = async (id: string) => {
@@ -675,6 +757,224 @@ export default function ContentStudioPage() {
           )}
         </div>
       )}
+
+      {/* ── MEDIA TAB ── */}
+      {tab === "media" && (
+        <div className="space-y-6">
+
+          {/* Welcome Video Setting */}
+          <div className="bg-blue-50/40 border border-blue-100 rounded-2xl p-5">
+            <div className="flex items-start gap-4">
+              <div className="rounded-lg bg-blue-100 p-2 mt-0.5 flex-shrink-0">
+                <Star className="h-4 w-4 text-blue-600" />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-sm font-semibold text-gray-900">Welcome Video</h2>
+                <p className="text-xs text-gray-500 mt-0.5 mb-3">
+                  Plays automatically when a partner logs in for the first time.
+                </p>
+                <div className="flex items-center gap-3">
+                  <select value={welcomeId} onChange={e => setWelcomeId(e.target.value)}
+                    className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm bg-white focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    <option value="">— None —</option>
+                    {mediaVideos.filter(v => v.is_live).map(v => (
+                      <option key={v.id} value={v.id}>{v.title}</option>
+                    ))}
+                  </select>
+                  <Button size="sm" onClick={saveWelcomeVideo} disabled={savingWelcome}
+                    className={welcomeSaved ? "bg-green-600 hover:bg-green-700" : ""}>
+                    {savingWelcome ? <Loader2 className="h-4 w-4 animate-spin" /> : welcomeSaved ? <><Check className="h-4 w-4 mr-1" />Saved</> : "Save"}
+                  </Button>
+                </div>
+                {welcomeId && mediaVideos.find(v => v.id === welcomeId) && (
+                  <p className="text-xs text-blue-600 mt-2">
+                    Currently: <span className="font-medium">{mediaVideos.find(v => v.id === welcomeId)?.title}</span>
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Header + Add button */}
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-gray-500">
+              {mediaVideos.filter(v => v.is_live).length} live · {mediaVideos.length} total
+            </p>
+            <Button size="sm" onClick={openNewVideo}>
+              <Plus className="mr-2 h-4 w-4" />Add Video
+            </Button>
+          </div>
+
+          {/* Add/Edit form */}
+          {showVideoForm && (
+            <Card className="border-blue-100">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-base font-semibold text-gray-900">{editingVideo ? "Edit Video" : "Add New Video"}</h2>
+                  <button onClick={() => setShowVideoForm(false)} className="text-gray-400 hover:text-gray-600"><X className="h-4 w-4" /></button>
+                </div>
+                {videoError && <p className="text-sm text-red-600 mb-3 bg-red-50 rounded px-3 py-2">{videoError}</p>}
+                <form onSubmit={handleSaveVideo} className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Title *</label>
+                    <input value={videoForm.title} onChange={e => setVideoForm(f => ({ ...f, title: e.target.value }))} required className={inp} placeholder="e.g. Platform Overview" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Vimeo ID *</label>
+                    <div className="flex gap-2">
+                      <input value={videoForm.vimeo_id} onChange={e => setVideoForm(f => ({ ...f, vimeo_id: e.target.value.trim() }))} required className={inp} placeholder="e.g. 123456789" />
+                      {videoForm.vimeo_id && (
+                        <button type="button" onClick={() => setPreviewVimeo(videoForm.vimeo_id)}
+                          className="px-3 py-2 text-xs bg-gray-100 rounded-lg hover:bg-gray-200 whitespace-nowrap">Preview</button>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Category</label>
+                    <select value={videoForm.category} onChange={e => setVideoForm(f => ({ ...f, category: e.target.value }))} className={inp}>
+                      {VIDEO_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Sort Order</label>
+                    <input type="number" min="0" value={videoForm.sort_order} onChange={e => setVideoForm(f => ({ ...f, sort_order: parseInt(e.target.value) || 0 }))} className={inp} />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Description</label>
+                    <textarea value={videoForm.description} onChange={e => setVideoForm(f => ({ ...f, description: e.target.value }))} rows={2} className={inp + " resize-none"} />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Share Caption</label>
+                    <textarea value={videoForm.share_caption} onChange={e => setVideoForm(f => ({ ...f, share_caption: e.target.value }))} rows={2} className={inp + " resize-none"} />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Custom Thumbnail URL <span className="text-gray-400 font-normal">(optional)</span></label>
+                    <input value={videoForm.thumbnail_url} onChange={e => setVideoForm(f => ({ ...f, thumbnail_url: e.target.value }))} className={inp} placeholder="https://..." />
+                  </div>
+                  <div className="col-span-2 flex items-center gap-2">
+                    <input type="checkbox" id="is_live" checked={videoForm.is_live} onChange={e => setVideoForm(f => ({ ...f, is_live: e.target.checked }))} className="rounded" />
+                    <label htmlFor="is_live" className="text-sm text-gray-700 cursor-pointer">Publish immediately (visible to partners)</label>
+                  </div>
+                  {previewVimeo && (
+                    <div className="col-span-2 rounded-xl overflow-hidden bg-black" style={{ aspectRatio: "16/9" }}>
+                      <iframe src={`https://player.vimeo.com/video/${previewVimeo}`} className="w-full h-full" allow="autoplay; fullscreen" allowFullScreen />
+                    </div>
+                  )}
+                  <div className="col-span-2 flex justify-end gap-2">
+                    <Button type="button" variant="outline" onClick={() => setShowVideoForm(false)}>Cancel</Button>
+                    <Button type="submit" disabled={savingVideo}>
+                      {savingVideo && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      {editingVideo ? "Save Changes" : "Add Video"}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Video table */}
+          {mediaLoading ? (
+            <div className="space-y-2 animate-pulse">{[...Array(3)].map((_, i) => <div key={i} className="h-16 bg-gray-100 rounded-xl" />)}</div>
+          ) : mediaVideos.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 rounded-xl border border-dashed border-gray-200">
+              <Video className="h-8 w-8 text-gray-200 mb-3" />
+              <p className="text-gray-400 text-sm">No videos yet — add your first video above.</p>
+            </div>
+          ) : (
+            <div className="rounded-xl border border-gray-100 bg-white overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50">
+                    <th className="px-3 py-3 w-20" />
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Video</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Category</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vimeo ID</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th className="px-4 py-3" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {mediaVideos.map((video: any) => {
+                    const isWelcome = welcomeId === video.id;
+                    const isExpanded = expandedVideoId === video.id;
+                    return (
+                      <>
+                        <tr key={video.id} className={isWelcome ? "bg-blue-50/40" : "hover:bg-gray-50"}>
+                          <td className="px-3 py-2">
+                            <div className="w-16 rounded-lg overflow-hidden bg-gray-900 cursor-pointer relative flex-shrink-0"
+                              style={{ aspectRatio: "16/9" }} onClick={() => setExpandedVideo(isExpanded ? null : video.id)}>
+                              <img src={video.thumbnail_url || `https://vumbnail.com/${video.vimeo_id}.jpg`} alt="" className="w-full h-full object-cover" />
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                                <div className="w-5 h-5 rounded-full bg-white/80 flex items-center justify-center">
+                                  <div className="w-0 h-0 border-t-[4px] border-t-transparent border-b-[4px] border-b-transparent border-l-[7px] border-l-gray-800 ml-0.5" />
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              {isWelcome && <Star className="h-3.5 w-3.5 text-blue-500 fill-blue-500 flex-shrink-0" />}
+                              <div>
+                                <p className="font-medium text-gray-900">{video.title}</p>
+                                {video.description && <p className="text-xs text-gray-400 truncate max-w-xs">{video.description}</p>}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-500">{video.category}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1.5">
+                              <code className="text-xs font-mono text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">{video.vimeo_id}</code>
+                              <a href={`https://vimeo.com/${video.vimeo_id}`} target="_blank" rel="noopener noreferrer" className="text-gray-300 hover:text-blue-500 transition-colors">
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </a>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${video.is_live ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-400"}`}>
+                              {video.is_live ? "Live" : "Draft"}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-1 justify-end">
+                              <button onClick={() => toggleVideoLive(video)} title={video.is_live ? "Unpublish" : "Publish"}
+                                className={`p-1.5 rounded-lg transition-colors ${video.is_live ? "text-orange-400 hover:bg-orange-50" : "text-green-500 hover:bg-green-50"}`}>
+                                {video.is_live ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                              </button>
+                              <button onClick={() => openEditVideo(video)} className="p-1.5 rounded-lg text-blue-400 hover:bg-blue-50 transition-colors">
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                              <button onClick={() => handleDeleteVideo(video.id)} className="p-1.5 rounded-lg text-red-400 hover:bg-red-50 transition-colors">
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                              <button onClick={() => setExpandedVideo(isExpanded ? null : video.id)} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition-colors">
+                                {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr key={`${video.id}-preview`} className="bg-gray-50">
+                            <td colSpan={6} className="px-6 py-4">
+                              <div className="max-w-xl rounded-xl overflow-hidden bg-black shadow-sm" style={{ aspectRatio: "16/9" }}>
+                                <iframe src={`https://player.vimeo.com/video/${video.vimeo_id}?autoplay=1&title=0&byline=0`}
+                                  className="w-full h-full" allow="autoplay; fullscreen; picture-in-picture" allowFullScreen />
+                              </div>
+                              {video.share_slug && (
+                                <p className="text-xs text-gray-400 mt-2 font-mono">Share: app.evalent.io/watch/{video.share_slug}</p>
+                              )}
+                            </td>
+                          </tr>
+                        )}
+                      </>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
     </div>
   );
 }

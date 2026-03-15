@@ -21,19 +21,19 @@ import {
 export function AdminSidebar() {
   const pathname = usePathname();
 
-  const navItems = [
+  type NavItem = { href: string; label: string; icon: any; exact?: boolean; matchPaths?: string[] };
+  const navItems: NavItem[] = [
     { href: "/admin", label: "Dashboard", icon: LayoutDashboard, exact: true },
     { href: "/admin/schools", label: "Schools", icon: School },
     { href: "/admin/billing", label: "Billing", icon: CreditCard },
   { href: "/admin/targets", label: "Targets", icon: Target },
-  { href: "/admin/content", label: "Content Studio", icon: PenSquare },
+  { href: "/admin/content", label: "Content Studio", icon: PenSquare, matchPaths: ["/admin/content", "/admin/partner-videos"] },
     { href: "/admin/answer-keys", label: "Answer Keys", icon: Key },
     { href: "/admin/prompts", label: "AI Prompts", icon: Bot },
     { href: "/admin/reports", label: "Report Templates", icon: FileText },
     { href: "/admin/help-videos", label: "Help Videos", icon: Video },
     { href: "/admin/partners", label: "Partners", icon: UserCheck },
-  { href: "/admin/partner-videos", label: "Media Library", icon: Video },
-  { href: "/admin/payouts", label: "Payouts", icon: Wallet },
+    { href: "/admin/payouts", label: "Payouts", icon: Wallet },
   { href: "/admin/audit", label: "Audit Log", icon: ScrollText },
   ];
 
@@ -52,8 +52,8 @@ export function AdminSidebar() {
       </div>
 
       <nav className="flex-1 p-4 space-y-1">
-        {navItems.map(({ href, label, icon: Icon, exact }) => {
-          const active = exact ? pathname === href : pathname.startsWith(href);
+        {navItems.map(({ href, label, icon: Icon, exact, matchPaths }) => {
+          const active = exact ? pathname === href : (matchPaths ? matchPaths.some(p => pathname.startsWith(p)) : pathname.startsWith(href));
           return (
             <Link
               key={href}
