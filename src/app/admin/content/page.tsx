@@ -97,6 +97,7 @@ export default function ContentStudioPage() {
   const [selectedVoice, setVoice]   = useState<string>("");
   const [selectedFormat, setFormat] = useState<string>("landscape");
   const [showAvatarMgr, setAvatarMgr] = useState(false);
+  const [avatarVersion, setAvatarVersion] = useState<"3" | "4">("3");
   const [editAvatars, setEditAvatars] = useState<any[]>([]);
   const [editVoices, setEditVoices]   = useState<any[]>([]);
   const [savingAvatars, setSavingAvatars] = useState(false);
@@ -254,7 +255,7 @@ export default function ContentStudioPage() {
     const res = await fetch("/api/admin/content/heygen", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ post_id, avatar_id: selectedAvatar, voice_id: selectedVoice, video_format: selectedFormat }),
+      body: JSON.stringify({ post_id, avatar_id: selectedAvatar, voice_id: selectedVoice, video_format: selectedFormat, avatar_version: avatarVersion }),
     });
     const data = await res.json();
     if (res.ok) {
@@ -419,6 +420,18 @@ export default function ContentStudioPage() {
                       {hgAvatars.map((a: any) => <option key={a.id} value={a.id}>{a.label}</option>)}
                       {hgAvatars.length === 0 && <option value="">No avatars configured</option>}
                     </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Avatar Version</label>
+                    <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+                      {([["3", "Avatar 3", "Faster"], ["4", "Avatar 4", "Higher quality"]] as const).map(([v, label, sub]) => (
+                        <button key={v} type="button" onClick={() => setAvatarVersion(v)}
+                          className={`flex-1 px-3 py-2 text-xs font-medium transition-colors ${avatarVersion === v ? "bg-[#0d52dd] text-white" : "text-gray-500 hover:bg-gray-50"}`}>
+                          <div>{label}</div>
+                          <div className={`text-xs mt-0.5 ${avatarVersion === v ? "text-blue-200" : "text-gray-400"}`}>{sub}</div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1 flex items-center justify-between">

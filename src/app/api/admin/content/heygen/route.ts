@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
   const session = await guard();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { post_id, avatar_id, voice_id, video_format = "landscape" } = await req.json();
+  const { post_id, avatar_id, voice_id, video_format = "landscape", avatar_version = "3" } = await req.json();
 
   const supabase = createServerClient();
   const { data: post, error } = await supabase
@@ -97,11 +97,16 @@ export async function POST(req: NextRequest) {
     .replace(/\[.*?\]/g, "")
     .trim();
 
+  // Build character block based on avatar version
+  const characterBlock = avatar_version === "4"
+    ? { type: "avatar", avatar_id: resolvedAvatarId, avatar_style: "normal" }
+    : { type: "talking_photo", talking_photo_id: resolvedAvatarId };
+
   const payload = {
     title:     post.title,
     folder_id: HEYGEN_FOLDER,
     video_inputs: [{
-      character: { type: "talking_photo", talking_photo_id: resolvedAvatarId },
+      character: characterBlock,
       voice:     { type: "text", input_text: spokenScript, voice_id: resolvedVoiceId, speed: 0.9 },
     }],
     dimension: { width: format.width, height: format.height },
