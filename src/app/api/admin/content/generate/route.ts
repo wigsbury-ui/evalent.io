@@ -90,7 +90,13 @@ The script must be:
 - Natural spoken language — no jargon, no bullet points in the speech
 - Include [PAUSE] markers where the speaker should pause for emphasis
 - Mark key phrases with [EMPHASIS] for the avatar to stress
-- End with a clear, single CTA
+- End with a clear, single CTA that drives the viewer to start a free trial:
+      * Always mention the 10 free assessments with no credit card required
+      * Always reference app.evalent.io as the destination
+      * Make it feel earned and natural — the CTA should be the logical next step after the script's argument
+      * Example endings: "Start your 10 free assessments today at app.evalent.io — no credit card needed."
+        or "See it for yourself. Ten free assessments, instant reports, no commitment. app.evalent.io"
+        or "Your first 10 assessments are free. Visit app.evalent.io and start today."
 
 Also generate:
 - SEO-optimised title (for YouTube/Vimeo — include primary keyword)
