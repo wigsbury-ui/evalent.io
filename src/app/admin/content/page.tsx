@@ -89,6 +89,28 @@ export default function ContentStudioPage() {
   const [expandedVideoId, setExpandedVideo] = useState<string | null>(null);
   const VIDEO_CATEGORIES = ["Product Demo","How to Pitch","Platform Walkthrough","School Testimonial","Social Media","Training","General"];
 
+  // HeyGen config (loaded from DB)
+  const [hgAvatars, setHgAvatars]   = useState<any[]>([]);
+  const [hgVoices, setHgVoices]     = useState<any[]>([]);
+  const [hgFormats, setHgFormats]   = useState<Record<string, any>>({});
+  const [selectedAvatar, setAvatar] = useState<string>("");
+  const [selectedVoice, setVoice]   = useState<string>("");
+  const [selectedFormat, setFormat] = useState<string>("landscape");
+  const [showAvatarMgr, setAvatarMgr] = useState(false);
+  const [editAvatars, setEditAvatars] = useState<any[]>([]);
+  const [editVoices, setEditVoices]   = useState<any[]>([]);
+  const [savingAvatars, setSavingAvatars] = useState(false);
+
+  useEffect(() => {
+    // Load HeyGen config on mount
+    fetch("/api/admin/content/heygen", { method: "PATCH", headers: {"Content-Type":"application/json"}, body: "{}" })
+      .then(r => r.json()).then(d => {
+        if (d.avatars) { setHgAvatars(d.avatars); setAvatar(d.avatars[0]?.id || ""); }
+        if (d.voices)  { setHgVoices(d.voices);   setVoice(d.voices[0]?.id || ""); }
+        if (d.formats) setHgFormats(d.formats);
+      });
+  }, []);
+
   useEffect(() => {
     if (tab === "queue") loadQueue();
     if (tab === "partners") loadPartnerPosts();
@@ -232,7 +254,7 @@ export default function ContentStudioPage() {
     const res = await fetch("/api/admin/content/heygen", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ post_id, avatar_type: avatarType, voice: voiceLocale }),
+      body: JSON.stringify({ post_id, avatar_id: selectedAvatar, voice_id: selectedVoice, video_format: selectedFormat }),
     });
     const data = await res.json();
     if (res.ok) {
@@ -388,18 +410,36 @@ export default function ContentStudioPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">HeyGen Avatar</label>
-                    <select value={avatarType} onChange={e => setAvatarType(e.target.value)} className={inp + " bg-white"}>
-                      <option value="real">Real Clara</option>
-                      <option value="animated">Animated Clara</option>
+                    <label className="block text-xs font-medium text-gray-500 mb-1 flex items-center justify-between">
+                      <span>HeyGen Avatar</span>
+                      <button type="button" onClick={() => { setEditAvatars([...hgAvatars]); setEditVoices([...hgVoices]); setAvatarMgr(true); }}
+                        className="text-blue-400 hover:text-blue-600 text-xs font-normal">Manage</button>
+                    </label>
+                    <select value={selectedAvatar} onChange={e => setAvatar(e.target.value)} className={inp + " bg-white"}>
+                      {hgAvatars.map((a: any) => <option key={a.id} value={a.id}>{a.label}</option>)}
+                      {hgAvatars.length === 0 && <option value="">No avatars configured</option>}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">Voice</label>
-                    <select value={voiceLocale} onChange={e => setVoiceLocale(e.target.value)} className={inp + " bg-white"}>
-                      <option value="uk">🇬🇧 UK English</option>
-                      <option value="us">🇺🇸 US English</option>
+                    <label className="block text-xs font-medium text-gray-500 mb-1 flex items-center justify-between">
+                      <span>Voice</span>
+                    </label>
+                    <select value={selectedVoice} onChange={e => setVoice(e.target.value)} className={inp + " bg-white"}>
+                      {hgVoices.map((v: any) => <option key={v.id} value={v.id}>{v.flag} {v.label}</option>)}
+                      {hgVoices.length === 0 && <option value="">No voices configured</option>}
                     </select>
+                  </div>
+                  <div className="col-span-4">
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Video Format</label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {Object.entries(hgFormats).map(([key, fmt]: [string, any]) => (
+                        <button key={key} type="button" onClick={() => setFormat(key)}
+                          className={`rounded-lg border px-3 py-2 text-xs font-medium text-left transition-all ${selectedFormat === key ? "border-rose-300 bg-rose-50 text-rose-700" : "border-gray-200 text-gray-600 hover:border-gray-300"}`}>
+                          <div className="font-semibold">{key === "landscape" ? "16:9" : key === "portrait" ? "9:16" : key === "square" ? "1:1" : "1080p"}</div>
+                          <div className="text-gray-400 mt-0.5 truncate">{fmt.label?.split("(")[1]?.replace(")", "") || fmt.label}</div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
@@ -984,6 +1024,120 @@ export default function ContentStudioPage() {
               </table>
             </div>
           )}
+        </div>
+      )}
+
+
+      {/* ── Avatar/Voice Manager Modal ── */}
+      {showAvatarMgr && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
+          onClick={e => { if (e.target === e.currentTarget) setAvatarMgr(false); }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 pt-6 pb-4 border-b border-gray-100">
+              <div>
+                <h2 className="text-base font-bold text-gray-900">HeyGen Avatar & Voice Manager</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Add your HeyGen avatar IDs and voice IDs here</p>
+              </div>
+              <button onClick={() => setAvatarMgr(false)} className="text-gray-300 hover:text-gray-500"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="px-6 py-5 space-y-6">
+
+              {/* Avatars */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-gray-900">Avatars</h3>
+                  <button onClick={() => setEditAvatars([...editAvatars, { id: "", label: "", type: "real" }])}
+                    className="text-xs text-blue-500 hover:text-blue-700 flex items-center gap-1">
+                    <Plus className="h-3.5 w-3.5" />Add Avatar
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {editAvatars.map((a: any, i: number) => (
+                    <div key={i} className="grid grid-cols-12 gap-2 items-center">
+                      <div className="col-span-4">
+                        <input value={a.label} onChange={e => { const arr = [...editAvatars]; arr[i] = {...arr[i], label: e.target.value}; setEditAvatars(arr); }}
+                          className={inp} placeholder="Name (e.g. Neil)" />
+                      </div>
+                      <div className="col-span-6">
+                        <input value={a.id} onChange={e => { const arr = [...editAvatars]; arr[i] = {...arr[i], id: e.target.value.trim()}; setEditAvatars(arr); }}
+                          className={inp + " font-mono text-xs"} placeholder="HeyGen talking_photo_id" />
+                      </div>
+                      <div className="col-span-1">
+                        <select value={a.type} onChange={e => { const arr = [...editAvatars]; arr[i] = {...arr[i], type: e.target.value}; setEditAvatars(arr); }}
+                          className="w-full rounded-lg border border-gray-200 px-2 py-2 text-xs bg-white focus:outline-none">
+                          <option value="real">Real</option>
+                          <option value="animated">Anim</option>
+                        </select>
+                      </div>
+                      <div className="col-span-1 flex justify-center">
+                        <button onClick={() => setEditAvatars(editAvatars.filter((_: any, j: number) => j !== i))}
+                          className="text-red-400 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400 mt-2">Find your talking_photo_id in HeyGen → Avatars → select avatar → copy ID from URL or API</p>
+              </div>
+
+              {/* Voices */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold text-gray-900">Voices</h3>
+                  <button onClick={() => setEditVoices([...editVoices, { id: "", label: "", flag: "🎙️" }])}
+                    className="text-xs text-blue-500 hover:text-blue-700 flex items-center gap-1">
+                    <Plus className="h-3.5 w-3.5" />Add Voice
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  {editVoices.map((v: any, i: number) => (
+                    <div key={i} className="grid grid-cols-12 gap-2 items-center">
+                      <div className="col-span-1">
+                        <input value={v.flag} onChange={e => { const arr = [...editVoices]; arr[i] = {...arr[i], flag: e.target.value}; setEditVoices(arr); }}
+                          className={inp + " text-center"} placeholder="🎙️" maxLength={2} />
+                      </div>
+                      <div className="col-span-4">
+                        <input value={v.label} onChange={e => { const arr = [...editVoices]; arr[i] = {...arr[i], label: e.target.value}; setEditVoices(arr); }}
+                          className={inp} placeholder="e.g. Australian English" />
+                      </div>
+                      <div className="col-span-6">
+                        <input value={v.id} onChange={e => { const arr = [...editVoices]; arr[i] = {...arr[i], id: e.target.value.trim()}; setEditVoices(arr); }}
+                          className={inp + " font-mono text-xs"} placeholder="HeyGen voice_id" />
+                      </div>
+                      <div className="col-span-1 flex justify-center">
+                        <button onClick={() => setEditVoices(editVoices.filter((_: any, j: number) => j !== i))}
+                          className="text-red-400 hover:text-red-600"><Trash2 className="h-4 w-4" /></button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400 mt-2">Find voice IDs in HeyGen → Voices → hover any voice → copy ID</p>
+              </div>
+
+              {/* Save */}
+              <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
+                <button onClick={() => setAvatarMgr(false)} className="text-sm text-gray-500 hover:text-gray-700 px-4 py-2">Cancel</button>
+                <Button onClick={async () => {
+                  setSavingAvatars(true);
+                  const res = await fetch("/api/admin/heygen-settings", {
+                    method: "PATCH", headers: {"Content-Type":"application/json"},
+                    body: JSON.stringify({ heygen_avatars: editAvatars.filter((a: any) => a.id && a.label), heygen_voices: editVoices.filter((v: any) => v.id && v.label) })
+                  });
+                  if (res.ok) {
+                    setHgAvatars(editAvatars.filter((a: any) => a.id && a.label));
+                    setHgVoices(editVoices.filter((v: any) => v.id && v.label));
+                    if (editAvatars[0]?.id) setAvatar(editAvatars[0].id);
+                    if (editVoices[0]?.id)  setVoice(editVoices[0].id);
+                    setAvatarMgr(false);
+                  }
+                  setSavingAvatars(false);
+                }} disabled={savingAvatars}>
+                  {savingAvatars ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Save Configuration
+                </Button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

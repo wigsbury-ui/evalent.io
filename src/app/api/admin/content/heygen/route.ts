@@ -9,37 +9,68 @@ async function guard() {
   return session;
 }
 
-const HEYGEN_API = "https://api.heygen.com";
+const HEYGEN_API    = "https://api.heygen.com";
 const HEYGEN_FOLDER = "7b735e5ec3b549bb9264b594d8a9490e";
 
-// Known avatars from previous Evalent work
-const AVATARS = {
-  animated: { id: "881d169c307a4cd2acc76d0a6b5f5b0d", label: "Animated Clara" },
-  real:     { id: "bf8381a3213d4359b6a4e9be8046ae7b", label: "Real Clara" },
-};
-const VOICES = {
-  uk: { id: "A1pGOLo02KVeFRghTFnF", label: "UK English" },
-  us: { id: "TW9XPf7yjX2Xg5kWijqY", label: "US English" },
+// Fallback defaults (used if DB settings not found)
+const DEFAULT_AVATARS = [
+  { id: "881d169c307a4cd2acc76d0a6b5f5b0d", label: "Animated Clara", type: "animated" },
+  { id: "bf8381a3213d4359b6a4e9be8046ae7b", label: "Real Clara",     type: "real"     },
+];
+const DEFAULT_VOICES = [
+  { id: "A1pGOLo02KVeFRghTFnF", label: "UK English", flag: "🇬🇧" },
+  { id: "TW9XPf7yjX2Xg5kWijqY", label: "US English", flag: "🇺🇸" },
+];
+
+const VIDEO_FORMATS: Record<string, { width: number; height: number; label: string }> = {
+  landscape:  { width: 1280, height: 720,  label: "Landscape 16:9 (YouTube / Vimeo)" },
+  portrait:   { width: 720,  height: 1280, label: "Portrait 9:16 (Instagram Reels / TikTok)" },
+  square:     { width: 1080, height: 1080, label: "Square 1:1 (LinkedIn / Instagram)" },
+  widescreen: { width: 1920, height: 1080, label: "Widescreen 1080p (Full HD)" },
 };
 
 async function heygenFetch(method: string, path: string, body?: any) {
   const key = process.env.HEYGEN_API_KEY;
-  if (!key) throw new Error("HEYGEN_API_KEY not configured in environment variables");
+  if (!key) throw new Error("HEYGEN_API_KEY not configured");
   const opts: RequestInit = {
     method,
-    headers: { "Accept": "application/json", "X-Api-Key": key, ...(body ? { "Content-Type": "application/json" } : {}) },
+    headers: {
+      "Accept": "application/json",
+      "X-Api-Key": key,
+      ...(body ? { "Content-Type": "application/json" } : {}),
+    },
     ...(body ? { body: JSON.stringify(body) } : {}),
   };
   const res = await fetch(`${HEYGEN_API}${path}`, opts);
   return res.json();
 }
 
-// POST — generate a new HeyGen video from a content post
+async function getSettings(supabase: any) {
+  const { data } = await supabase
+    .from("platform_settings")
+    .select("key, value")
+    .in("key", ["heygen_avatars", "heygen_voices"]);
+
+  let avatars = DEFAULT_AVATARS;
+  let voices  = DEFAULT_VOICES;
+
+  (data || []).forEach((row: any) => {
+    try {
+      const parsed = typeof row.value === "string" ? JSON.parse(row.value) : row.value;
+      if (row.key === "heygen_avatars" && Array.isArray(parsed)) avatars = parsed;
+      if (row.key === "heygen_voices"  && Array.isArray(parsed)) voices  = parsed;
+    } catch {}
+  });
+
+  return { avatars, voices };
+}
+
+// POST — generate video
 export async function POST(req: NextRequest) {
   const session = await guard();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { post_id, avatar_type = "real", voice = "uk" } = await req.json();
+  const { post_id, avatar_id, voice_id, video_format = "landscape" } = await req.json();
 
   const supabase = createServerClient();
   const { data: post, error } = await supabase
@@ -48,10 +79,18 @@ export async function POST(req: NextRequest) {
   if (error || !post) return NextResponse.json({ error: "Post not found" }, { status: 404 });
   if (post.type !== "video_script") return NextResponse.json({ error: "Only video scripts can be sent to HeyGen" }, { status: 400 });
 
-  const avatarId = AVATARS[avatar_type as keyof typeof AVATARS]?.id || AVATARS.real.id;
-  const voiceId  = VOICES[voice as keyof typeof VOICES]?.id || VOICES.uk.id;
+  const { avatars, voices } = await getSettings(supabase);
 
-  // Clean script — remove stage directions for the spoken text
+  // Use provided IDs or fall back to first in list
+  const resolvedAvatarId = avatar_id || avatars[0]?.id;
+  const resolvedVoiceId  = voice_id  || voices[0]?.id;
+  const format = VIDEO_FORMATS[video_format] || VIDEO_FORMATS.landscape;
+
+  if (!resolvedAvatarId || !resolvedVoiceId) {
+    return NextResponse.json({ error: "No avatar or voice configured" }, { status: 400 });
+  }
+
+  // Clean script for spoken text
   const spokenScript = post.body
     .replace(/\[PAUSE\]/g, " ")
     .replace(/\[EMPHASIS\]/g, "")
@@ -59,45 +98,33 @@ export async function POST(req: NextRequest) {
     .trim();
 
   const payload = {
-    title: post.title,
+    title:     post.title,
     folder_id: HEYGEN_FOLDER,
     video_inputs: [{
-      character: {
-        type: "talking_photo",
-        talking_photo_id: avatarId,
-      },
-      voice: {
-        type: "text",
-        input_text: spokenScript,
-        voice_id: voiceId,
-        speed: 0.9,
-      },
+      character: { type: "talking_photo", talking_photo_id: resolvedAvatarId },
+      voice:     { type: "text", input_text: spokenScript, voice_id: resolvedVoiceId, speed: 0.9 },
     }],
-    dimension: { width: 1280, height: 720 },
+    dimension: { width: format.width, height: format.height },
   };
 
   const result = await heygenFetch("POST", "/v2/video/generate", payload);
-
-  if (result.error) {
-    return NextResponse.json({ error: result.error.message || JSON.stringify(result.error) }, { status: 500 });
-  }
+  if (result.error) return NextResponse.json({ error: result.error.message || JSON.stringify(result.error) }, { status: 500 });
 
   const videoId = result.data?.video_id;
-  if (!videoId) return NextResponse.json({ error: "No video_id returned from HeyGen" }, { status: 500 });
+  if (!videoId) return NextResponse.json({ error: "No video_id from HeyGen" }, { status: 500 });
 
-  // Save HeyGen video ID back to the post
   await supabase.from("content_posts").update({
     heygen_video_id: videoId,
-    heygen_status: "pending",
-    avatar_id: avatarId,
-    voice_id: voiceId,
-    updated_at: new Date().toISOString(),
+    heygen_status:   "pending",
+    avatar_id:       resolvedAvatarId,
+    voice_id:        resolvedVoiceId,
+    updated_at:      new Date().toISOString(),
   }).eq("id", post_id);
 
-  return NextResponse.json({ video_id: videoId, status: "pending" });
+  return NextResponse.json({ video_id: videoId, status: "pending", format: format.label });
 }
 
-// GET — check status of a HeyGen video
+// GET — check video status
 export async function GET(req: NextRequest) {
   const session = await guard();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -109,33 +136,29 @@ export async function GET(req: NextRequest) {
   const { data: post } = await supabase
     .from("content_posts").select("heygen_video_id, heygen_status, heygen_video_url").eq("id", post_id).single();
 
-  if (!post?.heygen_video_id) return NextResponse.json({ error: "No HeyGen video for this post" }, { status: 404 });
-
-  // If already completed, return cached URL
+  if (!post?.heygen_video_id) return NextResponse.json({ error: "No HeyGen video" }, { status: 404 });
   if (post.heygen_status === "completed" && post.heygen_video_url) {
     return NextResponse.json({ status: "completed", video_url: post.heygen_video_url });
   }
 
   const result = await heygenFetch("GET", `/v1/video_status.get?video_id=${post.heygen_video_id}`);
-  const status = result.data?.status;
+  const status   = result.data?.status;
   const videoUrl = result.data?.video_url;
 
-  // Update status in DB
-  const updates: Record<string, any> = {
-    heygen_status: status,
-    updated_at: new Date().toISOString(),
-  };
+  const updates: Record<string, any> = { heygen_status: status, updated_at: new Date().toISOString() };
   if (videoUrl) updates.heygen_video_url = videoUrl;
-
   await supabase.from("content_posts").update(updates).eq("id", post_id);
 
   return NextResponse.json({ status, video_url: videoUrl || null });
 }
 
-// PATCH — list available avatars and voices (for future avatar picker)
+// PATCH — get config (avatars, voices, formats) for UI
 export async function PATCH(req: NextRequest) {
   const session = await guard();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  return NextResponse.json({ avatars: AVATARS, voices: VOICES });
+  const supabase = createServerClient();
+  const { avatars, voices } = await getSettings(supabase);
+
+  return NextResponse.json({ avatars, voices, formats: VIDEO_FORMATS });
 }
