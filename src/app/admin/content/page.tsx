@@ -329,6 +329,7 @@ export default function ContentStudioPage() {
           { key: "generate", label: "Generate" },
           { key: "queue",    label: `Queue${posts.length > 0 ? ` (${posts.length})` : ""}` },
           { key: "partners", label: "Partner Feed" },
+        { key: "media",    label: "Media Library" },
         ].map(t => (
           <button key={t.key} onClick={() => setTab(t.key as any)}
             className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${tab === t.key ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}>
