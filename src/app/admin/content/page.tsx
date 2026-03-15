@@ -62,6 +62,7 @@ export default function ContentStudioPage() {
   const [sendingHeygen, setSendingHeygen] = useState<string | null>(null);
   const [pushingVimeo, setPushingVimeo] = useState<string | null>(null);
   const [vimeoSuccess, setVimeoSuccess] = useState<string | null>(null);
+  const [vimeoSuccess, setVimeoSuccess] = useState<string | null>(null);
 
   // Queue tab state
   const [posts, setPosts] = useState<any[]>([]);
