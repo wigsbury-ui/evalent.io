@@ -17,7 +17,7 @@ function EvalentStory() {
           @keyframes fadeUp { 0%{opacity:0;transform:translateY(8px)} 100%{opacity:1;transform:translateY(0)} }
           @keyframes dash   { to{stroke-dashoffset:-24} }
           @keyframes blink  { 0%,100%{opacity:1} 45%,55%{opacity:0} }
-          @keyframes pb1k   { 0%,100%{opacity:.55;transform:scaleX(1)} 50%{opacity:.82;transform:scaleX(.78)} }
+          @keyframes pb1k   { 0%,100%{opacity:.55;transform:scaleY(1)} 50%{opacity:.82;transform:scaleY(.75)} } 50%{opacity:.82;transform:scaleX(.78)} }
           @keyframes pb2k   { 0%,100%{opacity:.45;transform:scaleY(1)} 50%{opacity:.68;transform:scaleY(.72)} }
           @keyframes pb3k   { 0%,100%{opacity:.62;transform:scaleY(1)} 50%{opacity:.9;transform:scaleY(.85)} }
           .s1{animation:fadeUp 1s ease .3s both}
@@ -25,7 +25,7 @@ function EvalentStory() {
           .s3{animation:fadeUp 1s ease 3.3s both}
           .s4{animation:fadeUp 1s ease 4.8s both}
           .s5{animation:fadeUp 1s ease 6.0s both}
-          .pb1{transform-origin:left center;transform-box:fill-box;animation:pb1k 3.2s ease-in-out 7.5s infinite}
+          .pb1{transform-origin:center bottom;transform-box:fill-box;animation:pb1k 3.2s ease-in-out 7.5s infinite}
           .pb2{transform-origin:center bottom;transform-box:fill-box;animation:pb2k 4.1s ease-in-out 7.5s infinite}
           .pb3{transform-origin:center bottom;transform-box:fill-box;animation:pb3k 2.8s ease-in-out 7.5s infinite}
           .fl{stroke-dasharray:5 4;animation:dash 1.4s linear infinite;fill:none}
@@ -56,7 +56,7 @@ function EvalentStory() {
         <rect className="cur" x="155" y="107" width="2" height="8" rx="1" fill="rgba(255,255,255,.75)"/>
         {/* Right side descriptor */}
         <text x="232" y="24" fill="rgba(255,255,255,.85)" fontSize="12" fontFamily="sans-serif" fontWeight="600">Student submits</text>
-        <text x="232" y="40" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">Timed MCQ across English,</text>
+        <text x="232" y="40" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">MCQ across English,</text>
         <text x="232" y="54" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">Maths &amp; Reasoning plus</text>
         <text x="232" y="68" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">extended writing tasks.</text>
       </g>
@@ -95,8 +95,8 @@ function EvalentStory() {
         <text x="140" y="260" fill="rgba(255,255,255,.38)" fontSize="8" fontFamily="sans-serif">WRITING</text>
         <text x="195" y="260" fill="rgba(255,255,255,.5)" fontSize="8" fontFamily="sans-serif" fontWeight="600">4/4</text>
         {/* Right side descriptor */}
-        <text x="232" y="180" fill="rgba(255,255,255,.85)" fontSize="12" fontFamily="sans-serif" fontWeight="600">AI scores instantly</text>
-        <text x="232" y="196" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">Claude evaluates every</text>
+        <text x="232" y="180" fill="rgba(255,255,255,.85)" fontSize="12" fontFamily="sans-serif" fontWeight="600">Evalent scores instantly</text>
+        <text x="232" y="196" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">We evaluate every</text>
         <text x="232" y="210" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">response against your</text>
         <text x="232" y="224" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">school&apos;s entry criteria.</text>
         <text x="232" y="246" fill="rgba(255,255,255,.35)" fontSize="9" fontFamily="sans-serif">~2 minutes</text>
@@ -132,7 +132,7 @@ function EvalentStory() {
         <rect x="154" y="434" width="52" height="6" rx="3" fill="rgba(255,255,255,.14)"/>
         <rect x="154" y="446" width="44" height="6" rx="3" fill="rgba(255,255,255,.1)"/>
         {/* Right side descriptor */}
-        <text x="232" y="348" fill="rgba(255,255,255,.85)" fontSize="12" fontFamily="sans-serif" fontWeight="600">Professional report</text>
+        <text x="232" y="348" fill="rgba(255,255,255,.85)" fontSize="12" fontFamily="sans-serif" fontWeight="600">Professional reports</text>
         <text x="232" y="364" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">Domain scores, writing</text>
         <text x="232" y="378" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">analysis, mindset profile</text>
         <text x="232" y="392" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">&amp; AI narrative. PDF ready.</text>
