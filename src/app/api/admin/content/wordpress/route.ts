@@ -159,8 +159,6 @@ export async function POST(req: NextRequest) {
   // Generate featured image with DALL-E 3 (runs in parallel with WP prep)
   const imagePromise = generateFeaturedImage(post.title, post.excerpt || "");
 
-  // Generate featured image with DALL-E 3 (runs in parallel with WP prep)
-  const imagePromise = generateFeaturedImage(post.title, post.excerpt || "");
 
   const wpPayload: Record<string, any> = {
     title:   post.title,
