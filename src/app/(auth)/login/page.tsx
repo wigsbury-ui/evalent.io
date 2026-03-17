@@ -17,11 +17,17 @@ function EvalentStory() {
           @keyframes fadeUp { 0%{opacity:0;transform:translateY(8px)} 100%{opacity:1;transform:translateY(0)} }
           @keyframes dash   { to{stroke-dashoffset:-24} }
           @keyframes blink  { 0%,100%{opacity:1} 45%,55%{opacity:0} }
+          @keyframes pb1k   { 0%,100%{opacity:.55;transform:scaleX(1)} 50%{opacity:.82;transform:scaleX(.78)} }
+          @keyframes pb2k   { 0%,100%{opacity:.45;transform:scaleX(1)} 50%{opacity:.68;transform:scaleX(.65)} }
+          @keyframes pb3k   { 0%,100%{opacity:.62;transform:scaleX(1)} 50%{opacity:.9;transform:scaleX(.88)} }
           .s1{animation:fadeUp 1s ease .3s both}
           .s2{animation:fadeUp 1s ease 1.8s both}
           .s3{animation:fadeUp 1s ease 3.3s both}
           .s4{animation:fadeUp 1s ease 4.8s both}
           .s5{animation:fadeUp 1s ease 6.0s both}
+          .pb1{transform-origin:left center;transform-box:fill-box;animation:pb1k 3.2s ease-in-out 7.5s infinite}
+          .pb2{transform-origin:left center;transform-box:fill-box;animation:pb2k 4.1s ease-in-out 7.5s infinite}
+          .pb3{transform-origin:left center;transform-box:fill-box;animation:pb3k 2.8s ease-in-out 7.5s infinite}
           .fl{stroke-dasharray:5 4;animation:dash 1.4s linear infinite;fill:none}
           .cur{animation:blink 1.2s step-end infinite}
         `}</style>
@@ -72,13 +78,13 @@ function EvalentStory() {
         {/* Domain bars */}
         <text x="116" y="184" fill="rgba(255,255,255,.38)" fontSize="8" fontFamily="sans-serif">ENGLISH</text>
         <rect x="116" y="188" width="88" height="6" rx="3" fill="rgba(255,255,255,.1)"/>
-        <rect className="pb1" x="116" y="188" width="72" height="6" rx="3" fill="rgba(255,255,255,.55)"/>
+        <rect className="pb1" className="pb1" x="116" y="188" width="72" height="6" rx="3" fill="rgba(255,255,255,.55)"/>
         <text x="116" y="204" fill="rgba(255,255,255,.38)" fontSize="8" fontFamily="sans-serif">MATHS</text>
         <rect x="116" y="208" width="88" height="6" rx="3" fill="rgba(255,255,255,.1)"/>
-        <rect className="pb2" x="116" y="208" width="58" height="6" rx="3" fill="rgba(255,255,255,.45)"/>
+        <rect className="pb2" className="pb2" x="116" y="208" width="58" height="6" rx="3" fill="rgba(255,255,255,.45)"/>
         <text x="116" y="224" fill="rgba(255,255,255,.38)" fontSize="8" fontFamily="sans-serif">REASONING</text>
         <rect x="116" y="228" width="88" height="6" rx="3" fill="rgba(255,255,255,.1)"/>
-        <rect className="pb3" x="116" y="228" width="80" height="6" rx="3" fill="rgba(255,255,255,.62)"/>
+        <rect className="pb3" className="pb3" x="116" y="228" width="80" height="6" rx="3" fill="rgba(255,255,255,.62)"/>
         {/* Mindset */}
         <text x="18" y="260" fill="rgba(255,255,255,.38)" fontSize="8" fontFamily="sans-serif">MINDSET</text>
         <circle cx="70" cy="256" r="4" fill="rgba(255,255,255,.55)"/>
@@ -164,7 +170,7 @@ function EvalentStory() {
       {/* ── Tagline ── */}
       <g className="s5">
         <line x1="8" y1="628" x2="472" y2="628" stroke="rgba(255,255,255,.12)" strokeWidth="1"/>
-        <text x="240" y="650" textAnchor="middle" fill="rgba(255,255,255,.85)" fontSize="13" fontFamily="sans-serif" fontWeight="600">Admissions Intelligence Platform</text>
+        <text x="240" y="650" textAnchor="middle" fill="rgba(255,255,255,.85)" fontSize="13" fontFamily="sans-serif" fontWeight="600">Evalent. The Admissions Intelligence Platform.</text>
         <text x="240" y="670" textAnchor="middle" fill="rgba(255,255,255,.45)" fontSize="10" fontFamily="sans-serif" letterSpacing=".5">AI-powered scoring · Professional reports · Streamlined decisions</text>
       </g>
     </svg>
