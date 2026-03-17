@@ -18,16 +18,16 @@ function EvalentStory() {
           @keyframes dash   { to{stroke-dashoffset:-24} }
           @keyframes blink  { 0%,100%{opacity:1} 45%,55%{opacity:0} }
           @keyframes pb1k   { 0%,100%{opacity:.55;transform:scaleX(1)} 50%{opacity:.82;transform:scaleX(.78)} }
-          @keyframes pb2k   { 0%,100%{opacity:.45;transform:scaleX(1)} 50%{opacity:.68;transform:scaleX(.65)} }
-          @keyframes pb3k   { 0%,100%{opacity:.62;transform:scaleX(1)} 50%{opacity:.9;transform:scaleX(.88)} }
+          @keyframes pb2k   { 0%,100%{opacity:.45;transform:scaleY(1)} 50%{opacity:.68;transform:scaleY(.72)} }
+          @keyframes pb3k   { 0%,100%{opacity:.62;transform:scaleY(1)} 50%{opacity:.9;transform:scaleY(.85)} }
           .s1{animation:fadeUp 1s ease .3s both}
           .s2{animation:fadeUp 1s ease 1.8s both}
           .s3{animation:fadeUp 1s ease 3.3s both}
           .s4{animation:fadeUp 1s ease 4.8s both}
           .s5{animation:fadeUp 1s ease 6.0s both}
           .pb1{transform-origin:left center;transform-box:fill-box;animation:pb1k 3.2s ease-in-out 7.5s infinite}
-          .pb2{transform-origin:left center;transform-box:fill-box;animation:pb2k 4.1s ease-in-out 7.5s infinite}
-          .pb3{transform-origin:left center;transform-box:fill-box;animation:pb3k 2.8s ease-in-out 7.5s infinite}
+          .pb2{transform-origin:center bottom;transform-box:fill-box;animation:pb2k 4.1s ease-in-out 7.5s infinite}
+          .pb3{transform-origin:center bottom;transform-box:fill-box;animation:pb3k 2.8s ease-in-out 7.5s infinite}
           .fl{stroke-dasharray:5 4;animation:dash 1.4s linear infinite;fill:none}
           .cur{animation:blink 1.2s step-end infinite}
         `}</style>
@@ -214,7 +214,7 @@ function LoginForm() {
           <svg width="130" height="34" viewBox="0 0 130 34" fill="none" xmlns="http://www.w3.org/2000/svg">
             <rect width="34" height="34" rx="9" fill="rgba(255,255,255,0.18)" stroke="rgba(255,255,255,0.3)" strokeWidth="1"/>
             <text x="17" y="23" textAnchor="middle" fill="white" fontSize="17" fontFamily="sans-serif" fontWeight="700">E</text>
-            <text x="48" y="23" fill="white" fontSize="17" fontFamily="sans-serif" fontWeight="600">valent</text>
+            <text x="42" y="23" fill="white" fontSize="17" fontFamily="sans-serif" fontWeight="600">valent</text>
           </svg>
         </div>
         <div className="flex-1 flex items-center justify-center px-8 pt-20 pb-8">
@@ -235,6 +235,9 @@ function LoginForm() {
             <span className="text-xl font-semibold text-gray-900">Evalent</span>
           </div>
           <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-evalent-600 mb-3">
+              Admissions Intelligence Platform
+            </p>
             <h2 className="text-2xl font-bold text-gray-900">Welcome back</h2>
             <p className="mt-2 text-sm text-gray-500">Sign in to your Evalent admin account</p>
           </div>
