@@ -37,9 +37,18 @@ export async function POST(req: NextRequest) {
     : "";
 
   const videoDuration = duration || 90;
-  const curriculumContext = curriculum && curriculum !== "all"
-    ? `\nTarget curriculum: ${curriculum}. Tailor all language, examples, grade references and terminology specifically for ${curriculum} schools. Use ${curriculum}-appropriate grade labels (${curriculum === "IB" ? "G3-G10 / MYP / PYP" : curriculum === "British" ? "Year 3-11" : curriculum === "American" ? "Grade 3-10" : "Year 7-11 / IGCSE track"}).`
-    : "\nTarget audience: international schools across IB, British, American and IGCSE curricula. Use inclusive language that resonates across all programmes.";
+  const CURRICULUM_LABELS: Record<string, string> = {
+    IB:          "International Baccalaureate (IB) — use MYP/PYP terminology, G3-G10 grade labels",
+    British:     "British / English National Curriculum — use Year 3-11 labels, NC terminology",
+    American:    "American / Common Core — use Grade 3-10 labels, US education terminology",
+    IGCSE:       "Cambridge IGCSE pathway — use Year 7-11 labels, Cambridge/IGCSE terminology",
+    Australian:  "Australian Curriculum (ACARA) — use Year 3-10 labels, ACARA terminology",
+    NewZealand:  "New Zealand Curriculum (NZC) — use Year 3-10 labels, NZC terminology",
+    Other:       "international schools with mixed or other curricula",
+  };
+  const curriculumContext = curriculum && curriculum !== "all" && CURRICULUM_LABELS[curriculum]
+    ? \`\nTarget curriculum: \${CURRICULUM_LABELS[curriculum]}. Tailor all language, examples, grade references and terminology specifically for this curriculum. Avoid references to other curricula.\`
+    : "\nTarget audience: international schools across IB, British, American, Australian and other curricula. Use inclusive language that resonates broadly.";
   const targetPlatform = platform || "linkedin";
 
   const prompts: Record<string, string> = {

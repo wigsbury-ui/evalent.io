@@ -99,6 +99,42 @@ const ALL_TOPIC_SUGGESTIONS: Record<string, string[]> = {
     "Admissions best practice for dual-pathway schools",
     "Year 10 late entry — how IGCSE schools can make better decisions",
   ],
+  Australian: [
+    "How Australian curriculum schools approach Year 7 admissions",
+    "What ACARA-aligned assessments reveal about primary school leavers",
+    "Admissions for Australian curriculum international schools",
+    "Why Australian schools overseas need structured admissions",
+    "How to identify Year 7 readiness in Australian curriculum schools",
+    "Supporting diverse learners in Australian international school admissions",
+    "What great admissions looks like in an ACARA-aligned school",
+    "Year 7 entry — what Australian curriculum schools should assess",
+    "How to build a defensible admissions process for Australian schools",
+    "The case for structured testing in Australian international schools",
+  ],
+  NewZealand: [
+    "How New Zealand curriculum schools approach Year 7 admissions",
+    "What NZC-aligned assessments reveal about primary school leavers",
+    "Admissions for New Zealand curriculum international schools",
+    "Why NZC schools need criterion-referenced admissions",
+    "How to identify Year 9 readiness in New Zealand curriculum schools",
+    "Supporting EAL students in NZC school admissions",
+    "What structured admissions looks like for New Zealand curriculum schools",
+    "How to assess writing readiness for the New Zealand curriculum",
+    "Admissions best practice for NZC pathway schools",
+    "The case for structured testing in New Zealand international schools",
+  ],
+  Other: [
+    "Why international schools need structured admissions regardless of curriculum",
+    "How to build a fair admissions process for a multi-curriculum school",
+    "The case for criterion-referenced assessments in any school system",
+    "What great admissions decisions look like across different curricula",
+    "How to assess the whole child in an international school context",
+    "Supporting multilingual learners in school admissions",
+    "How to make admissions fairer for internationally mobile families",
+    "Building an admissions process that works across grade levels",
+    "Why structured testing reduces bias in any school admissions context",
+    "How top international schools use data to make better admissions decisions",
+  ],
 };
 
 const inp = "w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500";
@@ -117,6 +153,7 @@ export default function ContentStudioPage() {
   const [generating, setGenerating] = useState(false);
   const [suggestionOffset, setSuggestionOffset] = useState(0);
   const [suggestionCurriculum, setSuggestionCurriculum] = useState("all");
+  const [curricula, setCurricula] = useState<{name: string; label: string}[]>([]);
   const [generated, setGenerated] = useState<any[]>([]);
   const [saving, setSaving] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
@@ -171,6 +208,9 @@ export default function ContentStudioPage() {
   const [savingAvatars, setSavingAvatars] = useState(false);
 
   useEffect(() => {
+    // Load curricula for topic filter
+    fetch("/api/curricula").then(r => r.json()).then(d => { if (Array.isArray(d)) setCurricula(d); });
+
     // Load HeyGen config on mount
     fetch("/api/admin/content/heygen", { method: "PATCH", headers: {"Content-Type":"application/json"}, body: "{}" })
       .then(r => r.json()).then(d => {
@@ -540,10 +580,9 @@ export default function ContentStudioPage() {
                       onChange={e => { setSuggestionCurriculum(e.target.value); setSuggestionOffset(0); }}
                       className="text-xs rounded-lg border border-gray-200 px-2.5 py-1.5 bg-white text-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-400">
                       <option value="all">All programmes</option>
-                      <option value="IB">IB</option>
-                      <option value="British">British</option>
-                      <option value="American">American</option>
-                      <option value="IGCSE">IGCSE</option>
+                      {curricula.map(curr => (
+                        <option key={curr.name} value={curr.name}>{curr.label}</option>
+                      ))}
                     </select>
                     <span className="text-xs text-gray-400">Topic ideas:</span>
                     <button
