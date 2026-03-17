@@ -27,22 +27,29 @@ async function generateFeaturedImage(title: string, excerpt: string): Promise<st
         max_tokens: 200,
         messages: [{
           role: "user",
-          content: `Create a DALL-E 3 image prompt for a blog post featured image. The image must visually represent the specific topic of this post.
+          content: `Create a DALL-E 3 image prompt for a professional blog post featured image.
 
 Blog title: "${title}"
 Content summary: "${excerpt?.slice(0, 300) || ""}"
 
-The image should:
-- Directly represent the SPECIFIC topic of this post — not generic education or technology imagery
-- Be a conceptual illustration or editorial photograph that someone could look at and guess the blog topic
-- Use real-world metaphors: e.g. for "admissions decisions" show doors/pathways/crossroads; for "data and assessments" show documents/charts; for "international schools" show diverse architectural elements or global imagery
-- Professional, clean aesthetic — blues, whites, light grays — no cluttered backgrounds
+Rules:
+- ONE single bold visual metaphor — nothing else in the image
+- Minimalist: 2-3 elements maximum, generous empty space
+- Bold colour contrast: deep navy or royal blue against clean white or warm cream
+- Flat editorial illustration style — NOT 3D renders, NOT photorealistic
+- Simple enough to understand in 2 seconds
 - No faces, no people, no text or words in the image
-- 16:9 wide format composition
+- Wide 16:9 format with clear central focal point
 
-Think carefully about what SPECIFIC visual metaphor represents "${title}" and build the prompt around that central metaphor.
+Good metaphor examples:
+- "Admissions decisions" -> single open doorway, warm light beyond
+- "Holistic assessment" -> three clean overlapping circles on white
+- "International schools" -> bold globe with single glowing pin
+- "Data and results" -> one clean upward line on minimal grid
 
-Return ONLY the DALL-E prompt, nothing else. Max 80 words.`
+Think: what is the ONE simplest boldest image for "${title}"?
+
+Return ONLY the DALL-E prompt. Max 60 words.`
         }]
       })
     });
