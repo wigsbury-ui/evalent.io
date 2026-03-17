@@ -16,7 +16,7 @@ function EvalentStory() {
         <style>{`
           @keyframes fadeUp  { 0%{opacity:0;transform:translateY(8px)} 100%{opacity:1;transform:translateY(0)} }
           @keyframes dash    { to{stroke-dashoffset:-24} }
-          @keyframes spin    { 0%{transform:rotate(0deg);opacity:0} 10%{opacity:1} 100%{transform:rotate(360deg);opacity:1} }
+          @keyframes spin    { 0%{transform:rotate(0deg);opacity:0} 5%{opacity:1} 100%{transform:rotate(360deg);opacity:1} }
           @keyframes blink   { 0%,100%{opacity:1} 45%,55%{opacity:0} }
           @keyframes barAnim { 0%,100%{transform:scaleX(1)} 50%{transform:scaleX(0.72)} }
           .s1  { animation: fadeUp 1s ease 0.3s both }
@@ -25,11 +25,11 @@ function EvalentStory() {
           .s4  { animation: fadeUp 1s ease 4.8s both }
           .s5  { animation: fadeUp 1s ease 6.0s both }
           .fl  { stroke-dasharray:5 4; animation:dash 1.4s linear infinite; fill:none }
-          .arc { transform-origin:74px 275px; animation:spin 3s linear 1.8s infinite; transform-box:fill-box; opacity:0 }
+          .arc { transform-origin:74px 275px; animation:spin 3s linear 1.8s infinite; transform-box:fill-box; opacity:0; animation-fill-mode:none }
           .cur { animation: blink 1.2s step-end infinite }
-          .bar1 { transform-origin:116px 229px; animation: barAnim 3.2s ease-in-out 8s infinite }
-          .bar2 { transform-origin:116px 249px; animation: barAnim 4.1s ease-in-out 8s infinite }
-          .bar3 { transform-origin:116px 269px; animation: barAnim 2.8s ease-in-out 8.5s infinite }
+          .bar1 { transform-origin:116px 229px; transform-box:fill-box; animation: barAnim 3.2s ease-in-out 8s infinite }
+          .bar2 { transform-origin:116px 249px; transform-box:fill-box; animation: barAnim 4.1s ease-in-out 8s infinite }
+          .bar3 { transform-origin:116px 269px; transform-box:fill-box; animation: barAnim 2.8s ease-in-out 8.5s infinite }
         `}</style>
       </defs>
 
