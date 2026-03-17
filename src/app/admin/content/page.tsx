@@ -24,7 +24,7 @@ const WP_CATEGORIES = [
   { id: 12, name: "Schools" },
 ];
 
-const TOPIC_SUGGESTIONS = [
+const ALL_TOPIC_SUGGESTIONS = [
   "Why international schools are moving to structured admissions",
   "The problem with subjective admissions processes",
   "How AI is changing admissions for IB schools",
@@ -33,6 +33,23 @@ const TOPIC_SUGGESTIONS = [
   "What great admissions decisions look like",
   "Supporting EAL students in the admissions process",
   "Building a defensible admissions process",
+  "Why gut-feel admissions is costing schools great students",
+  "How to assess the whole child — not just test scores",
+  "What IB schools look for in a Grade 6 applicant",
+  "The hidden cost of a bad admissions decision",
+  "How to make admissions fairer for international families",
+  "Why criterion-referenced beats norm-referenced every time",
+  "Admissions in the age of AI — what changes, what doesn't",
+  "How top international schools are using data to decide",
+  "The 3 things every admissions report should include",
+  "Why mindset matters more than grades in admissions",
+  "How to build an admissions process your board will trust",
+  "What parents don't see behind your admissions decision",
+  "Reducing bias in international school admissions",
+  "How Evalent helps admissions teams work smarter",
+  "Why writing tasks reveal more than multiple choice",
+  "The admissions mistakes even great schools make",
+  "How to handle high-volume admissions without losing quality",
 ];
 
 const inp = "w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500";
@@ -49,6 +66,7 @@ export default function ContentStudioPage() {
   const [tone, setTone] = useState("thought leadership");
   const [angle, setAngle] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [suggestionOffset, setSuggestionOffset] = useState(0);
   const [generated, setGenerated] = useState<any[]>([]);
   const [saving, setSaving] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
@@ -465,13 +483,23 @@ export default function ContentStudioPage() {
                   placeholder="e.g. Why structured admissions helps IB schools make better decisions"
                   onKeyDown={e => e.key === "Enter" && handleGenerate()} />
                 {/* Suggestions */}
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {TOPIC_SUGGESTIONS.slice(0, 4).map(s => (
+                <div className="flex flex-wrap gap-1.5 mt-2 items-center">
+                  {ALL_TOPIC_SUGGESTIONS.slice(suggestionOffset % ALL_TOPIC_SUGGESTIONS.length, (suggestionOffset % ALL_TOPIC_SUGGESTIONS.length) + 4).concat(
+                    suggestionOffset % ALL_TOPIC_SUGGESTIONS.length + 4 > ALL_TOPIC_SUGGESTIONS.length
+                      ? ALL_TOPIC_SUGGESTIONS.slice(0, (suggestionOffset % ALL_TOPIC_SUGGESTIONS.length + 4) - ALL_TOPIC_SUGGESTIONS.length)
+                      : []
+                  ).map(s => (
                     <button key={s} onClick={() => setTopic(s)}
                       className="text-xs bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-full px-2.5 py-1 text-gray-500 transition-colors">
                       {s}
                     </button>
                   ))}
+                  <button
+                    onClick={() => setSuggestionOffset(o => (o + 4) % ALL_TOPIC_SUGGESTIONS.length)}
+                    className="text-gray-400 hover:text-blue-500 transition-colors ml-1 flex-shrink-0"
+                    title="Refresh suggestions">
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  </button>
                 </div>
               </div>
 
