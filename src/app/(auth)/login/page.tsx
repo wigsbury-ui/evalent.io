@@ -18,7 +18,6 @@ function EvalentStory() {
           @keyframes dash    { to{stroke-dashoffset:-24} }
           @keyframes pulse2  { 0%,100%{opacity:.15;r:28} 50%{opacity:.45;r:32} }
           @keyframes blink   { 0%,100%{opacity:1} 45%,55%{opacity:0} }
-          @keyframes barAnim { 0%,100%{transform:scaleX(1)} 50%{transform:scaleX(0.72)} }
           .s1  { animation: fadeUp 1s ease 0.3s both }
           .s2  { animation: fadeUp 1s ease 1.8s both }
           .s3  { animation: fadeUp 1s ease 3.3s both }
@@ -27,9 +26,7 @@ function EvalentStory() {
           .fl  { stroke-dasharray:5 4; animation:dash 1.4s linear infinite; fill:none }
           .pring { animation:pulse2 2.4s ease-in-out 1.8s infinite }
           .cur { animation: blink 1.2s step-end infinite }
-          .bar1 { transform-origin:left center; transform-box:fill-box; animation: barAnim 3.2s ease-in-out 8s infinite }
-          .bar2 { transform-origin:left center; transform-box:fill-box; animation: barAnim 4.1s ease-in-out 8s infinite }
-          .bar3 { transform-origin:left center; transform-box:fill-box; animation: barAnim 2.8s ease-in-out 8.5s infinite }
+
         `}</style>
       </defs>
 
@@ -80,10 +77,19 @@ function EvalentStory() {
         <rect x="116" y="226" width="88" height="6" rx="3" fill="rgba(255,255,255,.1)"/>
         <rect x="116" y="246" width="88" height="6" rx="3" fill="rgba(255,255,255,.1)"/>
         <rect x="116" y="266" width="88" height="6" rx="3" fill="rgba(255,255,255,.1)"/>
-        {/* Animated fill bars — use g wrapper for reliable cross-browser transform */}
-        <g className="bar1"><rect x="116" y="226" width="72" height="6" rx="3" fill="rgba(255,255,255,.55)"/></g>
-        <g className="bar2"><rect x="116" y="246" width="58" height="6" rx="3" fill="rgba(255,255,255,.45)"/></g>
-        <g className="bar3"><rect x="116" y="266" width="80" height="6" rx="3" fill="rgba(255,255,255,.62)"/></g>
+        {/* Animated fill bars — SMIL animate for reliable cross-browser */}
+        <rect x="116" y="226" height="6" rx="3" fill="rgba(255,255,255,.55)">
+          <animate attributeName="width" values="72;52;72" dur="3.2s" begin="8s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
+          <animate attributeName="opacity" values=".55;.82;.55" dur="3.2s" begin="8s" repeatCount="indefinite"/>
+        </rect>
+        <rect x="116" y="246" height="6" rx="3" fill="rgba(255,255,255,.45)">
+          <animate attributeName="width" values="58;40;58" dur="4.1s" begin="8s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
+          <animate attributeName="opacity" values=".45;.68;.45" dur="4.1s" begin="8s" repeatCount="indefinite"/>
+        </rect>
+        <rect x="116" y="266" height="6" rx="3" fill="rgba(255,255,255,.62)">
+          <animate attributeName="width" values="80;62;80" dur="2.8s" begin="8s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.6 1;0.4 0 0.6 1"/>
+          <animate attributeName="opacity" values=".62;.9;.62" dur="2.8s" begin="8s" repeatCount="indefinite"/>
+        </rect>
         {/* Mindset */}
         <text x="18" y="322" fill="rgba(255,255,255,.38)" fontSize="8" fontFamily="sans-serif">MINDSET</text>
         <circle cx="70" cy="318" r="4" fill="rgba(255,255,255,.55)"/>
@@ -113,7 +119,23 @@ function EvalentStory() {
         <rect x="20" y="417" width="186" height="18" rx="4" fill="rgba(255,255,255,.1)"/>
         <text x="113" y="430" textAnchor="middle" fill="rgba(255,255,255,.65)" fontSize="8" fontFamily="sans-serif" fontWeight="600">EVALENT RECOMMENDATION</text>
         <rect x="44" y="443" width="134" height="22" rx="7" fill="rgba(255,255,255,.16)" stroke="rgba(255,255,255,.32)" strokeWidth="1"/>
-        <text x="111" y="458" textAnchor="middle" fill="white" fontSize="11" fontFamily="sans-serif" fontWeight="700">Ready to admit</text>
+        <text x="111" y="458" textAnchor="middle" fill="white" fontSize="11" fontFamily="sans-serif" fontWeight="700">
+          <tspan>Ready to admit
+            <animate attributeName="opacity" values="1;1;0;0;0;0;0;0;0;0;0;0" dur="10s" begin="7s" repeatCount="indefinite"/>
+          </tspan>
+        </text>
+        <text x="111" y="458" textAnchor="middle" fill="white" fontSize="11" fontFamily="sans-serif" fontWeight="700" opacity="0">
+          Admit with support
+          <animate attributeName="opacity" values="0;0;0;1;1;0;0;0;0;0;0;0" dur="10s" begin="7s" repeatCount="indefinite"/>
+        </text>
+        <text x="111" y="458" textAnchor="middle" fill="rgba(255,200,100,.9)" fontSize="11" fontFamily="sans-serif" fontWeight="700" opacity="0">
+          Further review needed
+          <animate attributeName="opacity" values="0;0;0;0;0;0;1;1;0;0;0;0" dur="10s" begin="7s" repeatCount="indefinite"/>
+        </text>
+        <text x="111" y="458" textAnchor="middle" fill="white" fontSize="11" fontFamily="sans-serif" fontWeight="700" opacity="0">
+          Ready to admit
+          <animate attributeName="opacity" values="0;0;0;0;0;0;0;0;0;1;1;0" dur="10s" begin="7s" repeatCount="indefinite"/>
+        </text>
         <rect x="20"  y="478" width="36" height="36" rx="3" fill="rgba(255,255,255,.05)" stroke="rgba(255,255,255,.1)"/>
         <rect x="22"  y="494" width="32" height="18" rx="2" fill="rgba(255,255,255,.52)"/>
         <text x="38"  y="525" textAnchor="middle" fill="rgba(255,255,255,.38)" fontSize="7" fontFamily="sans-serif">ENG</text>
