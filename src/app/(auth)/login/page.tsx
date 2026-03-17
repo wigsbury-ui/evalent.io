@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import Image from "next/image";
 
 function EvalentStory() {
   return (
@@ -205,16 +204,12 @@ function LoginForm() {
     <div className="flex min-h-screen">
       {/* Left panel */}
       <div className="hidden w-1/2 flex-col bg-gradient-to-br from-evalent-950 via-evalent-700 to-evalent-500 lg:flex relative overflow-hidden">
-        <div className="absolute top-8 left-10 z-10 flex items-center gap-2">
-          <Image
-            src="/evalent-logo-white.png"
-            alt="Evalent"
-            width={140}
-            height={36}
-            className="h-9 w-auto"
-            priority
-            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-          />
+        <div className="absolute top-8 left-10 z-10">
+          <svg width="130" height="34" viewBox="0 0 130 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="34" height="34" rx="9" fill="rgba(255,255,255,0.18)" stroke="rgba(255,255,255,0.3)" strokeWidth="1"/>
+            <text x="17" y="23" textAnchor="middle" fill="white" fontSize="17" fontFamily="sans-serif" fontWeight="700">E</text>
+            <text x="48" y="23" fill="white" fontSize="17" fontFamily="sans-serif" fontWeight="600">valent</text>
+          </svg>
         </div>
         <div className="flex-1 flex items-center justify-center px-8 pt-20 pb-8">
           <EvalentStory />
