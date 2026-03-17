@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
   const session = await guard();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { type, topic, tone, angle, duration, platform } = await req.json();
+  const { type, topic, tone, angle, duration, platform, curriculum } = await req.json();
 
   const supabase = createServerClient();
   const [schoolsRes, submissionsRes] = await Promise.all([
@@ -37,11 +37,14 @@ export async function POST(req: NextRequest) {
     : "";
 
   const videoDuration = duration || 90;
+  const curriculumContext = curriculum && curriculum !== "all"
+    ? `\nTarget curriculum: ${curriculum}. Tailor all language, examples, grade references and terminology specifically for ${curriculum} schools. Use ${curriculum}-appropriate grade labels (${curriculum === "IB" ? "G3-G10 / MYP / PYP" : curriculum === "British" ? "Year 3-11" : curriculum === "American" ? "Grade 3-10" : "Year 7-11 / IGCSE track"}).`
+    : "\nTarget audience: international schools across IB, British, American and IGCSE curricula. Use inclusive language that resonates across all programmes.";
   const targetPlatform = platform || "linkedin";
 
   const prompts: Record<string, string> = {
     linkedin: `You are writing LinkedIn posts for Evalent.
-${EVALENT_CONTEXT}${liveContext}
+${EVALENT_CONTEXT}${liveContext}${curriculumContext}
 Write 3 distinct LinkedIn posts about: "${topic}"
 Tone: ${tone || "thought leadership"}
 ${angle ? `Angle: ${angle}` : ""}
@@ -50,7 +53,7 @@ Format as JSON array: [{"title": "internal title", "body": "full post"}]
 Return ONLY the JSON array.`,
 
     blog: `You are writing blog posts for Evalent.
-${EVALENT_CONTEXT}${liveContext}
+${EVALENT_CONTEXT}${liveContext}${curriculumContext}
 Write 3 blog post outlines about: "${topic}"
 Tone: ${tone || "educational"}
 ${angle ? `Angle: ${angle}` : ""}
@@ -59,7 +62,7 @@ Format as JSON array: [{"title": "title", "excerpt": "excerpt", "body": "html bo
 Return ONLY the JSON array.`,
 
     partner: `You are creating post ideas for Evalent's referral partners.
-${EVALENT_CONTEXT}${liveContext}
+${EVALENT_CONTEXT}${liveContext}${curriculumContext}
 Create 3 post ideas for: "${topic}"
 ${angle ? `Angle: ${angle}` : ""}
 Each: 100-180 words, genuine recommendation tone, include [YOUR_EVALENT_LINK], 3-4 hashtags.
@@ -67,7 +70,7 @@ Format as JSON array: [{"title": "internal title", "body": "full post"}]
 Return ONLY the JSON array.`,
 
     whatsapp: `You are writing WhatsApp messages for Evalent.
-${EVALENT_CONTEXT}${liveContext}
+${EVALENT_CONTEXT}${liveContext}${curriculumContext}
 Write 3 WhatsApp messages about: "${topic}"
 ${angle ? `Angle: ${angle}` : ""}
 Each: 80-120 words, personal and direct, clear low-pressure CTA.
@@ -75,7 +78,7 @@ Format as JSON array: [{"title": "internal title", "body": "message text"}]
 Return ONLY the JSON array.`,
 
     video_script: `You are writing optimised video scripts for Evalent to use with an AI avatar (HeyGen).
-${EVALENT_CONTEXT}${liveContext}
+${EVALENT_CONTEXT}${liveContext}${curriculumContext}
 
 Write a video script about: "${topic}"
 Target platform: ${targetPlatform}

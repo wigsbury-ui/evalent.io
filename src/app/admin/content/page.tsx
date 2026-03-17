@@ -24,33 +24,82 @@ const WP_CATEGORIES = [
   { id: 12, name: "Schools" },
 ];
 
-const ALL_TOPIC_SUGGESTIONS = [
-  "Why international schools are moving to structured admissions",
-  "The problem with subjective admissions processes",
-  "How AI is changing admissions for IB schools",
-  "Admissions season tips for international school leaders",
-  "The case for criterion-referenced assessments",
-  "What great admissions decisions look like",
-  "Supporting EAL students in the admissions process",
-  "Building a defensible admissions process",
-  "Why gut-feel admissions is costing schools great students",
-  "How to assess the whole child — not just test scores",
-  "What IB schools look for in a Grade 6 applicant",
-  "The hidden cost of a bad admissions decision",
-  "How to make admissions fairer for international families",
-  "Why criterion-referenced beats norm-referenced every time",
-  "Admissions in the age of AI — what changes, what doesn't",
-  "How top international schools are using data to decide",
-  "The 3 things every admissions report should include",
-  "Why mindset matters more than grades in admissions",
-  "How to build an admissions process your board will trust",
-  "What parents don't see behind your admissions decision",
-  "Reducing bias in international school admissions",
-  "How Evalent helps admissions teams work smarter",
-  "Why writing tasks reveal more than multiple choice",
-  "The admissions mistakes even great schools make",
-  "How to handle high-volume admissions without losing quality",
-];
+const ALL_TOPIC_SUGGESTIONS: Record<string, string[]> = {
+  all: [
+    "Why international schools are moving to structured admissions",
+    "The problem with subjective admissions processes",
+    "The case for criterion-referenced assessments",
+    "What great admissions decisions look like",
+    "Supporting EAL students in the admissions process",
+    "Building a defensible admissions process",
+    "Why gut-feel admissions is costing schools great students",
+    "How to assess the whole child — not just test scores",
+    "The hidden cost of a bad admissions decision",
+    "How to make admissions fairer for international families",
+    "Admissions in the age of AI — what changes, what doesn't",
+    "How top international schools are using data to decide",
+    "The 3 things every admissions report should include",
+    "Why mindset matters more than grades in admissions",
+    "How to build an admissions process your board will trust",
+    "What parents don't see behind your admissions decision",
+    "Reducing bias in international school admissions",
+    "How Evalent helps admissions teams work smarter",
+    "Why writing tasks reveal more than multiple choice",
+    "The admissions mistakes even great schools make",
+    "How to handle high-volume admissions without losing quality",
+    "Why structured testing is fairer for international families",
+  ],
+  IB: [
+    "What IB schools look for in a Grade 6 applicant",
+    "How AI is changing admissions for IB schools",
+    "Admissions for the IB MYP — what really matters",
+    "Why the IB learner profile starts at admissions",
+    "How to identify inquiry-ready students at entry",
+    "IB admissions — balancing academic rigour with holistic assessment",
+    "What makes a great IB PYP to MYP transition candidate",
+    "How IB schools use criterion-referenced admissions",
+    "Assessing international-mindedness at the admissions stage",
+    "Why IB schools need structured admissions more than ever",
+    "The link between IB values and admissions decisions",
+    "What G6 and G9 IB entry points really demand from applicants",
+  ],
+  British: [
+    "How British curriculum schools approach Year 7 admissions",
+    "What UK-style assessments reveal about primary school leavers",
+    "How to align admissions with the British National Curriculum",
+    "Year 7 entry — what British schools should be testing",
+    "Why British international schools need localised admissions tools",
+    "Admissions season tips for British curriculum school leaders",
+    "How to run a rigorous Year 9 entry assessment",
+    "What great British curriculum admissions looks like in 2025",
+    "Supporting non-native English speakers in British school admissions",
+    "The case for structured assessments in British international schools",
+  ],
+  American: [
+    "How American curriculum schools approach Grade 6 admissions",
+    "Common Core-aligned admissions — what to test and why",
+    "What US-style assessments reveal about applicant readiness",
+    "Why American international schools are adopting structured admissions",
+    "How to identify College-prep ready students at middle school entry",
+    "Admissions for Grade 9 in American curriculum schools",
+    "Supporting diverse learners in American international school admissions",
+    "What makes a strong Grade 3 applicant in an American curriculum school",
+    "How to align admissions with American learning standards",
+    "The case for structured testing in American international schools",
+  ],
+  IGCSE: [
+    "How IGCSE pathway schools approach Year 9 admissions",
+    "What IGCSE schools should look for in a Year 7 applicant",
+    "Admissions for Cambridge pathway schools — a practical guide",
+    "Why IGCSE schools need criterion-referenced admissions",
+    "How to identify academically ready students for the IGCSE track",
+    "Supporting late-entry students in IGCSE pathway admissions",
+    "What a structured admissions process looks like for IGCSE schools",
+    "How to assess writing readiness for the Cambridge curriculum",
+    "Admissions best practice for dual-pathway schools",
+    "Year 10 late entry — how IGCSE schools can make better decisions",
+  ],
+};
 
 const inp = "w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500";
 
@@ -67,6 +116,7 @@ export default function ContentStudioPage() {
   const [angle, setAngle] = useState("");
   const [generating, setGenerating] = useState(false);
   const [suggestionOffset, setSuggestionOffset] = useState(0);
+  const [suggestionCurriculum, setSuggestionCurriculum] = useState("all");
   const [generated, setGenerated] = useState<any[]>([]);
   const [saving, setSaving] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
@@ -215,7 +265,7 @@ export default function ContentStudioPage() {
     const res = await fetch("/api/admin/content/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type, topic, tone, angle, duration: videoDuration, platform: videoPlatform }),
+      body: JSON.stringify({ type, topic, tone, angle, duration: videoDuration, platform: videoPlatform, curriculum: suggestionCurriculum }),
     });
     const data = await res.json();
     if (data.posts) {
@@ -483,23 +533,43 @@ export default function ContentStudioPage() {
                   placeholder="e.g. Why structured admissions helps IB schools make better decisions"
                   onKeyDown={e => e.key === "Enter" && handleGenerate()} />
                 {/* Suggestions */}
-                <div className="flex flex-wrap gap-1.5 mt-2 items-center">
-                  {ALL_TOPIC_SUGGESTIONS.slice(suggestionOffset % ALL_TOPIC_SUGGESTIONS.length, (suggestionOffset % ALL_TOPIC_SUGGESTIONS.length) + 4).concat(
-                    suggestionOffset % ALL_TOPIC_SUGGESTIONS.length + 4 > ALL_TOPIC_SUGGESTIONS.length
-                      ? ALL_TOPIC_SUGGESTIONS.slice(0, (suggestionOffset % ALL_TOPIC_SUGGESTIONS.length + 4) - ALL_TOPIC_SUGGESTIONS.length)
-                      : []
-                  ).map(s => (
-                    <button key={s} onClick={() => setTopic(s)}
-                      className="text-xs bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-full px-2.5 py-1 text-gray-500 transition-colors">
-                      {s}
+                <div className="mt-2 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={suggestionCurriculum}
+                      onChange={e => { setSuggestionCurriculum(e.target.value); setSuggestionOffset(0); }}
+                      className="text-xs rounded-lg border border-gray-200 px-2.5 py-1.5 bg-white text-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-400">
+                      <option value="all">All programmes</option>
+                      <option value="IB">IB</option>
+                      <option value="British">British</option>
+                      <option value="American">American</option>
+                      <option value="IGCSE">IGCSE</option>
+                    </select>
+                    <span className="text-xs text-gray-400">Topic ideas:</span>
+                    <button
+                      onClick={() => {
+                        const pool = ALL_TOPIC_SUGGESTIONS[suggestionCurriculum] || ALL_TOPIC_SUGGESTIONS.all;
+                        setSuggestionOffset(o => (o + 4) % pool.length);
+                      }}
+                      className="text-gray-400 hover:text-blue-500 transition-colors ml-auto flex-shrink-0 flex items-center gap-1"
+                      title="Refresh suggestions">
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      <span className="text-xs">Refresh</span>
                     </button>
-                  ))}
-                  <button
-                    onClick={() => setSuggestionOffset(o => (o + 4) % ALL_TOPIC_SUGGESTIONS.length)}
-                    className="text-gray-400 hover:text-blue-500 transition-colors ml-1 flex-shrink-0"
-                    title="Refresh suggestions">
-                    <RefreshCw className="h-3.5 w-3.5" />
-                  </button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(() => {
+                      const pool = ALL_TOPIC_SUGGESTIONS[suggestionCurriculum] || ALL_TOPIC_SUGGESTIONS.all;
+                      const start = suggestionOffset % pool.length;
+                      const items = [...pool.slice(start, start + 4), ...pool.slice(0, Math.max(0, start + 4 - pool.length))].slice(0, 4);
+                      return items.map(s => (
+                        <button key={s} onClick={() => setTopic(s)}
+                          className="text-xs bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-full px-2.5 py-1 text-gray-500 transition-colors text-left">
+                          {s}
+                        </button>
+                      ));
+                    })()}
+                  </div>
                 </div>
               </div>
 
