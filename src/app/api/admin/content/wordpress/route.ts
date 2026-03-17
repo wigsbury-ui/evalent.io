@@ -27,19 +27,22 @@ async function generateFeaturedImage(title: string, excerpt: string): Promise<st
         max_tokens: 200,
         messages: [{
           role: "user",
-          content: `Create a DALL-E 3 image prompt for a professional blog post featured image.
+          content: `Create a DALL-E 3 image prompt for a blog post featured image. The image must visually represent the specific topic of this post.
+
 Blog title: "${title}"
-Excerpt: "${excerpt?.slice(0, 150) || ""}"
+Content summary: "${excerpt?.slice(0, 300) || ""}"
 
-Requirements:
-- Professional, editorial photography style
-- Abstract/conceptual — no faces, no people, no text in image
-- Clean, modern aesthetic with blues, whites and light grays
-- Suitable for an international education technology company blog
-- 16:9 composition for featured image
-- No stock photo clichés
+The image should:
+- Directly represent the SPECIFIC topic of this post — not generic education or technology imagery
+- Be a conceptual illustration or editorial photograph that someone could look at and guess the blog topic
+- Use real-world metaphors: e.g. for "admissions decisions" show doors/pathways/crossroads; for "data and assessments" show documents/charts; for "international schools" show diverse architectural elements or global imagery
+- Professional, clean aesthetic — blues, whites, light grays — no cluttered backgrounds
+- No faces, no people, no text or words in the image
+- 16:9 wide format composition
 
-Return ONLY the image prompt, nothing else. Max 100 words.`
+Think carefully about what SPECIFIC visual metaphor represents "${title}" and build the prompt around that central metaphor.
+
+Return ONLY the DALL-E prompt, nothing else. Max 80 words.`
         }]
       })
     });
