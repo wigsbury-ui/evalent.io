@@ -9,7 +9,7 @@ import Image from "next/image";
 
 function EvalentStory() {
   return (
-    <svg width="100%" viewBox="0 0 480 780" xmlns="http://www.w3.org/2000/svg" style={{maxHeight:"88vh"}}>
+    <svg width="100%" viewBox="0 0 480 690" xmlns="http://www.w3.org/2000/svg" style={{maxHeight:"88vh"}}>
       <defs>
         <marker id="aw" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
           <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -17,15 +17,13 @@ function EvalentStory() {
         <style>{`
           @keyframes fadeUp { 0%{opacity:0;transform:translateY(8px)} 100%{opacity:1;transform:translateY(0)} }
           @keyframes dash   { to{stroke-dashoffset:-24} }
-          @keyframes spin   { to{transform:rotate(360deg)} }
           @keyframes blink  { 0%,100%{opacity:1} 45%,55%{opacity:0} }
-          .s1{animation:fadeUp .8s ease .5s both}
-          .s2{animation:fadeUp .8s ease 1.5s both}
-          .s3{animation:fadeUp .8s ease 2.5s both}
-          .s4{animation:fadeUp .8s ease 3.5s both}
-          .s5{animation:fadeUp .8s ease 4.3s both}
+          .s1{animation:fadeUp 1s ease .3s both}
+          .s2{animation:fadeUp 1s ease 1.8s both}
+          .s3{animation:fadeUp 1s ease 3.3s both}
+          .s4{animation:fadeUp 1s ease 4.8s both}
+          .s5{animation:fadeUp 1s ease 6.0s both}
           .fl{stroke-dasharray:5 4;animation:dash 1.4s linear infinite;fill:none}
-          .sp{transform-origin:74px 283px;animation:spin 3s linear infinite;transform-box:fill-box}
           .cur{animation:blink 1.2s step-end infinite}
         `}</style>
       </defs>
@@ -67,8 +65,8 @@ function EvalentStory() {
       <g className="s2">
         <rect x="8" y="164" width="210" height="130" rx="12" fill="rgba(255,255,255,.08)" stroke="rgba(255,255,255,.2)" strokeWidth="1.5"/>
         {/* Spinner */}
-        <circle cx="74" cy="224" r="28" fill="none" stroke="rgba(255,255,255,.07)" strokeWidth="9"/>
-        <circle className="sp" cx="74" cy="224" r="28" fill="none" stroke="rgba(255,255,255,.8)" strokeWidth="3" strokeDasharray="56 120" strokeLinecap="round"/>
+        <circle cx="74" cy="224" r="28" fill="none" stroke="rgba(255,255,255,.18)" strokeWidth="2"/>
+        <circle cx="74" cy="224" r="34" fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="1"/>
         {/* E mark */}
         <rect x="64" y="214" width="20" height="20" rx="5" fill="rgba(255,255,255,.15)" stroke="rgba(255,255,255,.4)" strokeWidth="1.5"/>
         <text x="74" y="228" textAnchor="middle" fill="white" fontSize="11" fontFamily="sans-serif" fontWeight="700">E</text>
@@ -166,8 +164,9 @@ function EvalentStory() {
 
       {/* ── Tagline ── */}
       <g className="s5">
-        <line x1="8" y1="636" x2="472" y2="636" stroke="rgba(255,255,255,.1)" strokeWidth="1"/>
-        <text x="240" y="658" textAnchor="middle" fill="rgba(255,255,255,.35)" fontSize="11" fontFamily="sans-serif" letterSpacing="1">From submission to decision in minutes</text>
+        <line x1="8" y1="628" x2="472" y2="628" stroke="rgba(255,255,255,.12)" strokeWidth="1"/>
+        <text x="240" y="650" textAnchor="middle" fill="rgba(255,255,255,.85)" fontSize="13" fontFamily="sans-serif" fontWeight="600">Admissions Intelligence Platform</text>
+        <text x="240" y="670" textAnchor="middle" fill="rgba(255,255,255,.45)" fontSize="10" fontFamily="sans-serif" letterSpacing=".5">AI-powered scoring · Professional reports · Streamlined decisions</text>
       </g>
     </svg>
   );
