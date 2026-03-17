@@ -78,13 +78,13 @@ function EvalentStory() {
         {/* Domain bars */}
         <text x="116" y="184" fill="rgba(255,255,255,.38)" fontSize="8" fontFamily="sans-serif">ENGLISH</text>
         <rect x="116" y="188" width="88" height="6" rx="3" fill="rgba(255,255,255,.1)"/>
-        <rect className="pb1" className="pb1" x="116" y="188" width="72" height="6" rx="3" fill="rgba(255,255,255,.55)"/>
+        <rect className="pb1" x="116" y="188" width="72" height="6" rx="3" fill="rgba(255,255,255,.55)"/>
         <text x="116" y="204" fill="rgba(255,255,255,.38)" fontSize="8" fontFamily="sans-serif">MATHS</text>
         <rect x="116" y="208" width="88" height="6" rx="3" fill="rgba(255,255,255,.1)"/>
-        <rect className="pb2" className="pb2" x="116" y="208" width="58" height="6" rx="3" fill="rgba(255,255,255,.45)"/>
+        <rect className="pb2" x="116" y="208" width="58" height="6" rx="3" fill="rgba(255,255,255,.45)"/>
         <text x="116" y="224" fill="rgba(255,255,255,.38)" fontSize="8" fontFamily="sans-serif">REASONING</text>
         <rect x="116" y="228" width="88" height="6" rx="3" fill="rgba(255,255,255,.1)"/>
-        <rect className="pb3" className="pb3" x="116" y="228" width="80" height="6" rx="3" fill="rgba(255,255,255,.62)"/>
+        <rect className="pb3" x="116" y="228" width="80" height="6" rx="3" fill="rgba(255,255,255,.62)"/>
         {/* Mindset */}
         <text x="18" y="260" fill="rgba(255,255,255,.38)" fontSize="8" fontFamily="sans-serif">MINDSET</text>
         <circle cx="70" cy="256" r="4" fill="rgba(255,255,255,.55)"/>
