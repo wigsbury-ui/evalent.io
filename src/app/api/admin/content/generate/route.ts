@@ -46,9 +46,9 @@ export async function POST(req: NextRequest) {
     NewZealand:  "New Zealand Curriculum (NZC) — use Year 3-10 labels, NZC terminology",
     Other:       "international schools with mixed or other curricula",
   };
-  const curriculumContext = curriculum && curriculum !== "all" && CURRICULUM_LABELS[curriculum]
-    ? \`\nTarget curriculum: \${CURRICULUM_LABELS[curriculum]}. Tailor all language, examples, grade references and terminology specifically for this curriculum. Avoid references to other curricula.\`
-    : "\nTarget audience: international schools across IB, British, American, Australian and other curricula. Use inclusive language that resonates broadly.";
+  const curriculumContext = (curriculum && curriculum !== "all" && CURRICULUM_LABELS[curriculum])
+    ? "Target curriculum: " + CURRICULUM_LABELS[curriculum] + ". Tailor all language, examples, grade references and terminology specifically for this curriculum. Avoid references to other curricula."
+    : "Target audience: international schools across IB, British, American, Australian and other curricula. Use inclusive language that resonates broadly.";
   const targetPlatform = platform || "linkedin";
 
   const prompts: Record<string, string> = {
