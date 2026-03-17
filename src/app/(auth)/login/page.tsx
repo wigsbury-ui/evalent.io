@@ -27,9 +27,9 @@ function EvalentStory() {
           .fl  { stroke-dasharray:5 4; animation:dash 1.4s linear infinite; fill:none }
           .pring { animation:pulse2 2.4s ease-in-out 1.8s infinite }
           .cur { animation: blink 1.2s step-end infinite }
-          .bar1 { transform-origin:116px 229px; transform-box:fill-box; animation: barAnim 3.2s ease-in-out 8s infinite }
-          .bar2 { transform-origin:116px 249px; transform-box:fill-box; animation: barAnim 4.1s ease-in-out 8s infinite }
-          .bar3 { transform-origin:116px 269px; transform-box:fill-box; animation: barAnim 2.8s ease-in-out 8.5s infinite }
+          .bar1 { transform-origin:left center; transform-box:fill-box; animation: barAnim 3.2s ease-in-out 8s infinite }
+          .bar2 { transform-origin:left center; transform-box:fill-box; animation: barAnim 4.1s ease-in-out 8s infinite }
+          .bar3 { transform-origin:left center; transform-box:fill-box; animation: barAnim 2.8s ease-in-out 8.5s infinite }
         `}</style>
       </defs>
 
