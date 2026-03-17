@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 
 function EvalentStory() {
   return (
-    <svg width="100%" viewBox="0 0 480 690" xmlns="http://www.w3.org/2000/svg" style={{maxHeight:"88vh"}}>
+    <svg width="100%" viewBox="0 0 480 780" xmlns="http://www.w3.org/2000/svg" style={{maxHeight:"88vh"}}>
       <defs>
         <marker id="aw" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
           <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -16,160 +16,147 @@ function EvalentStory() {
         <style>{`
           @keyframes fadeUp { 0%{opacity:0;transform:translateY(8px)} 100%{opacity:1;transform:translateY(0)} }
           @keyframes dash   { to{stroke-dashoffset:-24} }
+          @keyframes spin   { to{transform:rotate(360deg)} }
           @keyframes blink  { 0%,100%{opacity:1} 45%,55%{opacity:0} }
-          @keyframes pb1k { 0%,100%{opacity:.55;transform:scaleX(1)} 50%{opacity:.82;transform:scaleX(.75)} } 50%{opacity:.82;transform:translateY(3px)} }          @keyframes pb2k { 0%,100%{opacity:.45;transform:scaleX(1)} 50%{opacity:.68;transform:scaleX(.65)} } 50%{opacity:.68;transform:translateY(4px)} }          @keyframes pb3k { 0%,100%{opacity:.62;transform:scaleX(1)} 50%{opacity:.9;transform:scaleX(.88)} } 50%{opacity:.9;transform:translateY(2px)} } 50%{opacity:.9;transform:scaleY(.85)} }
+          @keyframes pb1k   { 0%,100%{opacity:.55;transform:scaleX(1)} 50%{opacity:.82;transform:scaleX(.75)} }
+          @keyframes pb2k   { 0%,100%{opacity:.45;transform:scaleX(1)} 50%{opacity:.68;transform:scaleX(.65)} }
+          @keyframes pb3k   { 0%,100%{opacity:.62;transform:scaleX(1)} 50%{opacity:.9;transform:scaleX(.88)} }
           .s1{animation:fadeUp 1s ease .3s both}
           .s2{animation:fadeUp 1s ease 1.8s both}
           .s3{animation:fadeUp 1s ease 3.3s both}
           .s4{animation:fadeUp 1s ease 4.8s both}
           .s5{animation:fadeUp 1s ease 6.0s both}
+          .fl{stroke-dasharray:5 4;animation:dash 1.4s linear infinite;fill:none}
+          .sp{transform-origin:74px 293px;animation:spin 3s linear infinite;transform-box:fill-box}
+          .cur{animation:blink 1.2s step-end infinite}
           .pb1{transform-origin:left center;transform-box:fill-box;animation:pb1k 3.2s ease-in-out 7.5s infinite}
           .pb2{transform-origin:left center;transform-box:fill-box;animation:pb2k 4.1s ease-in-out 7.5s infinite}
           .pb3{transform-origin:left center;transform-box:fill-box;animation:pb3k 2.8s ease-in-out 7.5s infinite}
-          .fl{stroke-dasharray:5 4;animation:dash 1.4s linear infinite;fill:none}
-          .cur{animation:blink 1.2s step-end infinite}
         `}</style>
       </defs>
 
-      {/* ── Stage 1 — Student ── */}
+      {/* Stage 1 — Student */}
       <g className="s1">
-        {/* Card */}
-        <rect x="8" y="8" width="210" height="118" rx="12" fill="rgba(255,255,255,.08)" stroke="rgba(255,255,255,.2)" strokeWidth="1.5"/>
-        {/* Avatar */}
-        <circle cx="52" cy="46" r="16" fill="rgba(255,255,255,.12)" stroke="rgba(255,255,255,.25)" strokeWidth="1.5"/>
-        <circle cx="52" cy="42" r="6.5" fill="rgba(255,255,255,.55)"/>
-        <path d="M39 57 Q52 50 65 57" fill="rgba(255,255,255,.28)" stroke="rgba(255,255,255,.28)" strokeWidth="1"/>
-        {/* Name lines */}
-        <rect x="82" y="36" width="110" height="8" rx="3" fill="rgba(255,255,255,.55)"/>
-        <rect x="82" y="50" width="88" height="6" rx="3" fill="rgba(255,255,255,.28)"/>
-        <rect x="82" y="62" width="100" height="6" rx="3" fill="rgba(255,255,255,.2)"/>
-        {/* MCQ */}
-        <circle cx="22" cy="96" r="4" fill="rgba(255,255,255,.65)"/>
-        <circle cx="35" cy="96" r="4" fill="rgba(255,255,255,.18)"/>
-        <circle cx="48" cy="96" r="4" fill="rgba(255,255,255,.18)"/>
-        <circle cx="61" cy="96" r="4" fill="rgba(255,255,255,.18)"/>
-        <rect x="76" y="92" width="90" height="6" rx="3" fill="rgba(255,255,255,.18)"/>
-        {/* Writing + cursor */}
-        <rect x="22" y="108" width="130" height="6" rx="3" fill="rgba(255,255,255,.14)"/>
-        <rect className="cur" x="155" y="107" width="2" height="8" rx="1" fill="rgba(255,255,255,.75)"/>
-        {/* Right side descriptor */}
-        <text x="232" y="24" fill="rgba(255,255,255,.85)" fontSize="12" fontFamily="sans-serif" fontWeight="600">Student submits</text>
-        <text x="232" y="40" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">MCQ across English,</text>
-        <text x="232" y="54" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">Maths &amp; Reasoning plus</text>
-        <text x="232" y="68" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">extended writing tasks.</text>
+        <text x="200" y="18" textAnchor="middle" fill="rgba(255,255,255,.5)" fontSize="9" fontFamily="sans-serif" fontWeight="600" letterSpacing="2.5">STUDENT ASSESSMENT</text>
+        <rect x="8" y="28" width="210" height="118" rx="12" fill="rgba(255,255,255,.08)" stroke="rgba(255,255,255,.2)" strokeWidth="1.5"/>
+        <circle cx="52" cy="66" r="16" fill="rgba(255,255,255,.12)" stroke="rgba(255,255,255,.25)" strokeWidth="1.5"/>
+        <circle cx="52" cy="62" r="6.5" fill="rgba(255,255,255,.55)"/>
+        <path d="M39 77 Q52 70 65 77" fill="rgba(255,255,255,.28)" stroke="rgba(255,255,255,.28)" strokeWidth="1"/>
+        <rect x="82" y="56" width="110" height="8" rx="3" fill="rgba(255,255,255,.55)"/>
+        <rect x="82" y="70" width="88" height="6" rx="3" fill="rgba(255,255,255,.28)"/>
+        <rect x="82" y="82" width="100" height="6" rx="3" fill="rgba(255,255,255,.2)"/>
+        <circle cx="22" cy="116" r="4" fill="rgba(255,255,255,.65)"/>
+        <circle cx="35" cy="116" r="4" fill="rgba(255,255,255,.18)"/>
+        <circle cx="48" cy="116" r="4" fill="rgba(255,255,255,.18)"/>
+        <circle cx="61" cy="116" r="4" fill="rgba(255,255,255,.18)"/>
+        <rect x="76" y="112" width="90" height="6" rx="3" fill="rgba(255,255,255,.18)"/>
+        <rect x="22" y="128" width="130" height="6" rx="3" fill="rgba(255,255,255,.14)"/>
+        <rect className="cur" x="155" y="127" width="2" height="8" rx="1" fill="rgba(255,255,255,.75)"/>
+        <text x="232" y="44" fill="rgba(255,255,255,.85)" fontSize="12" fontFamily="sans-serif" fontWeight="600">Student submits</text>
+        <text x="232" y="60" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">MCQ across English,</text>
+        <text x="232" y="74" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">Maths &amp; Reasoning plus</text>
+        <text x="232" y="88" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">extended writing tasks.</text>
       </g>
 
       {/* Connector 1 */}
       <g className="s2">
-        <line x1="113" y1="128" x2="113" y2="162" className="fl" stroke="rgba(255,255,255,.35)" markerEnd="url(#aw)"/>
+        <line x1="113" y1="148" x2="113" y2="182" className="fl" stroke="rgba(255,255,255,.35)" markerEnd="url(#aw)"/>
       </g>
 
-      {/* ── Stage 2 — AI Engine ── */}
+      {/* Stage 2 — AI Engine */}
       <g className="s2">
-        <rect x="8" y="164" width="210" height="130" rx="12" fill="rgba(255,255,255,.08)" stroke="rgba(255,255,255,.2)" strokeWidth="1.5"/>
-        {/* Spinner */}
-        <circle cx="74" cy="224" r="28" fill="none" stroke="rgba(255,255,255,.18)" strokeWidth="2"/>
-        <circle cx="74" cy="224" r="34" fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="1"/>
-        {/* E mark */}
-        <rect x="64" y="214" width="20" height="20" rx="5" fill="rgba(255,255,255,.15)" stroke="rgba(255,255,255,.4)" strokeWidth="1.5"/>
-        <text x="74" y="228" textAnchor="middle" fill="white" fontSize="11" fontFamily="sans-serif" fontWeight="700">E</text>
-        {/* Domain bars */}
-        <text x="116" y="184" fill="rgba(255,255,255,.38)" fontSize="8" fontFamily="sans-serif">ENGLISH</text>
-        <rect x="116" y="188" width="88" height="6" rx="3" fill="rgba(255,255,255,.1)"/>
-        <rect className="pb1" x="116" y="188" width="72" height="6" rx="3" fill="rgba(255,255,255,.55)"/>
-        <text x="116" y="204" fill="rgba(255,255,255,.38)" fontSize="8" fontFamily="sans-serif">MATHS</text>
-        <rect x="116" y="208" width="88" height="6" rx="3" fill="rgba(255,255,255,.1)"/>
-        <rect className="pb2" x="116" y="208" width="58" height="6" rx="3" fill="rgba(255,255,255,.45)"/>
-        <text x="116" y="224" fill="rgba(255,255,255,.38)" fontSize="8" fontFamily="sans-serif">REASONING</text>
-        <rect x="116" y="228" width="88" height="6" rx="3" fill="rgba(255,255,255,.1)"/>
-        <rect className="pb3" x="116" y="228" width="80" height="6" rx="3" fill="rgba(255,255,255,.62)"/>
-        {/* Mindset */}
-        <text x="18" y="260" fill="rgba(255,255,255,.38)" fontSize="8" fontFamily="sans-serif">MINDSET</text>
-        <circle cx="70" cy="256" r="4" fill="rgba(255,255,255,.55)"/>
-        <circle cx="82" cy="256" r="4" fill="rgba(255,255,255,.55)"/>
-        <circle cx="94" cy="256" r="4" fill="rgba(255,255,255,.55)"/>
-        <circle cx="106" cy="256" r="4" fill="rgba(255,255,255,.18)"/>
-        <circle cx="118" cy="256" r="4" fill="rgba(255,255,255,.18)"/>
-        <text x="140" y="260" fill="rgba(255,255,255,.38)" fontSize="8" fontFamily="sans-serif">WRITING</text>
-        <text x="195" y="260" fill="rgba(255,255,255,.5)" fontSize="8" fontFamily="sans-serif" fontWeight="600">4/4</text>
-        {/* Right side descriptor */}
-        <text x="232" y="180" fill="rgba(255,255,255,.85)" fontSize="12" fontFamily="sans-serif" fontWeight="600">Evalent scores instantly</text>
-        <text x="232" y="196" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">We evaluate every</text>
-        <text x="232" y="210" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">response against your</text>
-        <text x="232" y="224" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">school&apos;s entry criteria.</text>
-        <text x="232" y="246" fill="rgba(255,255,255,.35)" fontSize="9" fontFamily="sans-serif">~2 minutes</text>
+        <text x="200" y="192" textAnchor="middle" fill="rgba(255,255,255,.5)" fontSize="9" fontFamily="sans-serif" fontWeight="600" letterSpacing="2.5">AI EVALUATION ENGINE</text>
+        <rect x="8" y="202" width="210" height="145" rx="12" fill="rgba(255,255,255,.08)" stroke="rgba(255,255,255,.2)" strokeWidth="1.5"/>
+        <circle cx="74" cy="275" r="28" fill="none" stroke="rgba(255,255,255,.07)" strokeWidth="9"/>
+        <circle className="sp" cx="74" cy="275" r="28" fill="none" stroke="rgba(255,255,255,.8)" strokeWidth="3" strokeDasharray="56 120" strokeLinecap="round"/>
+        <rect x="64" y="265" width="20" height="20" rx="5" fill="rgba(255,255,255,.15)" stroke="rgba(255,255,255,.4)" strokeWidth="1.5"/>
+        <text x="74" y="279" textAnchor="middle" fill="white" fontSize="11" fontFamily="sans-serif" fontWeight="700">E</text>
+        <text x="116" y="222" fill="rgba(255,255,255,.38)" fontSize="8" fontFamily="sans-serif">ENGLISH</text>
+        <rect x="116" y="226" width="88" height="6" rx="3" fill="rgba(255,255,255,.1)"/>
+        <rect className="pb1" x="116" y="226" width="72" height="6" rx="3" fill="rgba(255,255,255,.55)"/>
+        <text x="116" y="242" fill="rgba(255,255,255,.38)" fontSize="8" fontFamily="sans-serif">MATHS</text>
+        <rect x="116" y="246" width="88" height="6" rx="3" fill="rgba(255,255,255,.1)"/>
+        <rect className="pb2" x="116" y="246" width="58" height="6" rx="3" fill="rgba(255,255,255,.45)"/>
+        <text x="116" y="262" fill="rgba(255,255,255,.38)" fontSize="8" fontFamily="sans-serif">REASONING</text>
+        <rect x="116" y="266" width="88" height="6" rx="3" fill="rgba(255,255,255,.1)"/>
+        <rect className="pb3" x="116" y="266" width="80" height="6" rx="3" fill="rgba(255,255,255,.62)"/>
+        <text x="18" y="322" fill="rgba(255,255,255,.38)" fontSize="8" fontFamily="sans-serif">MINDSET</text>
+        <circle cx="70" cy="318" r="4" fill="rgba(255,255,255,.55)"/>
+        <circle cx="82" cy="318" r="4" fill="rgba(255,255,255,.55)"/>
+        <circle cx="94" cy="318" r="4" fill="rgba(255,255,255,.55)"/>
+        <circle cx="106" cy="318" r="4" fill="rgba(255,255,255,.18)"/>
+        <circle cx="118" cy="318" r="4" fill="rgba(255,255,255,.18)"/>
+        <text x="140" y="322" fill="rgba(255,255,255,.38)" fontSize="8" fontFamily="sans-serif">WRITING</text>
+        <text x="195" y="322" fill="rgba(255,255,255,.5)" fontSize="8" fontFamily="sans-serif" fontWeight="600">4/4</text>
+        <text x="232" y="218" fill="rgba(255,255,255,.85)" fontSize="12" fontFamily="sans-serif" fontWeight="600">Evalent scores instantly</text>
+        <text x="232" y="234" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">We evaluate every</text>
+        <text x="232" y="248" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">response against your</text>
+        <text x="232" y="262" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">school&apos;s entry criteria.</text>
+        <text x="232" y="284" fill="rgba(255,255,255,.35)" fontSize="9" fontFamily="sans-serif">~2 minutes</text>
       </g>
 
       {/* Connector 2 */}
       <g className="s3">
-        <line x1="113" y1="296" x2="113" y2="330" className="fl" stroke="rgba(255,255,255,.35)" markerEnd="url(#aw)"/>
+        <line x1="113" y1="349" x2="113" y2="383" className="fl" stroke="rgba(255,255,255,.35)" markerEnd="url(#aw)"/>
       </g>
 
-      {/* ── Stage 3 — Report ── */}
+      {/* Stage 3 — Report */}
       <g className="s3">
-        <rect x="8" y="332" width="210" height="148" rx="12" fill="rgba(255,255,255,.08)" stroke="rgba(255,255,255,.2)" strokeWidth="1.5"/>
-        {/* Header */}
-        <rect x="20" y="346" width="186" height="18" rx="4" fill="rgba(255,255,255,.1)"/>
-        <text x="113" y="359" textAnchor="middle" fill="rgba(255,255,255,.65)" fontSize="8" fontFamily="sans-serif" fontWeight="600">EVALENT RECOMMENDATION</text>
-        {/* Badge */}
-        <rect x="44" y="372" width="134" height="22" rx="7" fill="rgba(255,255,255,.16)" stroke="rgba(255,255,255,.32)" strokeWidth="1"/>
-        <text x="111" y="387" textAnchor="middle" fill="white" fontSize="11" fontFamily="sans-serif" fontWeight="700">Ready to admit</text>
-        {/* Mini bar chart */}
-        <rect x="20" y="406" width="36" height="36" rx="3" fill="rgba(255,255,255,.05)" stroke="rgba(255,255,255,.1)"/>
-        <rect className="pb1" x="22" y="422" width="32" height="18" rx="2" fill="rgba(255,255,255,.52)"/>
-        <text x="38" y="453" textAnchor="middle" fill="rgba(255,255,255,.38)" fontSize="7" fontFamily="sans-serif">ENG</text>
-        <rect x="62" y="406" width="36" height="36" rx="3" fill="rgba(255,255,255,.05)" stroke="rgba(255,255,255,.1)"/>
-        <rect className="pb2" x="64" y="428" width="32" height="12" rx="2" fill="rgba(255,255,255,.4)"/>
-        <text x="80" y="453" textAnchor="middle" fill="rgba(255,255,255,.38)" fontSize="7" fontFamily="sans-serif">MTH</text>
-        <rect x="104" y="406" width="36" height="36" rx="3" fill="rgba(255,255,255,.05)" stroke="rgba(255,255,255,.1)"/>
-        <rect className="pb3" x="106" y="416" width="32" height="24" rx="2" fill="rgba(255,255,255,.62)"/>
-        <text x="122" y="453" textAnchor="middle" fill="rgba(255,255,255,.38)" fontSize="7" fontFamily="sans-serif">RSN</text>
-        {/* Narrative lines */}
-        <rect x="154" y="410" width="54" height="6" rx="3" fill="rgba(255,255,255,.22)"/>
-        <rect x="154" y="422" width="48" height="6" rx="3" fill="rgba(255,255,255,.14)"/>
-        <rect x="154" y="434" width="52" height="6" rx="3" fill="rgba(255,255,255,.14)"/>
-        <rect x="154" y="446" width="44" height="6" rx="3" fill="rgba(255,255,255,.1)"/>
-        {/* Right side descriptor */}
-        <text x="232" y="348" fill="rgba(255,255,255,.85)" fontSize="12" fontFamily="sans-serif" fontWeight="600">Professional reports</text>
-        <text x="232" y="364" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">Domain scores, writing</text>
-        <text x="232" y="378" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">analysis, mindset profile</text>
-        <text x="232" y="392" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">&amp; AI narrative. PDF ready.</text>
+        <text x="200" y="393" textAnchor="middle" fill="rgba(255,255,255,.5)" fontSize="9" fontFamily="sans-serif" fontWeight="600" letterSpacing="2.5">INSTANT PDF REPORTS</text>
+        <rect x="8" y="403" width="210" height="155" rx="12" fill="rgba(255,255,255,.08)" stroke="rgba(255,255,255,.2)" strokeWidth="1.5"/>
+        <rect x="20" y="417" width="186" height="18" rx="4" fill="rgba(255,255,255,.1)"/>
+        <text x="113" y="430" textAnchor="middle" fill="rgba(255,255,255,.65)" fontSize="8" fontFamily="sans-serif" fontWeight="600">EVALENT RECOMMENDATION</text>
+        <rect x="44" y="443" width="134" height="22" rx="7" fill="rgba(255,255,255,.16)" stroke="rgba(255,255,255,.32)" strokeWidth="1"/>
+        <text x="111" y="458" textAnchor="middle" fill="white" fontSize="11" fontFamily="sans-serif" fontWeight="700">Ready to admit</text>
+        <rect x="20" y="478" width="36" height="36" rx="3" fill="rgba(255,255,255,.05)" stroke="rgba(255,255,255,.1)"/>
+        <rect x="22" y="494" width="32" height="18" rx="2" fill="rgba(255,255,255,.52)"/>
+        <text x="38" y="525" textAnchor="middle" fill="rgba(255,255,255,.38)" fontSize="7" fontFamily="sans-serif">ENG</text>
+        <rect x="62" y="478" width="36" height="36" rx="3" fill="rgba(255,255,255,.05)" stroke="rgba(255,255,255,.1)"/>
+        <rect x="64" y="500" width="32" height="12" rx="2" fill="rgba(255,255,255,.4)"/>
+        <text x="80" y="525" textAnchor="middle" fill="rgba(255,255,255,.38)" fontSize="7" fontFamily="sans-serif">MTH</text>
+        <rect x="104" y="478" width="36" height="36" rx="3" fill="rgba(255,255,255,.05)" stroke="rgba(255,255,255,.1)"/>
+        <rect x="106" y="488" width="32" height="24" rx="2" fill="rgba(255,255,255,.62)"/>
+        <text x="122" y="525" textAnchor="middle" fill="rgba(255,255,255,.38)" fontSize="7" fontFamily="sans-serif">RSN</text>
+        <rect x="154" y="482" width="54" height="6" rx="3" fill="rgba(255,255,255,.22)"/>
+        <rect x="154" y="494" width="48" height="6" rx="3" fill="rgba(255,255,255,.14)"/>
+        <rect x="154" y="506" width="52" height="6" rx="3" fill="rgba(255,255,255,.14)"/>
+        <rect x="154" y="518" width="44" height="6" rx="3" fill="rgba(255,255,255,.1)"/>
+        <text x="232" y="419" fill="rgba(255,255,255,.85)" fontSize="12" fontFamily="sans-serif" fontWeight="600">Professional reports</text>
+        <text x="232" y="435" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">Domain scores, writing</text>
+        <text x="232" y="449" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">analysis, mindset profile</text>
+        <text x="232" y="463" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">&amp; AI narrative. PDF ready.</text>
       </g>
 
       {/* Connector 3 */}
       <g className="s4">
-        <line x1="113" y1="482" x2="113" y2="516" className="fl" stroke="rgba(255,255,255,.35)" markerEnd="url(#aw)"/>
+        <line x1="113" y1="560" x2="113" y2="594" className="fl" stroke="rgba(255,255,255,.35)" markerEnd="url(#aw)"/>
       </g>
 
-      {/* ── Stage 4 — Decision ── */}
+      {/* Stage 4 — Decision */}
       <g className="s4">
-        <rect x="8" y="518" width="210" height="96" rx="12" fill="rgba(255,255,255,.08)" stroke="rgba(255,255,255,.2)" strokeWidth="1.5"/>
-        {/* Checkmark */}
-        <circle cx="52" cy="556" r="22" fill="rgba(255,255,255,.12)" stroke="rgba(255,255,255,.28)" strokeWidth="1.5"/>
-        <path d="M41 556 l8 8 l14-14" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-        {/* Text */}
-        <text x="84" y="548" fill="rgba(255,255,255,.88)" fontSize="12" fontFamily="sans-serif" fontWeight="600">Decision made</text>
-        <text x="84" y="563" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">Confidence.</text>
-        <text x="84" y="577" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">Consistency.</text>
-        {/* Curriculum pills — inside card */}
-        <rect x="16" y="598" width="46" height="12" rx="6" fill="rgba(255,255,255,.1)" stroke="rgba(255,255,255,.18)" strokeWidth=".8"/>
-        <text x="39" y="608" textAnchor="middle" fill="rgba(255,255,255,.55)" fontSize="7.5" fontFamily="sans-serif">IB</text>
-        <rect x="68" y="598" width="46" height="12" rx="6" fill="rgba(255,255,255,.1)" stroke="rgba(255,255,255,.18)" strokeWidth=".8"/>
-        <text x="91" y="608" textAnchor="middle" fill="rgba(255,255,255,.55)" fontSize="7.5" fontFamily="sans-serif">British</text>
-        <rect x="120" y="598" width="52" height="12" rx="6" fill="rgba(255,255,255,.1)" stroke="rgba(255,255,255,.18)" strokeWidth=".8"/>
-        <text x="146" y="608" textAnchor="middle" fill="rgba(255,255,255,.55)" fontSize="7.5" fontFamily="sans-serif">American</text>
-        {/* Right side descriptor */}
-        <text x="232" y="534" fill="rgba(255,255,255,.85)" fontSize="12" fontFamily="sans-serif" fontWeight="600">School decides</text>
-        <text x="232" y="550" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">Fair, defensible decisions</text>
-        <text x="232" y="564" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">every time. IB, British,</text>
-        <text x="232" y="578" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">American &amp; more.</text>
+        <text x="200" y="604" textAnchor="middle" fill="rgba(255,255,255,.5)" fontSize="9" fontFamily="sans-serif" fontWeight="600" letterSpacing="2.5">SCHOOL DECISION</text>
+        <rect x="8" y="614" width="210" height="96" rx="12" fill="rgba(255,255,255,.08)" stroke="rgba(255,255,255,.2)" strokeWidth="1.5"/>
+        <circle cx="52" cy="652" r="22" fill="rgba(255,255,255,.12)" stroke="rgba(255,255,255,.28)" strokeWidth="1.5"/>
+        <path d="M41 652 l8 8 l14-14" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+        <text x="84" y="644" fill="rgba(255,255,255,.88)" fontSize="12" fontFamily="sans-serif" fontWeight="600">Decision made</text>
+        <text x="84" y="659" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">Confidence.</text>
+        <text x="84" y="673" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">Consistency.</text>
+        <rect x="16" y="694" width="46" height="12" rx="6" fill="rgba(255,255,255,.1)" stroke="rgba(255,255,255,.18)" strokeWidth=".8"/>
+        <text x="39" y="704" textAnchor="middle" fill="rgba(255,255,255,.55)" fontSize="7.5" fontFamily="sans-serif">IB</text>
+        <rect x="68" y="694" width="46" height="12" rx="6" fill="rgba(255,255,255,.1)" stroke="rgba(255,255,255,.18)" strokeWidth=".8"/>
+        <text x="91" y="704" textAnchor="middle" fill="rgba(255,255,255,.55)" fontSize="7.5" fontFamily="sans-serif">British</text>
+        <rect x="120" y="694" width="52" height="12" rx="6" fill="rgba(255,255,255,.1)" stroke="rgba(255,255,255,.18)" strokeWidth=".8"/>
+        <text x="146" y="704" textAnchor="middle" fill="rgba(255,255,255,.55)" fontSize="7.5" fontFamily="sans-serif">American</text>
+        <text x="232" y="630" fill="rgba(255,255,255,.85)" fontSize="12" fontFamily="sans-serif" fontWeight="600">School decides</text>
+        <text x="232" y="646" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">Fair, defensible decisions</text>
+        <text x="232" y="660" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">every time. IB, British,</text>
+        <text x="232" y="674" fill="rgba(255,255,255,.5)" fontSize="10" fontFamily="sans-serif">American &amp; more.</text>
       </g>
 
-      {/* ── Tagline ── */}
+      {/* Tagline */}
       <g className="s5">
-        <line x1="8" y1="628" x2="472" y2="628" stroke="rgba(255,255,255,.12)" strokeWidth="1"/>
-        <text x="240" y="650" textAnchor="middle" fill="rgba(255,255,255,.85)" fontSize="13" fontFamily="sans-serif" fontWeight="600">Evalent. The Admissions Intelligence Platform.</text>
-        <text x="240" y="670" textAnchor="middle" fill="rgba(255,255,255,.45)" fontSize="10" fontFamily="sans-serif" letterSpacing=".5">AI-powered scoring · Professional reports · Streamlined decisions</text>
+        <line x1="8" y1="726" x2="472" y2="726" stroke="rgba(255,255,255,.1)" strokeWidth="1"/>
+        <text x="240" y="748" textAnchor="middle" fill="rgba(255,255,255,.35)" fontSize="11" fontFamily="sans-serif" letterSpacing="1">Evalent. The Admissions Intelligence Platform.</text>
       </g>
     </svg>
   );
@@ -223,7 +210,7 @@ function LoginForm() {
         </p>
       </div>
 
-      {/* Right panel — login form */}
+      {/* Right panel */}
       <div className="flex flex-1 items-center justify-center px-6 py-12">
         <div className="w-full max-w-md space-y-8">
           <div className="flex items-center gap-3 lg:hidden">
