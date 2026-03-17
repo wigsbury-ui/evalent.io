@@ -17,17 +17,15 @@ function EvalentStory() {
           @keyframes fadeUp { 0%{opacity:0;transform:translateY(8px)} 100%{opacity:1;transform:translateY(0)} }
           @keyframes dash   { to{stroke-dashoffset:-24} }
           @keyframes blink  { 0%,100%{opacity:1} 45%,55%{opacity:0} }
-          @keyframes pb1k   { 0%,100%{opacity:.55;transform:scaleY(1)} 50%{opacity:.82;transform:scaleY(.75)} } 50%{opacity:.82;transform:scaleX(.78)} }
-          @keyframes pb2k   { 0%,100%{opacity:.45;transform:scaleY(1)} 50%{opacity:.68;transform:scaleY(.72)} }
-          @keyframes pb3k   { 0%,100%{opacity:.62;transform:scaleY(1)} 50%{opacity:.9;transform:scaleY(.85)} }
+          @keyframes pb1k   { 0%,100%{opacity:.55;transform:translateY(0)} 50%{opacity:.82;transform:translateY(3px)} }          @keyframes pb2k   { 0%,100%{opacity:.45;transform:translateY(0)} 50%{opacity:.68;transform:translateY(4px)} }          @keyframes pb3k   { 0%,100%{opacity:.62;transform:translateY(0)} 50%{opacity:.9;transform:translateY(2px)} } 50%{opacity:.9;transform:scaleY(.85)} }
           .s1{animation:fadeUp 1s ease .3s both}
           .s2{animation:fadeUp 1s ease 1.8s both}
           .s3{animation:fadeUp 1s ease 3.3s both}
           .s4{animation:fadeUp 1s ease 4.8s both}
           .s5{animation:fadeUp 1s ease 6.0s both}
-          .pb1{transform-origin:center bottom;transform-box:fill-box;animation:pb1k 3.2s ease-in-out 7.5s infinite}
-          .pb2{transform-origin:center bottom;transform-box:fill-box;animation:pb2k 4.1s ease-in-out 7.5s infinite}
-          .pb3{transform-origin:center bottom;transform-box:fill-box;animation:pb3k 2.8s ease-in-out 7.5s infinite}
+          .pb1{animation:pb1k 3.2s ease-in-out 7.5s infinite}
+          .pb2{animation:pb2k 4.1s ease-in-out 7.5s infinite}
+          .pb3{animation:pb3k 2.8s ease-in-out 7.5s infinite}
           .fl{stroke-dasharray:5 4;animation:dash 1.4s linear infinite;fill:none}
           .cur{animation:blink 1.2s step-end infinite}
         `}</style>
