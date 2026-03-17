@@ -73,13 +73,13 @@ function EvalentStory() {
         {/* Domain bars */}
         <text x="116" y="184" fill="rgba(255,255,255,.38)" fontSize="8" fontFamily="sans-serif">ENGLISH</text>
         <rect x="116" y="188" width="88" height="6" rx="3" fill="rgba(255,255,255,.1)"/>
-        <rect x="116" y="188" width="72" height="6" rx="3" fill="rgba(255,255,255,.55)"/>
+        <rect className="pb1" x="116" y="188" width="72" height="6" rx="3" fill="rgba(255,255,255,.55)"/>
         <text x="116" y="204" fill="rgba(255,255,255,.38)" fontSize="8" fontFamily="sans-serif">MATHS</text>
         <rect x="116" y="208" width="88" height="6" rx="3" fill="rgba(255,255,255,.1)"/>
-        <rect x="116" y="208" width="58" height="6" rx="3" fill="rgba(255,255,255,.45)"/>
+        <rect className="pb2" x="116" y="208" width="58" height="6" rx="3" fill="rgba(255,255,255,.45)"/>
         <text x="116" y="224" fill="rgba(255,255,255,.38)" fontSize="8" fontFamily="sans-serif">REASONING</text>
         <rect x="116" y="228" width="88" height="6" rx="3" fill="rgba(255,255,255,.1)"/>
-        <rect x="116" y="228" width="80" height="6" rx="3" fill="rgba(255,255,255,.62)"/>
+        <rect className="pb3" x="116" y="228" width="80" height="6" rx="3" fill="rgba(255,255,255,.62)"/>
         {/* Mindset */}
         <text x="18" y="260" fill="rgba(255,255,255,.38)" fontSize="8" fontFamily="sans-serif">MINDSET</text>
         <circle cx="70" cy="256" r="4" fill="rgba(255,255,255,.55)"/>
@@ -113,13 +113,13 @@ function EvalentStory() {
         <text x="111" y="387" textAnchor="middle" fill="white" fontSize="11" fontFamily="sans-serif" fontWeight="700">Ready to admit</text>
         {/* Mini bar chart */}
         <rect x="20" y="406" width="36" height="36" rx="3" fill="rgba(255,255,255,.05)" stroke="rgba(255,255,255,.1)"/>
-        <rect x="22" y="422" width="32" height="18" rx="2" fill="rgba(255,255,255,.52)"/>
+        <rect className="pb1" x="22" y="422" width="32" height="18" rx="2" fill="rgba(255,255,255,.52)"/>
         <text x="38" y="453" textAnchor="middle" fill="rgba(255,255,255,.38)" fontSize="7" fontFamily="sans-serif">ENG</text>
         <rect x="62" y="406" width="36" height="36" rx="3" fill="rgba(255,255,255,.05)" stroke="rgba(255,255,255,.1)"/>
-        <rect x="64" y="428" width="32" height="12" rx="2" fill="rgba(255,255,255,.4)"/>
+        <rect className="pb2" x="64" y="428" width="32" height="12" rx="2" fill="rgba(255,255,255,.4)"/>
         <text x="80" y="453" textAnchor="middle" fill="rgba(255,255,255,.38)" fontSize="7" fontFamily="sans-serif">MTH</text>
         <rect x="104" y="406" width="36" height="36" rx="3" fill="rgba(255,255,255,.05)" stroke="rgba(255,255,255,.1)"/>
-        <rect x="106" y="416" width="32" height="24" rx="2" fill="rgba(255,255,255,.62)"/>
+        <rect className="pb3" x="106" y="416" width="32" height="24" rx="2" fill="rgba(255,255,255,.62)"/>
         <text x="122" y="453" textAnchor="middle" fill="rgba(255,255,255,.38)" fontSize="7" fontFamily="sans-serif">RSN</text>
         {/* Narrative lines */}
         <rect x="154" y="410" width="54" height="6" rx="3" fill="rgba(255,255,255,.22)"/>
@@ -205,8 +205,16 @@ function LoginForm() {
     <div className="flex min-h-screen">
       {/* Left panel */}
       <div className="hidden w-1/2 flex-col bg-gradient-to-br from-evalent-950 via-evalent-700 to-evalent-500 lg:flex relative overflow-hidden">
-        <div className="absolute top-8 left-10 z-10">
-          <Image src="/evalent-logo-white.png" alt="Evalent" width={140} height={36} className="h-9 w-auto" priority />
+        <div className="absolute top-8 left-10 z-10 flex items-center gap-2">
+          <Image
+            src="/evalent-logo-white.png"
+            alt="Evalent"
+            width={140}
+            height={36}
+            className="h-9 w-auto"
+            priority
+            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+          />
         </div>
         <div className="flex-1 flex items-center justify-center px-8 pt-20 pb-8">
           <EvalentStory />
