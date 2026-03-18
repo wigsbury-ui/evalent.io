@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   const supabase = createServerClient();
   const { data: partner, error } = await supabase
     .from("partners")
-    .select("id, first_name, last_name, email, company, status, partner_type_id, partner_types(name, commission_model, commission_value, commission_scope), override_commission_model, override_commission_value, override_commission_scope, override_commission_value_subsequent, override_commission_tiered_years, total_clicks, total_conversions, total_earned")
+    .select("id, first_name, last_name, email, company, status, partner_type_id, partner_types(name, commission_model, commission_value, commission_scope), override_commission_model, override_commission_value, override_commission_scope, total_clicks, total_conversions, total_earned")
     .eq("id", payload.partnerId)
     .single();
 
