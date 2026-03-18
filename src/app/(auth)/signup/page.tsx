@@ -1,8 +1,7 @@
 // src/app/(auth)/signup/page.tsx
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -66,9 +65,8 @@ function PasswordInput({
 
 export default function SignupPage() {
   const router = useRouter()
-  const [searchParams] = useSearchParams ? [useSearchParams()] : [null]
-  const embedded = searchParams?.get('embedded') === 'true'
   const [step, setStep] = useState(1)
+  const [embedded, setEmbedded] = useState(false)
 
   // Read ?ref= from URL and store as cookie so attribution persists through signup
   useEffect(() => {
@@ -76,6 +74,9 @@ export default function SignupPage() {
     const ref = params.get("ref");
     if (ref) {
       document.cookie = `evalent_ref=${ref}; max-age=${60 * 60 * 24 * 30}; path=/; SameSite=Lax`;
+    }
+    if (params.get("embedded") === "true") {
+      setEmbedded(true);
     }
   }, []);
   const [loading, setLoading] = useState(false)
