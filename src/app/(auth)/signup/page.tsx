@@ -176,9 +176,9 @@ export default function SignupPage() {
       <div className={embedded ? "w-full" : "w-full max-w-md"}>
         {!embedded && <div className="text-center mb-8">
           <Link href="https://evalent.io">
-            <Image src="/evalent-logo.png" alt="Evalent" width={140} height={36} className="h-9 w-auto mx-auto" />
+            <Image src="/evalent-logo-new.png" alt="Evalent" width={120} height={22} className="w-auto mx-auto" style={{height:22}} />
           </Link>
-          <p className="text-gray-500 text-sm mt-2">AI-powered school admissions</p>
+          <p className="text-gray-500 text-sm mt-2">Admissions Intelligence</p>
         </div>}
 
         <div className={`bg-white rounded-2xl p-8 ${embedded ? "" : "shadow-sm border border-gray-200"}`}>
