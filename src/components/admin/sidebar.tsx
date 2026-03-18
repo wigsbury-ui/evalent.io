@@ -46,7 +46,7 @@ export function AdminSidebar() {
     <aside className="w-64 min-h-screen bg-white border-r border-gray-100 flex flex-col">
       <div className="p-6 border-b border-gray-100">
         <Link href="/admin">
-          <Image src="/evalent-logo.png" alt="Evalent" width={120} height={32} className="h-8 w-auto" />
+          <Image src="/evalent-logo-new.png" alt="Evalent" width={120} height={22} className="h-auto w-auto" style={{height:22}} />
         </Link>
       </div>
 

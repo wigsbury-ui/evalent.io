@@ -217,7 +217,7 @@ export default function AdminDashboard() {
     <div className="p-6 max-w-7xl mx-auto space-y-8">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-sm text-gray-400 mt-0.5">Evalent platform — business overview</p>
+        <p className="text-sm text-gray-400 mt-0.5">Super admin — business overview</p>
       </div>
 
       {/* Revenue KPIs */}
