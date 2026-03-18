@@ -1,7 +1,8 @@
 // src/app/(auth)/signup/page.tsx
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
@@ -65,6 +66,8 @@ function PasswordInput({
 
 export default function SignupPage() {
   const router = useRouter()
+  const [searchParams] = useSearchParams ? [useSearchParams()] : [null]
+  const embedded = searchParams?.get('embedded') === 'true'
   const [step, setStep] = useState(1)
 
   // Read ?ref= from URL and store as cookie so attribution persists through signup
@@ -167,12 +170,12 @@ export default function SignupPage() {
   return (
     <div className={`min-h-screen flex items-center justify-center p-4 ${typeof window !== "undefined" && new URLSearchParams(window.location.search).get("embedded") === "true" ? "bg-transparent" : "bg-gradient-to-br from-slate-50 to-blue-50"}`}>
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
+        {!embedded && <div className="text-center mb-8">
           <Link href="https://evalent.io">
             <Image src="/evalent-logo.png" alt="Evalent" width={140} height={36} className="h-9 w-auto mx-auto" />
           </Link>
           <p className="text-gray-500 text-sm mt-2">AI-powered school admissions</p>
-        </div>
+        </div>}
 
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
           {/* Step indicator */}
@@ -309,10 +312,10 @@ export default function SignupPage() {
           )}
         </div>
 
-        <p className="text-center text-sm text-gray-500 mt-6">
+        {!embedded && <p className="text-center text-sm text-gray-500 mt-6">
           Already have an account?{' '}
           <Link href="/login" className="text-blue-600 hover:underline font-medium">Sign in</Link>
-        </p>
+        </p>}
       </div>
     </div>
   )
