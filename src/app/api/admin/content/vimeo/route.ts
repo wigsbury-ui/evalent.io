@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
     share_caption: post.body
       ? post.body.slice(0, 280).replace(/\[PAUSE\]|\[EMPHASIS\]/g, "").trim()
       : post.title,
-    thumbnail_url: `https://vumbnail.com/${vimeoId}.jpg`,
+    thumbnail_url: `https://i.vimeocdn.com/video/${vimeoId}_640x360.jpg`,
     created_at:    new Date().toISOString(),
     updated_at:    new Date().toISOString(),
   }).select().single();
