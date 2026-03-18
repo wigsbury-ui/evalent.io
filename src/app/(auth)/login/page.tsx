@@ -256,7 +256,7 @@ function LoginForm() {
           <p className="text-center text-sm text-gray-500 mt-3">
             New user?{" "}
             <button onClick={() => setShowSignup(true)} className="text-evalent-600 hover:text-evalent-700 font-medium underline underline-offset-2 transition-colors">
-              Sign up here
+              Free sign up
             </button>
           </p>
           {showSignup && (
