@@ -212,7 +212,7 @@ function LoginForm() {
 
   return (
     <div className="flex min-h-screen">
-      <div className="hidden w-1/2 flex-col bg-gradient-to-br from-evalent-950 via-evalent-700 to-evalent-500 lg:flex relative overflow-hidden">
+      <div className="hidden w-1/2 flex-col lg:flex relative overflow-hidden" style={{background:"linear-gradient(160deg,#07112e 0%,#0a2060 40%,#0d3ea8 100%)"}}>
         <div className="absolute top-8 left-10 z-10">
           <svg width="130" height="34" viewBox="0 0 130 34" fill="none">
             <rect width="34" height="34" rx="9" fill="rgba(255,255,255,.18)" stroke="rgba(255,255,255,.3)" strokeWidth="1"/>
