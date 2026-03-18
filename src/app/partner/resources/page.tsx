@@ -1,5 +1,5 @@
 "use client";
-import { Download, Mail, MessageSquare, FileText, Lightbulb, Target, ChevronDown, ChevronUp } from "lucide-react";
+import { Download, Mail, MessageSquare, FileText, Lightbulb, Target, ChevronDown, ChevronUp, Play } from "lucide-react";
 import { useState, useEffect } from "react";
 
 const resources = [
