@@ -66,7 +66,10 @@ function PasswordInput({
 export default function SignupPage() {
   const router = useRouter()
   const [step, setStep] = useState(1)
-  const [embedded, setEmbedded] = useState(false)
+  const [embedded, setEmbedded] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return new URLSearchParams(window.location.search).get('embedded') === 'true'
+  })
 
   // Read ?ref= from URL and store as cookie so attribution persists through signup
   useEffect(() => {
@@ -170,7 +173,7 @@ export default function SignupPage() {
 
   return (
     <div className={`min-h-screen flex items-center justify-center p-4 ${typeof window !== "undefined" && new URLSearchParams(window.location.search).get("embedded") === "true" ? "bg-transparent" : "bg-gradient-to-br from-slate-50 to-blue-50"}`}>
-      <div className="w-full max-w-md">
+      <div className={embedded ? "w-full" : "w-full max-w-md"}>
         {!embedded && <div className="text-center mb-8">
           <Link href="https://evalent.io">
             <Image src="/evalent-logo.png" alt="Evalent" width={140} height={36} className="h-9 w-auto mx-auto" />
