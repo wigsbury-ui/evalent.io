@@ -12,18 +12,123 @@ const resources = [
         title: "Partner Programme Overview",
         description: "Everything you need to know — commission structure, how tracking works, and what to expect.",
         type: "guide",
+        content: `HOW THE PARTNER PROGRAMME WORKS
+
+Welcome to the Evalent Partner Programme. Here’s everything you need to know to get started and earn commission.
+
+YOUR REFERRAL LINK
+You have a unique referral link (find it under "My Links"). Share it with schools by email, LinkedIn, WhatsApp, or at events. When someone clicks your link, their visit is tracked for 90 days. If they sign up and pay within that window, the conversion is attributed to you automatically.
+
+HOW COMMISSIONS WORK
+Your commission rate and structure are visible on your dashboard. Commission is calculated on the net subscription value (excluding tax).
+
+Commission types:
+• First payment — you earn on the initial payment only
+• First year ARR — you earn on all payments in the school’s first 12 months
+• Recurring — you earn on every renewal, indefinitely
+• Tiered — a higher intro rate for year 1 (or more), then a lower ongoing rate
+
+CONVERSION TRACKING
+1. School clicks your referral link → tracked automatically
+2. School signs up and pays → conversion recorded in your dashboard
+3. Evalent team reviews and approves the conversion
+4. Commission appears as "Approved" in your Payouts page
+5. Payment is processed on the agreed monthly schedule
+
+GETTING PAID
+Payouts are processed monthly for all approved conversions from the prior month. Your account manager will confirm your preferred payment method. Full payout history is available under "Payouts".
+
+WHAT COUNTS AS A CONVERSION
+A conversion is recorded when a school signs up via your referral link (or is manually attributed to you), completes their first payment, and the conversion is approved by the Evalent team.
+
+QUESTIONS?
+Email partners@evalent.io or contact your account manager directly.`,
       },
       {
         title: "Evalent One-Pager",
         description: "A concise summary of what Evalent is and the value it delivers to international schools. Share this with prospects.",
-        type: "download",
-        filename: "Evalent_One_Pager.pdf",
+        type: "guide",
+        content: `EVALENT — ADMISSIONS INTELLIGENCE PLATFORM
+One-pager for school conversations
+
+WHAT IS EVALENT?
+Evalent is an AI-powered admissions assessment platform built for international schools. It replaces informal, subjective entry processes with structured, data-rich evaluations — delivered as a professional report within minutes of the assessment being completed.
+
+WHAT DOES IT ASSESS?
+Each assessment covers four domains:
+• English — reading comprehension (MCQ) + extended writing task, AI-evaluated
+• Mathematics — core and applied problem solving
+• Reasoning — logical deduction and pattern recognition
+• Mindset & Values — a short inventory of learning behaviours and attitudes
+
+Available for Grades 3–10. Curriculum-aware: IB, British, and American.
+
+WHAT THE SCHOOL RECEIVES
+A branded PDF report for each applicant, including:
+• Subject scores benchmarked against the school’s own entrance thresholds
+• AI-evaluated writing bands with qualitative commentary
+• An overall recommendation: Ready to admit / Admit with support / Further review / Do not admit
+• Creativity, Values, and Mindset narrative sections
+
+WHY SCHOOLS CHOOSE EVALENT
+• Reports generated in minutes — not days
+• Consistent, defensible criteria — not gut feel
+• Benchmarked against the school’s own thresholds, not national norms
+• Professional school-branded reports
+• One-click assessor decisions (Admit / Reject / Waitlist) by email
+• No specialist training — fully browser-based
+
+PRICING
+• Essentials: $2,900 / £2,300 per year — up to 100 assessments
+• Professional: $5,500 / £4,400 per year — up to 250 assessments
+• Enterprise: $9,500 / £7,600 per year — 500+ assessments
+
+All plans include full report generation, school branding, admin dashboard, and support.
+Trial available — schools can run a live assessment before committing.
+
+evalent.io`,
       },
       {
-        title: "Evalent Pitch Deck",
-        description: "Full slide deck explaining the platform, pricing, and key differentiators. Use in conversations with school leaders.",
-        type: "download",
-        filename: "Evalent_Partner_Deck.pdf",
+        title: "Evalent Pitch Deck — Talking Points",
+        description: "Slide-by-slide guidance for presenting Evalent to school leaders. Use this when you’re in a conversation or on a call.",
+        type: "guide",
+        content: `EVALENT PITCH — SLIDE-BY-SLIDE TALKING POINTS
+
+SLIDE 1 — THE PROBLEM
+“Most international schools make admissions decisions based on informal tests, teacher impressions, and gut feel. With 50–500 applicants a year, that’s slow, inconsistent, and hard to defend to parents or boards.”
+
+Key stat: Schools with competitive admissions spend an average of 3–5 hours per borderline applicant. Most of that time is spent on poor-quality information.
+
+SLIDE 2 — THE SOLUTION
+“Evalent gives every applicant a structured online assessment covering English, Maths, Reasoning, and a short mindset inventory. The results are processed automatically and a full PDF report is ready within minutes.”
+
+Emphasise: No marking, no chasing. The report just arrives in the assessor’s inbox.
+
+SLIDE 3 — THE REPORT
+“The report includes subject scores benchmarked against the school’s own entrance thresholds — not national norms. It includes AI-evaluated writing commentary, a mindset profile, and a clear recommendation.”
+
+If you can, show a sample report. This is the single most persuasive thing in the pitch. Ask your account manager for a sample PDF.
+
+SLIDE 4 — HOW IT WORKS
+1. School sets their entrance thresholds (one-time setup, guided by Evalent)
+2. Student receives a link and completes the 45-minute assessment
+3. Report is generated automatically
+4. Assessor receives the report by email with one-click decision buttons (Admit / Reject / Waitlist / Request Info)
+
+SLIDE 5 — CURRICULUM SUPPORT
+“Evalent supports IB, British, and American curricula — questions and writing prompts are calibrated to each. A school doesn’t need to change anything about how they teach.”
+
+SLIDE 6 — PRICING
+• Essentials: $2,900 / £2,300 — 100 assessments/year
+• Professional: $5,500 / £4,400 — 250 assessments/year
+• Enterprise: $9,500 / £7,600 — 500+ assessments/year
+
+Cost framing: “For a school running 100 assessments a year, that’s $29 per applicant — less than 30 minutes of a staff member’s time.”
+
+SLIDE 7 — TRIAL & CLOSE
+“There’s a trial available. We can set up a live assessment for one of your current applicants so you can see exactly what the report looks like before committing.”
+
+Close: “The best next step is a 30-minute demo with the Evalent team. I can arrange that directly — they’ll walk you through a live assessment end to end.”`,
       },
     ],
   },
