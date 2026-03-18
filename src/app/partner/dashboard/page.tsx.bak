@@ -7,7 +7,6 @@ const SCOPE_LABEL: Record<string, string> = {
   first_payment: "per first payment",
   first_year: "of first year ARR",
   recurring: "recurring per payment",
-  tiered: "tiered",
 };
 
 // localStorage key scoped per partner email to avoid cross-partner bleed
@@ -140,10 +139,7 @@ export default function PartnerDashboard() {
           {showWelcome ? `Getting started` : `Welcome back, ${partner.first_name} 👋`}
         </h1>
         <p className="text-sm text-gray-400 mt-1">
-          {type?.name} · {scope === "tiered"
-          ? `${model === "fixed" ? `$${value} flat` : `${value}%`} for year${(partner.override_commission_tiered_years ?? 1) > 1 ? `s 1–${partner.override_commission_tiered_years}` : " 1"}, then ${model === "fixed" ? `$${partner.override_commission_value_subsequent ?? "?"}` : `${partner.override_commission_value_subsequent ?? "?"}%`} ongoing`
-          : `${model === "fixed" ? `$${value} flat` : `${value}%`} ${SCOPE_LABEL[scope] ?? scope}`
-        }
+          {type?.name} · {model === "fixed" ? `$${value} flat` : `${value}%`} {SCOPE_LABEL[scope] ?? scope}
         </p>
       </div>
 
