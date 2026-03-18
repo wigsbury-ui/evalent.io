@@ -20,7 +20,6 @@ const SCOPE_LABEL: Record<string, string> = {
   first_payment: "first payment",
   first_year: "first year ARR",
   recurring: "recurring",
-  tiered: "tiered",
 };
 
 export default function PartnersPage() {
@@ -155,7 +154,7 @@ export default function PartnersPage() {
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">{type?.name ?? "—"}</td>
                     <td className="px-4 py-3 text-sm text-gray-600">
-                      {scope === "tiered" ? (<>{model === "fixed" ? `$${value} flat` : `${value}%`} for year{(p.override_commission_tiered_years ?? 1) > 1 ? `s 1–${p.override_commission_tiered_years}` : " 1"}, then {model === "fixed" ? `$${p.override_commission_value_subsequent ?? "?"}` : `${p.override_commission_value_subsequent ?? "?"}%`} ongoing</>) : (<>{model === "fixed" ? `$${value} flat` : `${value}%`} of {SCOPE_LABEL[scope] ?? scope}</>)}
+                      {model === "fixed" ? `$${value} flat` : `${value}%`} of {SCOPE_LABEL[scope] ?? scope}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">{p.total_clicks}</td>
                     <td className="px-4 py-3 text-sm text-gray-600">{p.total_conversions}</td>
