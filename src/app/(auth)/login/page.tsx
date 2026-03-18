@@ -180,7 +180,7 @@ function EvalentStory() {
       {/* ── Tagline ── */}
       <g className="s5">
         <line x1="8" y1="726" x2="472" y2="726" stroke="rgba(255,255,255,.1)" strokeWidth="1"/>
-        <text x="240" y="748" textAnchor="middle" fill="rgba(255,255,255,.35)" fontSize="11" fontFamily="sans-serif" letterSpacing="1">Evalent. The Admissions Intelligence Platform.</text>
+        <text x="240" y="748" textAnchor="middle" fill="rgba(255,255,255,.35)" fontSize="11" fontFamily="sans-serif" letterSpacing="1">Evalent. The Admissions Intelligence.</text>
       </g>
     </svg>
   );
@@ -214,13 +214,7 @@ function LoginForm() {
   return (
     <div className="flex min-h-screen">
       <div className="hidden w-1/2 flex-col lg:flex relative overflow-hidden" style={{background:"linear-gradient(160deg,#07112e 0%,#0a2060 40%,#0d3ea8 100%)"}}>
-        <div className="absolute top-8 left-10 z-10">
-          <svg width="130" height="34" viewBox="0 0 130 34" fill="none">
-            <rect width="34" height="34" rx="9" fill="rgba(255,255,255,.18)" stroke="rgba(255,255,255,.3)" strokeWidth="1"/>
-            <text x="17" y="23" textAnchor="middle" fill="white" fontSize="17" fontFamily="sans-serif" fontWeight="700">E</text>
-            <text x="42" y="23" fill="white" fontSize="17" fontFamily="sans-serif" fontWeight="600">valent</text>
-          </svg>
-        </div>
+
         <div className="flex-1 flex items-center justify-center px-8 pt-20 pb-8">
           <EvalentStory />
         </div>
@@ -236,7 +230,8 @@ function LoginForm() {
             <span className="text-xl font-semibold text-gray-900">Evalent</span>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-evalent-600 mb-3">Admissions Intelligence Platform</p>
+            <img src="/evalent-logo.png" alt="Evalent" style={{ height: 36, width: "auto", marginBottom: 20 }} />
+            <p className="text-xs font-semibold uppercase tracking-widest text-evalent-600 mb-3">Admissions Intelligence</p>
             <h2 className="text-2xl font-bold text-gray-900">Welcome back</h2>
             <p className="mt-2 text-sm text-gray-500">Sign in to your Evalent admin account</p>
           </div>
