@@ -197,6 +197,65 @@ Don't oversell in email. Just create enough curiosity to get on a call.
   },
 ];
 
+function VideoSection() {
+  const [videos, setVideos] = useState<any[]>([]);
+  const [active, setActive] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/partner/me")
+      .then(r => r.json())
+      .then(d => {
+        const vids = d.videos || [];
+        setVideos(vids);
+        if (vids.length > 0) setActive(vids[0].vimeo_id);
+      });
+  }, []);
+
+  if (videos.length === 0) return null;
+
+  return (
+    <div>
+      <div className="flex items-center gap-2.5 mb-4">
+        <div className="rounded-lg p-1.5 text-blue-600 bg-blue-50"><Play className="h-4 w-4"/></div>
+        <h2 className="text-base font-semibold text-gray-900">Videos</h2>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {/* Active video player */}
+        <div className="md:col-span-2">
+          {active && (
+            <div className="rounded-xl overflow-hidden bg-black shadow" style={{aspectRatio:"16/9"}}>
+              <iframe
+                src={`https://player.vimeo.com/video/${active}?title=0&byline=0&portrait=0&color=0d52dd`}
+                className="w-full h-full"
+                allow="autoplay; fullscreen; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+          )}
+        </div>
+        {/* Video list */}
+        <div className="flex flex-col gap-2 overflow-y-auto" style={{maxHeight:340}}>
+          {videos.map((v: any) => (
+            <button
+              key={v.vimeo_id}
+              onClick={() => setActive(v.vimeo_id)}
+              className={`flex items-start gap-3 rounded-xl p-3 text-left transition-colors ${active === v.vimeo_id ? "bg-blue-50 border border-blue-200" : "bg-white border border-gray-100 hover:bg-gray-50"}`}
+            >
+              <div className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center ${active === v.vimeo_id ? "bg-blue-600" : "bg-gray-100"}`}>
+                <Play className={`h-3.5 w-3.5 ${active === v.vimeo_id ? "text-white" : "text-gray-400"}`}/>
+              </div>
+              <div className="min-w-0">
+                <p className={`text-sm font-medium leading-tight line-clamp-2 ${active === v.vimeo_id ? "text-blue-700" : "text-gray-900"}`}>{v.title}</p>
+                {v.category && <p className="text-xs text-gray-400 mt-0.5">{v.category}</p>}
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function TemplateCard({ item }: { item: any }) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
