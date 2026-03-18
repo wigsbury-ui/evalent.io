@@ -7,6 +7,8 @@ import { Loader2 } from "lucide-react";
 export default function PartnerResetPasswordPage() {
   const router = useRouter();
   const [token, setToken] = useState("");
+
+  useEffect(() => { document.title = "Evalent — Partner Portal"; }, []);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);

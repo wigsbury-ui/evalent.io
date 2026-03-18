@@ -1,11 +1,15 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Loader2 } from "lucide-react";
 
 export default function PartnerLoginPage() {
   const router = useRouter();
+
+  useEffect(() => {
+    document.title = "Evalent — Partner Portal";
+  }, []);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -64,7 +68,8 @@ export default function PartnerLoginPage() {
             className="w-auto mx-auto"
             style={{ height: 22 }}
           />
-          <p className="text-sm text-gray-500 mt-2">Admissions Intelligence · Partner Portal</p>
+          <p className="text-sm text-gray-500 mt-2">Admissions Intelligence</p>
+          <p className="text-sm text-gray-600 font-medium mt-0.5">Partner Portal</p>
         </div>
 
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
