@@ -1103,7 +1103,7 @@ export default function ContentStudioPage() {
                       <>
                         <tr key={video.id} className={isWelcome ? "bg-blue-50/40" : "hover:bg-gray-50"}>
                           <td className="px-3 py-2">
-                            <div className="w-24 rounded-lg overflow-hidden bg-gray-900 cursor-pointer relative flex-shrink-0"
+                            <div className="w-40 aspect-video rounded-lg overflow-hidden bg-gray-900 cursor-pointer relative flex-shrink-0"
                               style={{ aspectRatio: "16/9" }} onClick={() => setExpandedVideo(isExpanded ? null : video.id)}>
                               <img src={video.thumbnail_url || `https://vumbnail.com/${video.vimeo_id}.jpg`} alt="" className="w-full h-full object-cover" />
                               <div className="absolute inset-0 flex items-center justify-center bg-black/20">
