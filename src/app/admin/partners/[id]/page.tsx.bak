@@ -19,7 +19,6 @@ const SCOPE_LABEL: Record<string, string> = {
   first_payment: "first payment",
   first_year: "first year ARR",
   recurring: "recurring",
-  tiered: "tiered",
 };
 
 const CONVERSION_STATUS_COLOURS: Record<string, string> = {
@@ -54,8 +53,6 @@ export default function PartnerEditPage() {
     first_name: "", last_name: "", email: "", company: "",
     partner_type_id: "", notes: "", bio: "",
     override_commission_model: "", override_commission_value: "", override_commission_scope: "",
-    override_commission_value_subsequent: "",
-    override_commission_tiered_years: "1",
   });
 
   useEffect(() => {
@@ -82,8 +79,6 @@ export default function PartnerEditPage() {
           override_commission_model: partnerData.override_commission_model || "",
           override_commission_value: partnerData.override_commission_value?.toString() || "",
           override_commission_scope: partnerData.override_commission_scope || "",
-          override_commission_value_subsequent: partnerData.override_commission_value_subsequent?.toString() || "",
-          override_commission_tiered_years: partnerData.override_commission_tiered_years?.toString() || "1",
         });
       }
       setLoading(false);
@@ -97,12 +92,8 @@ export default function PartnerEditPage() {
       body.override_commission_model = null;
       body.override_commission_value = null;
       body.override_commission_scope = null;
-      body.override_commission_value_subsequent = null;
-      body.override_commission_tiered_years = null;
     } else {
       body.override_commission_value = parseFloat(body.override_commission_value) || null;
-      body.override_commission_value_subsequent = body.override_commission_scope === "tiered" ? (parseFloat(body.override_commission_value_subsequent) || null) : null;
-      body.override_commission_tiered_years = body.override_commission_scope === "tiered" ? (parseInt(body.override_commission_tiered_years) || 1) : null;
     }
     const res = await fetch("/api/admin/partners", {
       method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
@@ -334,29 +325,7 @@ export default function PartnerEditPage() {
                       <option value="first_payment">First payment</option>
                       <option value="first_year">First year ARR</option>
                       <option value="recurring">Recurring</option>
-                    <option value="tiered">Tiered (intro rate, then ongoing)</option>
                     </select>
-                  {form.override_commission_scope === "tiered" && (
-                    <div className="mt-3 rounded-lg border border-indigo-100 bg-indigo-50 p-3 space-y-3">
-                      <p className="text-xs font-medium text-indigo-700">Tiered rate configuration</p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-500 mb-1">Year 1–N rate {form.override_commission_model === "fixed" ? "($)" : "(%)"}</label>
-                          <input type="number" min="0" step="0.01" value={form.override_commission_value} onChange={e => setForm(f => ({ ...f, override_commission_value: e.target.value }))} className={inp} placeholder={form.override_commission_model === "fixed" ? "e.g. 500" : "e.g. 20"} />
-                          <p className="text-xs text-gray-400 mt-1">Higher intro rate</p>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-500 mb-1">Years at intro rate</label>
-                          <input type="number" min="1" max="10" step="1" value={form.override_commission_tiered_years} onChange={e => setForm(f => ({ ...f, override_commission_tiered_years: e.target.value }))} className={inp} placeholder="e.g. 1" />
-                          <p className="text-xs text-gray-400 mt-1">Then switches to ongoing rate</p>
-                        </div>
-                        <div className="col-span-2">
-                          <label className="block text-xs font-medium text-gray-500 mb-1">Ongoing rate (from year {parseInt(form.override_commission_tiered_years || "1") + 1}+) {form.override_commission_model === "fixed" ? "($)" : "(%)"}</label>
-                          <input type="number" min="0" step="0.01" value={form.override_commission_value_subsequent} onChange={e => setForm(f => ({ ...f, override_commission_value_subsequent: e.target.value }))} className={inp} placeholder={form.override_commission_model === "fixed" ? "e.g. 200" : "e.g. 5"} />
-                        </div>
-                      </div>
-                    </div>
-                  )}
                   </div>
                 </>
               )}
@@ -364,11 +333,8 @@ export default function PartnerEditPage() {
             {form.override_commission_model && (
               <div className="rounded-lg bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-700">
                 <span className="font-medium">Effective rate: </span>
-                {form.override_commission_scope === "tiered" ? (
-                  <>{form.override_commission_model === "fixed" ? `$${form.override_commission_value || "??"}` : `${form.override_commission_value || "??"}%`} for year{parseInt(form.override_commission_tiered_years || "1") > 1 ? `s 1–${form.override_commission_tiered_years}` : " 1"}, then {form.override_commission_model === "fixed" ? `$${form.override_commission_value_subsequent || "??"}` : `${form.override_commission_value_subsequent || "??"}%`} ongoing</>
-                ) : (
-                  <>{form.override_commission_model === "fixed" ? `$${form.override_commission_value || "??"}` : `${form.override_commission_value || "??"}%`} {" "}of {(SCOPE_LABEL[form.override_commission_scope] ?? form.override_commission_scope ?? type?.commission_scope) || "—"}</>
-                )}
+                {form.override_commission_model === "fixed" ? `$${form.override_commission_value || "??"}` : `${form.override_commission_value || "??"}%`}
+                {" "}of {(SCOPE_LABEL[form.override_commission_scope] ?? form.override_commission_scope ?? type?.commission_scope) || "—"}
               </div>
             )}
           </CardContent>

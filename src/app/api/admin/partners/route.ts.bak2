@@ -40,8 +40,6 @@ export async function POST(req: NextRequest) {
     override_commission_value: override_commission_value ?? null,
     override_commission_scope: override_commission_scope || null,
       override_commission_value_subsequent: body.override_commission_value_subsequent ?? null,
-      override_commission_tiered_years: body.override_commission_tiered_years ?? null,
-      override_commission_value_subsequent: body.override_commission_value_subsequent ?? null,
       override_commission_tiered_years: body.override_commission_tiered_years ?? null, override_commission_value_subsequent: override_commission_value_subsequent ?? null, override_commission_tiered_years: override_commission_tiered_years ?? null,
       override_commission_value_subsequent: override_commission_value_subsequent ?? null,
       override_commission_tiered_years: override_commission_tiered_years ?? null,
@@ -67,7 +65,7 @@ export async function PATCH(req: NextRequest) {
   const { id, password, ...rest } = body;
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
   const allowed = ["first_name","last_name","email","company","partner_type_id","status","notes","bio",
-    "override_commission_model","override_commission_value","override_commission_scope","override_commission_value_subsequent","override_commission_tiered_years","override_commission_value_subsequent","override_commission_tiered_years","override_commission_value_subsequent","override_commission_tiered_years","override_commission_value_subsequent","override_commission_tiered_years"];
+    "override_commission_model","override_commission_value","override_commission_scope","override_commission_value_subsequent","override_commission_tiered_years","override_commission_value_subsequent","override_commission_tiered_years","override_commission_value_subsequent","override_commission_tiered_years"];
   const safe: Record<string, any> = { updated_at: new Date().toISOString() };
   for (const k of allowed) { if (rest[k] !== undefined) safe[k] = rest[k]; }
   if (password) safe.password_hash = await hash(password, 12);
