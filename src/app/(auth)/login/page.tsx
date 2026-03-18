@@ -230,8 +230,7 @@ function LoginForm() {
             <span className="text-xl font-semibold text-gray-900">Evalent</span>
           </div>
           <div>
-            <img src="/evalent-logo-new.png" alt="Evalent" style={{ height: 22, width: "auto", marginBottom: 20 }} />
-            <p className="text-xs font-semibold uppercase tracking-widest text-evalent-600 mb-3">Admissions Intelligence</p>
+            <img src="/evalent-logo-new.png" alt="Evalent" style={{ height: 22, width: "auto", marginBottom: 24 }} />
             <h2 className="text-2xl font-bold text-gray-900">Welcome back</h2>
             <p className="mt-2 text-sm text-gray-500">Sign in to your Evalent admin account</p>
           </div>
