@@ -272,7 +272,7 @@ function LoginForm() {
                   <p style={{fontSize:14,fontWeight:600,color:"#0a1a4e",margin:0}}>Create your free account</p>
                   <button onClick={() => setShowSignup(false)} style={{width:28,height:28,borderRadius:"50%",background:"#f1f5f9",border:"none",cursor:"pointer",fontSize:18,color:"#64748b",display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
                 </div>
-                <iframe src="https://app.evalent.io/signup" style={{flex:1,border:"none",minHeight:520}} title="Sign up" />
+                <iframe src="https://app.evalent.io/signup?embedded=true" style={{flex:1,border:"none",minHeight:520}} title="Sign up" />
               </div>
             </div>
           )}
