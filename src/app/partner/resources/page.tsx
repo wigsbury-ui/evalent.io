@@ -1,6 +1,6 @@
 "use client";
 import { Download, Mail, MessageSquare, FileText, Lightbulb, Target, ChevronDown, ChevronUp } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 const resources = [
   {
