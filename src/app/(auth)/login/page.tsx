@@ -194,6 +194,7 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showSignup, setShowSignup] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -258,6 +259,23 @@ function LoginForm() {
             </CardContent>
           </Card>
           <p className="text-center text-xs text-gray-400">Contact your platform administrator if you need access.</p>
+          <p className="text-center text-sm text-gray-500 mt-3">
+            New user?{" "}
+            <button onClick={() => setShowSignup(true)} className="text-evalent-600 hover:text-evalent-700 font-medium underline underline-offset-2 transition-colors">
+              Sign up here
+            </button>
+          </p>
+          {showSignup && (
+            <div onClick={(e) => { if (e.target === e.currentTarget) setShowSignup(false); }} style={{position:"fixed",inset:0,zIndex:50,background:"rgba(7,17,46,0.75)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}}>
+              <div style={{background:"white",borderRadius:20,overflow:"hidden",width:"100%",maxWidth:520,maxHeight:"90vh",boxShadow:"0 40px 80px rgba(0,0,0,0.4)",display:"flex",flexDirection:"column"}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"16px 20px",borderBottom:"1px solid #f1f5f9"}}>
+                  <p style={{fontSize:14,fontWeight:600,color:"#0a1a4e",margin:0}}>Create your free account</p>
+                  <button onClick={() => setShowSignup(false)} style={{width:28,height:28,borderRadius:"50%",background:"#f1f5f9",border:"none",cursor:"pointer",fontSize:18,color:"#64748b",display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
+                </div>
+                <iframe src="https://app.evalent.io/signup" style={{flex:1,border:"none",minHeight:520}} title="Sign up" />
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
