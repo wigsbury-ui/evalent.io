@@ -267,12 +267,12 @@ function LoginForm() {
           </p>
           {showSignup && (
             <div onClick={(e) => { if (e.target === e.currentTarget) setShowSignup(false); }} style={{position:"fixed",inset:0,zIndex:50,background:"rgba(7,17,46,0.75)",backdropFilter:"blur(4px)",display:"flex",alignItems:"center",justifyContent:"center",padding:"20px"}}>
-              <div style={{background:"white",borderRadius:20,overflow:"hidden",width:"100%",maxWidth:520,maxHeight:"90vh",boxShadow:"0 40px 80px rgba(0,0,0,0.4)",display:"flex",flexDirection:"column"}}>
-                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"16px 20px",borderBottom:"1px solid #f1f5f9"}}>
+              <div style={{background:"white",borderRadius:20,overflow:"hidden",width:"100%",maxWidth:520,maxHeight:"90vh",boxShadow:"0 40px 80px rgba(0,0,0,0.4)",display:"flex",flexDirection:"column",border:"none"}}>
+                <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",padding:"16px 20px"}}>
                   <p style={{fontSize:14,fontWeight:600,color:"#0a1a4e",margin:0}}>Create your free account</p>
                   <button onClick={() => setShowSignup(false)} style={{width:28,height:28,borderRadius:"50%",background:"#f1f5f9",border:"none",cursor:"pointer",fontSize:18,color:"#64748b",display:"flex",alignItems:"center",justifyContent:"center"}}>×</button>
                 </div>
-                <iframe src="https://app.evalent.io/signup?embedded=true" style={{flex:1,border:"none",minHeight:520}} title="Sign up" />
+                <iframe src="https://app.evalent.io/signup?embedded=true" style={{flex:1,border:"none",minHeight:540,overflow:"hidden",background:"transparent"}} title="Sign up" />
               </div>
             </div>
           )}

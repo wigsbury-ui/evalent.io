@@ -178,7 +178,7 @@ export default function SignupPage() {
           <p className="text-gray-500 text-sm mt-2">AI-powered school admissions</p>
         </div>}
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
+        <div className={`bg-white rounded-2xl p-8 ${embedded ? "" : "shadow-sm border border-gray-200"}`}>
           {/* Step indicator */}
           <div className="flex items-center mb-8">
             {[1, 2].map((s, i) => (
