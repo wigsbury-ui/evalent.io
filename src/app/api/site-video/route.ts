@@ -14,8 +14,18 @@ export async function GET() {
     {
       headers: {
         "Access-Control-Allow-Origin": "*",
-        "Cache-Control": "public, s-maxage=300",
+        "Access-Control-Allow-Methods": "GET",
+        "Cache-Control": "public, s-maxage=60",
       },
     }
   );
+}
+
+export async function OPTIONS() {
+  return NextResponse.json({}, {
+    headers: {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+    }
+  });
 }
