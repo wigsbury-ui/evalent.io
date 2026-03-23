@@ -63,6 +63,20 @@ function PasswordInput({
   )
 }
 
+function getPasswordStrength(pw: string): { score: number; label: string; color: string; bg: string } {
+  if (pw.length === 0) return { score: 0, label: '', color: '', bg: '' }
+  let score = 0
+  if (pw.length >= 12) score++
+  if (pw.length >= 16) score++
+  if (/[A-Z]/.test(pw)) score++
+  if (/[0-9]/.test(pw)) score++
+  if (/[^A-Za-z0-9]/.test(pw)) score++
+  if (score <= 1) return { score, label: 'Weak', color: 'text-red-500', bg: 'bg-red-400' }
+  if (score <= 2) return { score, label: 'Fair', color: 'text-orange-500', bg: 'bg-orange-400' }
+  if (score <= 3) return { score, label: 'Good', color: 'text-yellow-600', bg: 'bg-yellow-400' }
+  return { score, label: 'Strong', color: 'text-green-600', bg: 'bg-green-500' }
+}
+
 export default function SignupPage() {
   const router = useRouter()
   const [step, setStep] = useState(1)
@@ -122,7 +136,8 @@ export default function SignupPage() {
   // Inline validation hints
   const emailValid = form.email.trim() === '' || /^[^@]+@[^@]+.[^@]+$/.test(form.email.trim())
   const passwordMatch = form.confirm_password === '' || form.password === form.confirm_password
-  const passwordLong = form.password === '' || form.password.length >= 8
+  const passwordLong = form.password === '' || form.password.length >= 12
+  const passwordStrength = getPasswordStrength(form.password)
 
   const step1Valid = form.school_name.trim().length > 1 && form.curriculum !== ''
   const step2Valid =
@@ -130,7 +145,7 @@ export default function SignupPage() {
     form.last_name.trim().length > 0 &&
     form.role !== '' &&
     /^[^@]+@[^@]+.[^@]+$/.test(form.email.trim()) &&
-    form.password.length >= 8 &&
+    form.password.length >= 12 &&
     form.password === form.confirm_password
 
   async function validateDiscount(code: string) {
