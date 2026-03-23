@@ -5,7 +5,7 @@ import { createServerClient } from "@/lib/supabase/server";
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
-  if (!session || session.user?.role !== "superadmin") {
+  if (!session || session.user?.role !== "super_admin") {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
