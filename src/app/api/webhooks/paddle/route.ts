@@ -86,6 +86,105 @@ async function sendDunningEmail(schoolId: string, type: 'past_due' | 'payment_fa
   }
 }
 
+// ── Commission calculation ───────────────────────────────────────────────────
+async function calculateAndRecordCommission(
+  schoolId: string,
+  amountPaidUsd: number,
+  paddleTransactionId: string,
+  isRenewal: boolean
+) {
+  try {
+    const { data: conversion } = await supabase
+      .from('referral_conversions')
+      .select('id, partner_id, status')
+      .eq('school_id', schoolId)
+      .in('status', ['pending', 'approved'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (!conversion) {
+      console.log(`[Commission] No conversion found for school ${schoolId}`)
+      return
+    }
+
+    // Prevent double-processing same transaction
+    const { count } = await supabase
+      .from('referral_conversions')
+      .select('id', { count: 'exact', head: true })
+      .eq('paddle_transaction_id', paddleTransactionId)
+    if ((count ?? 0) > 0) {
+      console.log(`[Commission] Transaction ${paddleTransactionId} already processed`)
+      return
+    }
+
+    const { data: partner } = await supabase
+      .from('partners')
+      .select('override_commission_model, override_commission_value, override_commission_scope, override_commission_value_subsequent, override_commission_tiered_years, partner_types(commission_model, commission_value, commission_scope)')
+      .eq('id', conversion.partner_id)
+      .single()
+
+    if (!partner) return
+
+    const pt = (partner.partner_types as any)
+    const model: string = partner.override_commission_model ?? pt?.commission_model ?? 'percentage'
+    const value: number = Number(partner.override_commission_value ?? pt?.commission_value ?? 0)
+    const scope: string = partner.override_commission_scope ?? pt?.commission_scope ?? 'first_payment'
+    const valueSubs: number = Number(partner.override_commission_value_subsequent ?? value)
+    const tieredYears: number = Number(partner.override_commission_tiered_years ?? 1)
+
+    let shouldPay = false
+    let rateToUse = value
+
+    if (scope === 'first_payment' || scope === 'first_year') {
+      shouldPay = !isRenewal
+    } else if (scope === 'recurring') {
+      shouldPay = true
+    } else if (scope === 'tiered') {
+      const { count: paidCount } = await supabase
+        .from('referral_conversions')
+        .select('id', { count: 'exact', head: true })
+        .eq('school_id', schoolId)
+        .eq('partner_id', conversion.partner_id)
+        .not('commission_amount', 'is', null)
+      const payments = paidCount ?? 0
+      shouldPay = true
+      rateToUse = payments < tieredYears ? value : valueSubs
+    }
+
+    // Option A: commission on amount actually charged (after discounts)
+    let commissionAmount = 0
+    if (shouldPay) {
+      if (model === 'percentage') {
+        commissionAmount = Math.round(amountPaidUsd * (rateToUse / 100) * 100) / 100
+      } else {
+        commissionAmount = rateToUse
+      }
+    }
+
+    await supabase.from('referral_conversions')
+      .update({
+        commission_amount: commissionAmount,
+        amount_paid: amountPaidUsd,
+        paddle_transaction_id: paddleTransactionId,
+        commission_calculated_at: new Date().toISOString(),
+        status: shouldPay ? 'approved' : 'pending',
+        is_renewal: isRenewal,
+      })
+      .eq('id', conversion.id)
+
+    if (shouldPay) {
+      await supabase.rpc('increment_partner_earnings', {
+        p_partner_id: conversion.partner_id,
+        p_amount: commissionAmount,
+      })
+      console.log(`[Commission] $${commissionAmount} for partner ${conversion.partner_id} (school ${schoolId})`)
+    }
+  } catch (err) {
+    console.error('[Commission] Error:', err)
+  }
+}
+
 // ── Signature verification ─────────────────────────────────────────────────────
 
 async function verifyPaddleSignature(request: NextRequest): Promise<string | null> {
@@ -167,6 +266,12 @@ export async function POST(request: NextRequest) {
           .eq('id', schoolId)
 
         console.log(`[Paddle Webhook] School ${schoolId} activated on ${tierInfo.tier}`)
+
+        // Commission on first payment — Option A (actual amount charged)
+        const firstTxId = data.transaction_id ?? data.id
+        const unitPrice = data.items?.[0]?.price?.unit_price?.amount
+        const amountPaid = unitPrice ? Math.round(parseFloat(unitPrice)) / 100 : 0
+        if (amountPaid > 0) await calculateAndRecordCommission(schoolId, amountPaid, firstTxId, false)
         break
       }
 
@@ -259,6 +364,11 @@ export async function POST(request: NextRequest) {
             .eq('paddle_subscription_id', subscriptionId)
 
           console.log(`[Paddle Webhook] Renewal for school ${school.id} — year count reset`)
+
+          // Commission on renewal — Option A (actual amount charged)
+          const grandTotal = data.details?.totals?.grand_total ?? data.details?.totals?.subtotal
+          const renewalAmount = grandTotal ? Math.round(parseFloat(grandTotal)) / 100 : 0
+          if (renewalAmount > 0) await calculateAndRecordCommission(school.id, renewalAmount, transactionId, true)
         }
 
         console.log(`[Paddle Webhook] Transaction ${transactionId} completed`)
