@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import Image from "next/image";
 import {
   LayoutDashboard, School, Key, Bot, FileText, ScrollText,
-  LogOut, Video, CreditCard, UserCheck, Wallet, Target, PenSquare,
+  LogOut, Video, CreditCard, UserCheck, Wallet, Target, PenSquare, Tag,
 } from "lucide-react";
 
 type NavItem = {
@@ -34,6 +34,7 @@ const NAV: NavItem[] = [
   { href: "/admin/help-videos", label: "Help Videos",      icon: Video },
 
   { href: "/admin/partners",    label: "Partners",         icon: UserCheck,   section: "Partners" },
+  { href: "/admin/discounts",   label: "Discount Codes",   icon: Tag },
   { href: "/admin/payouts",     label: "Payouts",          icon: Wallet },
 
   { href: "/admin/audit",       label: "Audit Log",        icon: ScrollText,  section: "System" },
