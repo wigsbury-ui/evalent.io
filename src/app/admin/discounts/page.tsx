@@ -20,7 +20,8 @@ interface DiscountCode {
 
 interface Partner {
   id: string
-  name: string
+  first_name: string
+  last_name: string
   company: string
 }
 
@@ -147,7 +148,7 @@ export default function DiscountsPage() {
               <select value={form.partner_id} onChange={e => setForm(f => ({ ...f, partner_id: e.target.value }))}
                 className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-evalent-500">
                 <option value="">No partner</option>
-                {partners.map(p => <option key={p.id} value={p.id}>{p.name}{p.company ? ` — ${p.company}` : ''}</option>)}
+                {partners.map(p => <option key={p.id} value={p.id}>{p.first_name} {p.last_name}{p.company ? ` (${p.company})` : ''}</option>)}
               </select>
             </div>
             <div>
