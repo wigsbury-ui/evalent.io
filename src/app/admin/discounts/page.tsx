@@ -117,20 +117,20 @@ export default function DiscountsPage() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-black text-gray-900 flex items-center gap-2">
-            <Tag className="w-6 h-6 text-brand" /> Discount Codes
+            <Tag className="w-6 h-6 text-evalent-600" /> Discount Codes
           </h1>
           <p className="text-sm text-gray-500 mt-1">{codes.length} codes total &mdash; {active.length} active</p>
         </div>
         <button
           onClick={() => setShowForm(v => !v)}
-          className="flex items-center gap-2 bg-brand text-white text-sm font-bold px-4 py-2.5 rounded-xl hover:bg-blue-800 transition-colors"
+          className="flex items-center gap-2 bg-evalent-600 text-white text-sm font-bold px-4 py-2.5 rounded-md hover:bg-evalent-700 transition-colors"
         >
           <Plus className="w-4 h-4" /> New Code
         </button>
       </div>
 
       {showForm && (
-        <form onSubmit={handleCreate} className="bg-white border-2 border-brand rounded-2xl p-6 mb-6">
+        <form onSubmit={handleCreate} className="bg-white border-2 border-evalent-500 rounded-xl p-6 mb-6">
           <h2 className="text-base font-bold text-gray-900 mb-4">Create discount code</h2>
           <div className="grid grid-cols-2 gap-4">
             <div>
@@ -139,13 +139,13 @@ export default function DiscountsPage() {
                 required value={form.code}
                 onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
                 placeholder="e.g. AMAL20"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono uppercase focus:outline-none focus:border-brand"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono uppercase focus:outline-none focus:ring-2 focus:ring-evalent-500"
               />
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-500 mb-1 tracking-wide">LINKED PARTNER (optional)</label>
               <select value={form.partner_id} onChange={e => setForm(f => ({ ...f, partner_id: e.target.value }))}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-brand">
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-evalent-500">
                 <option value="">No partner</option>
                 {partners.map(p => <option key={p.id} value={p.id}>{p.name}{p.company ? ` — ${p.company}` : ''}</option>)}
               </select>
@@ -153,7 +153,7 @@ export default function DiscountsPage() {
             <div>
               <label className="block text-xs font-bold text-gray-500 mb-1 tracking-wide">DISCOUNT TYPE *</label>
               <select value={form.discount_type} onChange={e => setForm(f => ({ ...f, discount_type: e.target.value }))}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-brand">
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-evalent-500">
                 <option value="percentage">Percentage (%)</option>
                 <option value="fixed_usd">Fixed amount (USD)</option>
               </select>
@@ -167,13 +167,13 @@ export default function DiscountsPage() {
                 value={form.discount_value}
                 onChange={e => setForm(f => ({ ...f, discount_value: e.target.value }))}
                 placeholder={form.discount_type === 'percentage' ? '20' : '500'}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-evalent-500"
               />
             </div>
             <div>
               <label className="block text-xs font-bold text-gray-500 mb-1 tracking-wide">APPLIES TO PLAN</label>
               <select value={form.applies_to_plan} onChange={e => setForm(f => ({ ...f, applies_to_plan: e.target.value }))}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-brand">
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-evalent-500">
                 <option value="">Any plan</option>
                 <option value="essentials">Essentials</option>
                 <option value="professional">Professional</option>
@@ -187,7 +187,7 @@ export default function DiscountsPage() {
                 value={form.max_uses}
                 onChange={e => setForm(f => ({ ...f, max_uses: e.target.value }))}
                 placeholder="unlimited"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-evalent-500"
               />
             </div>
             <div>
@@ -196,7 +196,7 @@ export default function DiscountsPage() {
                 type="date"
                 value={form.expires_at}
                 onChange={e => setForm(f => ({ ...f, expires_at: e.target.value }))}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-evalent-500"
               />
             </div>
             <div>
@@ -205,14 +205,14 @@ export default function DiscountsPage() {
                 value={form.description}
                 onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                 placeholder="e.g. Partner intro discount — Q1 2026"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-evalent-500"
               />
             </div>
           </div>
           {error && <p className="text-xs text-red-600 mt-3 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
           <div className="flex gap-3 mt-4">
             <button type="submit" disabled={saving}
-              className="bg-brand text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-blue-800 transition-colors disabled:opacity-50">
+              className="bg-evalent-600 text-white text-sm font-bold px-5 py-2.5 rounded-md hover:bg-evalent-700 transition-colors disabled:opacity-50">
               {saving ? 'Creating…' : 'Create code'}
             </button>
             <button type="button" onClick={() => { setShowForm(false); setError('') }}
@@ -239,7 +239,7 @@ export default function DiscountsPage() {
                 <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-navy text-white">
+                      <tr className="bg-evalent-900 text-white">
                         <th className="px-5 py-3 text-left text-[10px] font-bold tracking-widest">CODE</th>
                         <th className="px-5 py-3 text-left text-[10px] font-bold tracking-widest">DISCOUNT</th>
                         <th className="px-5 py-3 text-left text-[10px] font-bold tracking-widest">PARTNER</th>
@@ -264,7 +264,7 @@ export default function DiscountsPage() {
                             {c.description && <div className="text-xs text-gray-400 mt-0.5">{c.description}</div>}
                           </td>
                           <td className="px-5 py-3">
-                            <span className="inline-block bg-blue-50 text-brand text-xs font-bold px-2.5 py-1 rounded-full">
+                            <span className="inline-block bg-evalent-50 text-evalent-700 text-xs font-bold px-2.5 py-1 rounded-full">
                               {formatDiscount(c.discount_type, c.discount_value)}
                             </span>
                           </td>
