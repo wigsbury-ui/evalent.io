@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 
   let query = supabase
     .from('discount_codes')
-    .select('*, partners(name, company)')
+    .select('*, partners(first_name, last_name, company)')
     .order('created_at', { ascending: false })
 
   if (partner_id) query = query.eq('partner_id', partner_id)
