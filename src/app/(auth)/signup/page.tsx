@@ -315,8 +315,20 @@ export default function SignupPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
                 <PasswordInput value={form.password} onChange={v => update('password', v)}
-                  placeholder="At least 8 characters" showPassword={showPassword} onToggle={() => setShowPassword(p => !p)} />
-                {!passwordLong && <p className="text-xs text-red-500 mt-1">Password must be at least 8 characters</p>}
+                  placeholder="At least 12 characters" showPassword={showPassword} onToggle={() => setShowPassword(p => !p)} />
+                {form.password.length > 0 && (
+                <div className="mt-2 space-y-1">
+                  <div className="flex gap-1">
+                    {[1,2,3,4].map(i => (
+                      <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${passwordStrength.score >= i ? passwordStrength.bg : 'bg-gray-100'}`} />
+                    ))}
+                  </div>
+                  <p className={`text-xs font-medium ${passwordStrength.color}`}>
+                    {passwordStrength.label}{passwordStrength.score <= 2 && ' — try adding numbers, symbols, or more length'}
+                  </p>
+                </div>
+              )}
+              {!passwordLong && form.password.length > 0 && <p className="text-xs text-red-500 mt-1">Password must be at least 12 characters</p>}
               </div>
 
               <div>
