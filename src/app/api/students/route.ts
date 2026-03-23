@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { generateStudentRef } from "@/lib/utils";
 import { z } from "zod";
 
@@ -28,6 +30,10 @@ const registerStudentSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session || !session.user.schoolId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   try {
     const body = await req.json();
     const parsed = registerStudentSchema.parse(body);
@@ -125,6 +131,10 @@ export async function POST(req: NextRequest) {
 
 // DELETE handler — remove a student by ID
 export async function DELETE(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session || !session.user.schoolId) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   try {
     const { searchParams } = new URL(req.url);
     const studentId = searchParams.get("id");

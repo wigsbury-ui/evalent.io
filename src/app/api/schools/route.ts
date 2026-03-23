@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/supabase/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import { z } from "zod";
 
 const JOTFORM_IDS: Record<number, string> = {
@@ -33,6 +35,10 @@ const createSchoolSchema = z.object({
 });
 
 export async function POST(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session || (session.user as any).role !== 'super_admin') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   try {
     const body = await req.json();
     const parsed = createSchoolSchema.parse(body);
@@ -100,7 +106,11 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session || (session.user as any).role !== 'super_admin') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   try {
     const supabase = createServerClient();
 

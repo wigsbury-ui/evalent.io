@@ -30,6 +30,12 @@ import {
  * - Fixed DB fallback: queries first_name + last_name (not non-existent student_name)
  */
 export async function POST(req: NextRequest) {
+  const secret = req.headers.get('x-pipeline-secret')
+  const expected = process.env.SCORE_PIPELINE_SECRET
+  if (!expected || secret !== expected) {
+    console.error('[SCORING] Unauthorized — missing or invalid x-pipeline-secret')
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   const startTime = Date.now();
 
   try {
