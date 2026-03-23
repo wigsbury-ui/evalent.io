@@ -23,8 +23,12 @@ export async function POST(req: NextRequest) {
     if (!school_name || !curriculum || !first_name || !last_name || !role || !email || !password) {
       return NextResponse.json({ error: 'All fields are required' }, { status: 400 })
     }
-    if (password.length < 8) {
-      return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 })
+    const BLOCKLIST = ['password','password1','password12','password123','12345678','123456789','1234567890','qwerty123','qwertyuiop','letmein1','welcome1','iloveyou1','sunshine1','princess1','football1','evalent','evalent1','admin1234','changeme1']
+    if (password.length < 12) {
+      return NextResponse.json({ error: 'Password must be at least 12 characters' }, { status: 400 })
+    }
+    if (BLOCKLIST.includes(password.toLowerCase())) {
+      return NextResponse.json({ error: 'This password is too common. Please choose a more unique password.' }, { status: 400 })
     }
 
     const { data: existingUser } = await supabase
