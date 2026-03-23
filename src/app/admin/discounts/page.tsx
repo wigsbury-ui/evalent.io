@@ -7,7 +7,7 @@ interface DiscountCode {
   code: string
   description: string | null
   partner_id: string | null
-  partners: { name: string; company: string } | null
+  partners: { first_name: string; last_name: string; company: string } | null
   discount_type: 'percentage' | 'fixed_usd'
   discount_value: number
   applies_to_plan: string | null
