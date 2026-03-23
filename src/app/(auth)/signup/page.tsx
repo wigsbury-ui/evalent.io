@@ -87,11 +87,14 @@ export default function SignupPage() {
   const [curricula, setCurricula] = useState<Curriculum[]>([])
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
+  const [discountStatus, setDiscountStatus] = useState<'idle'|'checking'|'valid'|'invalid'>('idle')
+  const [discountInfo, setDiscountInfo] = useState<{description:string|null,discount_type:string,discount_value:number}|null>(null)
 
   const [form, setForm] = useState({
     school_name: '',
     school_website: '',
     curriculum: '',
+    discount_code: '',
     first_name: '',
     last_name: '',
     role: '',
@@ -130,6 +133,20 @@ export default function SignupPage() {
     form.password.length >= 8 &&
     form.password === form.confirm_password
 
+  async function validateDiscount(code: string) {
+    if (!code.trim()) { setDiscountStatus('idle'); setDiscountInfo(null); return }
+    setDiscountStatus('checking')
+    const res = await fetch(`/api/public/validate-discount?code=${encodeURIComponent(code.trim())}`)
+    const data = await res.json()
+    if (data.valid) {
+      setDiscountStatus('valid')
+      setDiscountInfo({ description: data.description, discount_type: data.discount_type, discount_value: data.discount_value })
+    } else {
+      setDiscountStatus('invalid')
+      setDiscountInfo(null)
+    }
+  }
+
   async function handleSubmit() {
     setLoading(true)
     setError('')
@@ -141,6 +158,7 @@ export default function SignupPage() {
           school_name: form.school_name.trim(),
           school_website: form.school_website.trim(),
           curriculum: form.curriculum,
+          discount_code: form.discount_code.trim().toUpperCase() || undefined,
           first_name: form.first_name.trim(),
           last_name: form.last_name.trim(),
           role: form.role,
@@ -224,7 +242,30 @@ export default function SignupPage() {
                   {curricula.map(c => <option key={c.name} value={c.name}>{c.label}</option>)}
                 </select>
               </div>
-              <button onClick={() => step1Valid && setStep(2)} disabled={!step1Valid}
+              <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Discount code <span className="text-gray-400 font-normal">(optional)</span></label>
+            <input
+              type="text"
+              value={form.discount_code}
+              onChange={e => { update('discount_code', e.target.value.toUpperCase()); setDiscountStatus('idle'); setDiscountInfo(null) }}
+              onBlur={e => validateDiscount(e.target.value)}
+              placeholder="Enter code if you have one"
+              className={`w-full border rounded-lg px-3 py-2.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                discountStatus === 'valid' ? 'border-green-400 bg-green-50' :
+                discountStatus === 'invalid' ? 'border-red-300 bg-red-50' : 'border-gray-200'
+              }`}
+            />
+            {discountStatus === 'checking' && <p className="text-xs text-gray-400 mt-1">Checking code…</p>}
+            {discountStatus === 'valid' && discountInfo && (
+              <p className="text-xs text-green-700 mt-1 font-medium">
+                ✓ {discountInfo.discount_type === 'percentage' ? `${discountInfo.discount_value}% discount` : `$${discountInfo.discount_value} off`} applied
+                {discountInfo.description ? ` — ${discountInfo.description}` : ''}
+              </p>
+            )}
+            {discountStatus === 'invalid' && <p className="text-xs text-red-500 mt-1">Invalid or expired code</p>}
+          </div>
+
+          <button onClick={() => step1Valid && setStep(2)} disabled={!step1Valid}
                 className="w-full bg-blue-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                 Continue →
               </button>

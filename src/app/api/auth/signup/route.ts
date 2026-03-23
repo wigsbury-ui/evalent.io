@@ -9,7 +9,7 @@ const supabase = createClient(
 
 export async function POST(req: NextRequest) {
   try {
-    const { school_name, school_website, curriculum, first_name, last_name, role, email, password } = await req.json()
+    const { school_name, school_website, curriculum, first_name, last_name, role, email, password, discount_code } = await req.json()
 
     if (!school_name || !curriculum || !first_name || !last_name || !role || !email || !password) {
       return NextResponse.json({ error: 'All fields are required' }, { status: 400 })
@@ -48,6 +48,36 @@ export async function POST(req: NextRequest) {
     if (schoolError || !school) {
       console.error('[Signup] School error:', JSON.stringify(schoolError))
       return NextResponse.json({ error: 'Failed to create school account' }, { status: 500 })
+    }
+
+    // Handle discount code
+    if (discount_code) {
+      const { data: codeRow } = await supabase
+        .from('discount_codes')
+        .select('id, partner_id, is_active, max_uses, uses_count, expires_at')
+        .eq('code', discount_code.trim().toUpperCase())
+        .single()
+      if (codeRow && codeRow.is_active &&
+          (codeRow.max_uses === null || codeRow.uses_count < codeRow.max_uses) &&
+          (!codeRow.expires_at || new Date(codeRow.expires_at) > new Date())) {
+        await supabase.from('discount_codes')
+          .update({ uses_count: codeRow.uses_count + 1 })
+          .eq('id', codeRow.id)
+        await supabase.from('schools')
+          .update({ discount_code_used: discount_code.trim().toUpperCase() })
+          .eq('id', school.id)
+        if (codeRow.partner_id) {
+          const { data: link } = await supabase
+            .from('referral_links').select('id')
+            .eq('partner_id', codeRow.partner_id).limit(1).single()
+          await supabase.from('referral_conversions').insert({
+            partner_id: codeRow.partner_id,
+            referral_link_id: link?.id || null,
+            school_id: school.id,
+            status: 'pending',
+          })
+        }
+      }
     }
 
     const hashedPassword = await bcrypt.hash(password, 12)
