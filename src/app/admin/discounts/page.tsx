@@ -1,0 +1,307 @@
+'use client'
+import { useEffect, useState } from 'react'
+import { Tag, Plus, CheckCircle, XCircle, Copy } from 'lucide-react'
+
+interface DiscountCode {
+  id: string
+  code: string
+  description: string | null
+  partner_id: string | null
+  partners: { name: string; company: string } | null
+  discount_type: 'percentage' | 'fixed_usd'
+  discount_value: number
+  applies_to_plan: string | null
+  max_uses: number | null
+  uses_count: number
+  expires_at: string | null
+  is_active: boolean
+  created_at: string
+}
+
+interface Partner {
+  id: string
+  name: string
+  company: string
+}
+
+const PLANS = ['', 'essentials', 'professional', 'enterprise']
+
+const emptyForm = {
+  code: '',
+  description: '',
+  partner_id: '',
+  discount_type: 'percentage',
+  discount_value: '',
+  applies_to_plan: '',
+  max_uses: '',
+  expires_at: '',
+}
+
+export default function DiscountsPage() {
+  const [codes, setCodes] = useState<DiscountCode[]>([])
+  const [partners, setPartners] = useState<Partner[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState(emptyForm)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [copied, setCopied] = useState<string | null>(null)
+
+  useEffect(() => {
+    load()
+    loadPartners()
+  }, [])
+
+  async function load() {
+    setLoading(true)
+    const res = await fetch('/api/admin/discounts')
+    const data = await res.json()
+    setCodes(Array.isArray(data) ? data : [])
+    setLoading(false)
+  }
+
+  async function loadPartners() {
+    const res = await fetch('/api/admin/partners')
+    const data = await res.json()
+    setPartners(Array.isArray(data) ? data : [])
+  }
+
+  async function handleCreate(e: React.FormEvent) {
+    e.preventDefault()
+    setSaving(true)
+    setError('')
+    const res = await fetch('/api/admin/discounts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...form,
+        discount_value: parseFloat(form.discount_value),
+        max_uses: form.max_uses ? parseInt(form.max_uses) : null,
+        expires_at: form.expires_at || null,
+        partner_id: form.partner_id || null,
+        applies_to_plan: form.applies_to_plan || null,
+      }),
+    })
+    const data = await res.json()
+    if (!res.ok) { setError(data.error || 'Failed to create code'); setSaving(false); return }
+    setForm(emptyForm)
+    setShowForm(false)
+    load()
+    setSaving(false)
+  }
+
+  async function toggleActive(id: string, is_active: boolean) {
+    await fetch('/api/admin/discounts', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, is_active }),
+    })
+    load()
+  }
+
+  function copyCode(code: string) {
+    navigator.clipboard.writeText(code)
+    setCopied(code)
+    setTimeout(() => setCopied(null), 1500)
+  }
+
+  function formatDiscount(type: string, value: number) {
+    return type === 'percentage' ? `${value}% off` : `$${value} off`
+  }
+
+  const active = codes.filter(c => c.is_active)
+  const inactive = codes.filter(c => !c.is_active)
+
+  return (
+    <div className="p-8 max-w-6xl mx-auto">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-black text-gray-900 flex items-center gap-2">
+            <Tag className="w-6 h-6 text-brand" /> Discount Codes
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">{codes.length} codes total &mdash; {active.length} active</p>
+        </div>
+        <button
+          onClick={() => setShowForm(v => !v)}
+          className="flex items-center gap-2 bg-brand text-white text-sm font-bold px-4 py-2.5 rounded-xl hover:bg-blue-800 transition-colors"
+        >
+          <Plus className="w-4 h-4" /> New Code
+        </button>
+      </div>
+
+      {showForm && (
+        <form onSubmit={handleCreate} className="bg-white border-2 border-brand rounded-2xl p-6 mb-6">
+          <h2 className="text-base font-bold text-gray-900 mb-4">Create discount code</h2>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-gray-500 mb-1 tracking-wide">CODE *</label>
+              <input
+                required value={form.code}
+                onChange={e => setForm(f => ({ ...f, code: e.target.value.toUpperCase() }))}
+                placeholder="e.g. AMAL20"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono uppercase focus:outline-none focus:border-brand"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 mb-1 tracking-wide">LINKED PARTNER (optional)</label>
+              <select value={form.partner_id} onChange={e => setForm(f => ({ ...f, partner_id: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-brand">
+                <option value="">No partner</option>
+                {partners.map(p => <option key={p.id} value={p.id}>{p.name}{p.company ? ` — ${p.company}` : ''}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 mb-1 tracking-wide">DISCOUNT TYPE *</label>
+              <select value={form.discount_type} onChange={e => setForm(f => ({ ...f, discount_type: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-brand">
+                <option value="percentage">Percentage (%)</option>
+                <option value="fixed_usd">Fixed amount (USD)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 mb-1 tracking-wide">
+                VALUE * {form.discount_type === 'percentage' ? '(%)' : '(USD)'}
+              </label>
+              <input
+                required type="number" min="0" step="0.01"
+                value={form.discount_value}
+                onChange={e => setForm(f => ({ ...f, discount_value: e.target.value }))}
+                placeholder={form.discount_type === 'percentage' ? '20' : '500'}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 mb-1 tracking-wide">APPLIES TO PLAN</label>
+              <select value={form.applies_to_plan} onChange={e => setForm(f => ({ ...f, applies_to_plan: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:border-brand">
+                <option value="">Any plan</option>
+                <option value="essentials">Essentials</option>
+                <option value="professional">Professional</option>
+                <option value="enterprise">Enterprise</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 mb-1 tracking-wide">MAX USES (blank = unlimited)</label>
+              <input
+                type="number" min="1"
+                value={form.max_uses}
+                onChange={e => setForm(f => ({ ...f, max_uses: e.target.value }))}
+                placeholder="unlimited"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 mb-1 tracking-wide">EXPIRES (blank = never)</label>
+              <input
+                type="date"
+                value={form.expires_at}
+                onChange={e => setForm(f => ({ ...f, expires_at: e.target.value }))}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-gray-500 mb-1 tracking-wide">DESCRIPTION</label>
+              <input
+                value={form.description}
+                onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                placeholder="e.g. Partner intro discount — Q1 2026"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand"
+              />
+            </div>
+          </div>
+          {error && <p className="text-xs text-red-600 mt-3 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
+          <div className="flex gap-3 mt-4">
+            <button type="submit" disabled={saving}
+              className="bg-brand text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-blue-800 transition-colors disabled:opacity-50">
+              {saving ? 'Creating…' : 'Create code'}
+            </button>
+            <button type="button" onClick={() => { setShowForm(false); setError('') }}
+              className="text-sm text-gray-500 px-4 py-2.5 rounded-xl hover:bg-gray-100 transition-colors">
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
+      {loading ? (
+        <div className="text-sm text-gray-400 py-12 text-center">Loading…</div>
+      ) : codes.length === 0 ? (
+        <div className="text-center py-16 text-gray-400">
+          <Tag className="w-10 h-10 mx-auto mb-3 opacity-30" />
+          <p className="text-sm">No discount codes yet. Create one above.</p>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {[{ label: 'Active', list: active }, { label: 'Inactive', list: inactive }].map(({ label, list }) =>
+            list.length === 0 ? null : (
+              <div key={label}>
+                <h2 className="text-xs font-bold text-gray-400 tracking-widest uppercase mb-3">{label}</h2>
+                <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-navy text-white">
+                        <th className="px-5 py-3 text-left text-[10px] font-bold tracking-widest">CODE</th>
+                        <th className="px-5 py-3 text-left text-[10px] font-bold tracking-widest">DISCOUNT</th>
+                        <th className="px-5 py-3 text-left text-[10px] font-bold tracking-widest">PARTNER</th>
+                        <th className="px-5 py-3 text-left text-[10px] font-bold tracking-widest">PLAN</th>
+                        <th className="px-5 py-3 text-left text-[10px] font-bold tracking-widest">USES</th>
+                        <th className="px-5 py-3 text-left text-[10px] font-bold tracking-widest">EXPIRES</th>
+                        <th className="px-5 py-3 text-left text-[10px] font-bold tracking-widest">ACTIONS</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {list.map(c => (
+                        <tr key={c.id} className="hover:bg-gray-50">
+                          <td className="px-5 py-3">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-navy text-sm">{c.code}</span>
+                              <button onClick={() => copyCode(c.code)} className="text-gray-300 hover:text-brand transition-colors">
+                                {copied === c.code
+                                  ? <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+                                  : <Copy className="w-3.5 h-3.5" />}
+                              </button>
+                            </div>
+                            {c.description && <div className="text-xs text-gray-400 mt-0.5">{c.description}</div>}
+                          </td>
+                          <td className="px-5 py-3">
+                            <span className="inline-block bg-blue-50 text-brand text-xs font-bold px-2.5 py-1 rounded-full">
+                              {formatDiscount(c.discount_type, c.discount_value)}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3 text-xs text-gray-600">
+                            {c.partners ? c.partners.name : <span className="text-gray-300">—</span>}
+                          </td>
+                          <td className="px-5 py-3 text-xs text-gray-600 capitalize">
+                            {c.applies_to_plan || <span className="text-gray-300">Any</span>}
+                          </td>
+                          <td className="px-5 py-3 text-xs text-gray-600">
+                            {c.uses_count}{c.max_uses ? ` / ${c.max_uses}` : ''}
+                          </td>
+                          <td className="px-5 py-3 text-xs text-gray-600">
+                            {c.expires_at ? new Date(c.expires_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : <span className="text-gray-300">Never</span>}
+                          </td>
+                          <td className="px-5 py-3">
+                            <button
+                              onClick={() => toggleActive(c.id, !c.is_active)}
+                              className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${
+                                c.is_active
+                                  ? 'text-red-600 bg-red-50 hover:bg-red-100'
+                                  : 'text-green-700 bg-green-50 hover:bg-green-100'
+                              }`}
+                            >
+                              {c.is_active ? <><XCircle className="w-3.5 h-3.5" /> Deactivate</> : <><CheckCircle className="w-3.5 h-3.5" /> Activate</>}
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
