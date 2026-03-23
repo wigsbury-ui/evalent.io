@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import bcrypt from 'bcryptjs'
+import { signupRatelimit, getIP } from '@/lib/ratelimit'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -8,6 +9,14 @@ const supabase = createClient(
 )
 
 export async function POST(req: NextRequest) {
+  const ip = getIP(req)
+  const { success } = await signupRatelimit.limit(ip)
+  if (!success) {
+    return NextResponse.json(
+      { error: 'Too many signup attempts. Please try again in an hour.' },
+      { status: 429, headers: { 'Retry-After': '3600' } }
+    )
+  }
   try {
     const { school_name, school_website, curriculum, first_name, last_name, role, email, password, discount_code } = await req.json()
 
