@@ -270,7 +270,7 @@ export default function DiscountsPage() {
                             </span>
                           </td>
                           <td className="px-5 py-3 text-xs text-gray-600">
-                            {c.partners ? c.partners.name : <span className="text-gray-300">—</span>}
+                            {c.partners ? `${c.partners.first_name} ${c.partners.last_name}` : <span className="text-gray-300">—</span>}
                           </td>
                           <td className="px-5 py-3 text-xs text-gray-600 capitalize">
                             {c.applies_to_plan || <span className="text-gray-300">Any</span>}
