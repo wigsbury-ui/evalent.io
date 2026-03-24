@@ -888,8 +888,6 @@ function DomainPerformanceCards({
   );
 }
 
-  );
-}
 
 export default function SchoolDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
