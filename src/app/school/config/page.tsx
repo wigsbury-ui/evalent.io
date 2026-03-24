@@ -149,7 +149,7 @@ export default function SchoolConfigPage() {
   );
 
   return (
-    <div className="space-y-6 max-w-3xl">
+    <div className="space-y-6 max-w-3xl mx-auto">
 
       {/* Page header */}
       <div className="flex items-start justify-between">
