@@ -139,6 +139,9 @@ export default function SchoolConfigPage() {
   const [chartRetention, setChartRetention] = useState<number>(4);
   const [logoUrl, setLogoUrl] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [saving2fa, setSaving2fa] = useState(false);
+  const [saved2fa, setSaved2fa] = useState(false);
 
   useEffect(() => {
     fetch("/api/school/dashboard")
@@ -169,6 +172,7 @@ export default function SchoolConfigPage() {
           setCompletionMessage(s.completion_message || "");
           setChartRetention(s.chart_retention_weeks ?? 4);
           setLogoUrl(s.logo_url || "");
+          setTwoFactorEnabled(!!(s as any).two_factor_enabled);
         }
         setLoading(false);
       })
@@ -284,6 +288,22 @@ export default function SchoolConfigPage() {
         </p>
       </div>
     );
+  }
+
+  const handle2FASave = async () => {
+    setSaving2fa(true)
+    setSaved2fa(false)
+    try {
+      await fetch('/api/school/config/2fa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ two_factor_enabled: twoFactorEnabled }),
+      })
+      setSaved2fa(true)
+      setTimeout(() => setSaved2fa(false), 3000)
+    } finally {
+      setSaving2fa(false)
+    }
   }
 
   return (
@@ -710,7 +730,47 @@ export default function SchoolConfigPage() {
         </CardContent>
       </Card>
 
-            {/* Save button */}
+            {/* Two-Factor Authentication */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-evalent-50">
+              <ShieldCheck className="h-5 w-5 text-evalent-600" />
+            </div>
+            <div>
+              <CardTitle className="text-lg">Two-Factor Authentication</CardTitle>
+              <CardDescription>
+                Require a 6-digit email code in addition to your password when signing in.
+                Applies to your account only.
+              </CardDescription>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3">
+            <div>
+              <p className="text-sm font-medium text-gray-900">Email verification on sign-in</p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {twoFactorEnabled ? 'A code will be emailed to you each time you sign in.' : 'Currently disabled — password only.'}
+              </p>
+            </div>
+            <button
+              onClick={() => setTwoFactorEnabled(v => !v)}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-evalent-500 focus:ring-offset-2 ${twoFactorEnabled ? 'bg-evalent-600' : 'bg-gray-200'}`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${twoFactorEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+            </button>
+          </div>
+          <div className="mt-4 flex items-center gap-3">
+            <Button onClick={handle2FASave} disabled={saving2fa} variant="outline" size="sm">
+              {saving2fa ? 'Saving...' : saved2fa ? <><Check className="mr-1.5 h-4 w-4" />Saved</> : 'Save 2FA setting'}
+            </Button>
+            {saved2fa && <span className="text-sm text-green-600">Two-factor authentication updated.</span>}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Save button */}
       <div className="flex items-center gap-3">
         <Button
           onClick={handleSave}
