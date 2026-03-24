@@ -61,14 +61,16 @@ export default function TeamPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900">Team</h1>
           <p className="mt-1 text-gray-500">Manage who has access to your school's Evalent account.</p>
-          <LearnMoreLink featureId="team" title="Managing Your Team" />
         </div>
-        <Button
+        <div className="flex flex-col items-end gap-2">
+          <Button
           onClick={() => { setShowInvite(true); setInviteSent(false); setInviteError('') }}
           className="bg-evalent-700 hover:bg-evalent-600 text-white"
         >
           <UserPlus className="mr-2 h-4 w-4" />Invite team member
         </Button>
+          <LearnMoreLink featureId="team" title="Managing Your Team" />
+        </div>
       </div>
 
       {showInvite && (
