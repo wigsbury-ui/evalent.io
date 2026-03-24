@@ -1,5 +1,4 @@
 "use client";
-
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -7,28 +6,37 @@ import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { LayoutDashboard, Settings, GraduationCap, Users, UserPlus, LogOut, CreditCard } from "lucide-react";
 
-const navItems = [
-  { href: "/school", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/school/students", label: "Students", icon: UserPlus },
-  { href: "/school/config", label: "School Settings", icon: Settings },
-  { href: "/school/grades", label: "Pass Thresholds", icon: GraduationCap },
-  { href: "/school/assessors", label: "Assessors", icon: Users },
-  { href: "/school/billing", label: "Billing", icon: CreditCard },
+const ALL_NAV_ITEMS = [
+  { href: "/school",          label: "Dashboard",       icon: LayoutDashboard, adminOnly: false },
+  { href: "/school/students", label: "Students",        icon: UserPlus,        adminOnly: false },
+  { href: "/school/config",   label: "School Settings", icon: Settings,        adminOnly: true  },
+  { href: "/school/grades",   label: "Pass Thresholds", icon: GraduationCap,   adminOnly: true  },
+  { href: "/school/assessors",label: "Assessors",       icon: Users,           adminOnly: true  },
+  { href: "/school/billing",  label: "Billing",         icon: CreditCard,      adminOnly: true  },
+  { href: "/school/team",     label: "Team",            icon: Users,           adminOnly: true  },
 ];
 
-export function SchoolSidebar({ schoolName = "School Admin", logoUrl = null }: { schoolName?: string; logoUrl?: string | null }) {
+export function SchoolSidebar({
+  schoolName = "School Admin",
+  logoUrl = null,
+  role = "school_admin",
+}: {
+  schoolName?: string;
+  logoUrl?: string | null;
+  role?: string;
+}) {
   const pathname = usePathname();
   const [expanded, setExpanded] = useState(false);
+  const isViewer = role === "school_viewer";
+  const navItems = ALL_NAV_ITEMS.filter(item => !item.adminOnly || !isViewer);
 
   return (
     <>
-      {/* Fixed icon rail — always 56px wide, never moves */}
+      {/* Fixed icon rail */}
       <div className="fixed left-0 top-0 h-screen w-14 bg-white border-r border-gray-100 z-50 flex flex-col shrink-0" />
-
-      {/* Spacer so content doesn't go under the rail */}
+      {/* Spacer */}
       <div className="w-14 shrink-0" />
-
-      {/* Slide-out panel — overlays content, starts at 56px, expands to 224px */}
+      {/* Slide-out panel */}
       <aside
         onMouseEnter={() => setExpanded(true)}
         onMouseLeave={() => setExpanded(false)}
@@ -50,7 +58,9 @@ export function SchoolSidebar({ schoolName = "School Admin", logoUrl = null }: {
             )}
             <div className="overflow-hidden" style={{ width: expanded ? 148 : 0, transition: "width 200ms ease-in-out" }}>
               <p className="truncate text-sm font-semibold text-gray-900 leading-tight whitespace-nowrap">{schoolName}</p>
-              <p className="text-xs text-gray-400 leading-tight whitespace-nowrap">School Admin</p>
+              <p className="text-xs text-gray-400 leading-tight whitespace-nowrap">
+                {isViewer ? "Viewer" : "School Admin"}
+              </p>
             </div>
           </div>
         </div>
