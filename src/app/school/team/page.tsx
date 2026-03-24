@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Users, UserPlus, Mail, Check, X, Clock } from 'lucide-react'
+import { LearnMoreLink } from '@/components/ui/learn-more-link'
 
 interface TeamMember {
   id: string; name: string; email: string; role: string; is_active: boolean; created_at: string
@@ -60,6 +61,7 @@ export default function TeamPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900">Team</h1>
           <p className="mt-1 text-gray-500">Manage who has access to your school's Evalent account.</p>
+          <LearnMoreLink featureId="team" title="Managing Your Team" />
         </div>
         <Button
           onClick={() => { setShowInvite(true); setInviteSent(false); setInviteError('') }}

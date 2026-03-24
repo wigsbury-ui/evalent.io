@@ -425,6 +425,7 @@ export default function AssessorsPage() {
           </p>
         </div>
         <LearnMoreLink featureId="assessors" title="Managing Assessors" />
+          <LearnMoreLink featureId="decision_workflow" title="How Decision Emails Work" />
       </div>
 
       {/* ─── RESPONSE TIME METRICS ────────────────────────────── */}

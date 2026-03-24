@@ -2,6 +2,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { LearnMoreLink } from '@/components/ui/learn-more-link'
 
 declare global { interface Window { Paddle: any } }
 
@@ -230,7 +231,7 @@ export default function BillingClient({ billing }: { billing: BillingInfo | null
 
       {/* ── Plan status card ── */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <h1 className="text-xl font-bold text-gray-900 mb-5">Billing & Subscription</h1>
+        <div className="flex items-center justify-between mb-5"><h1 className="text-xl font-bold text-gray-900">Billing & Subscription</h1><LearnMoreLink featureId="billing" title="Billing & Subscription" /></div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pb-5 border-b border-gray-100">
           <div>

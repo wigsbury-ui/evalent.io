@@ -40,6 +40,8 @@ const FEATURE_SLOTS: { id: string; label: string; description: string }[] = [
   { id: "report_reading", label: "Reading Reports", description: "Shown on the report viewer page" },
   { id: "decision_workflow", label: "Decision Workflow", description: "Shown in assessor decision context" },
   { id: "getting_started", label: "Getting Started", description: "General onboarding / welcome video" },
+  { id: "team",    label: "Team",    description: "Shown on the Team management page" },
+  { id: "billing", label: "Billing", description: "Shown on the Billing & Subscription page" },
 ];
 
 /* ─── Main Page ─────────────────────────────────────────────── */
