@@ -890,34 +890,33 @@ export default function ContentStudioPage() {
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1 justify-end">
                               {post.type === "blog" && post.status === "published" && post.slug && (
-                                <div className="mt-2 p-2 bg-green-50 rounded-lg text-xs text-green-700 space-y-1.5">
-                                  <div>
-                                    ✅ Live at{" "}
-                                    <a href={`https://evalent.io/blog/${post.slug}`} target="_blank"
-                                      className="underline font-medium">
-                                      evalent.io/blog/{post.slug}
-                                    </a>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-green-600">Published:</span>
+                                <div className="mt-2 p-2 bg-green-50 rounded-lg text-xs text-green-700">
+                                  ✅ <a href={`https://evalent.io/blog/${post.slug}`} target="_blank"
+                                    className="underline font-medium break-all">
+                                    evalent.io/blog/{post.slug}
+                                  </a>
+                                </div>
+                              )}
+                              {post.type === "blog" && post.status !== "published" && (
+                                {post.type === "blog" && post.status === "published" && (
+                                  <div className="flex items-center gap-1.5 mr-2">
+                                    <span className="text-xs text-gray-500">Published:</span>
                                     <input
                                       type="date"
                                       defaultValue={post.published_at ? post.published_at.slice(0, 10) : ""}
                                       onChange={e => setEditingDate(d => ({ ...d, [post.id]: e.target.value }))}
-                                      className="border border-green-200 rounded px-1.5 py-0.5 text-xs text-green-800 bg-white focus:outline-none focus:ring-1 focus:ring-green-400"
+                                      className="border border-gray-300 rounded px-1.5 py-1 text-xs text-gray-700 bg-white focus:outline-none focus:ring-1 focus:ring-brand"
                                     />
                                     {editingDate[post.id] && editingDate[post.id] !== post.published_at?.slice(0, 10) && (
                                       <button
                                         onClick={() => saveDateChange(post.id, editingDate[post.id])}
-                                        className="text-[10px] font-bold px-2 py-0.5 bg-green-600 text-white rounded hover:bg-green-700"
+                                        className="text-xs font-bold px-2.5 py-1 bg-brand text-white rounded hover:bg-blue-700"
                                       >
-                                        Save
+                                        Save date
                                       </button>
                                     )}
                                   </div>
-                                </div>
-                              )}
-                              {post.type === "blog" && post.status !== "published" && (
+                                )}
                                 <button
                                     className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold bg-purple-700 hover:bg-purple-800 text-white transition-colors"
                                     onClick={() => publishToEvalentBlog(post)}
