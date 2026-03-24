@@ -231,6 +231,44 @@ A: An AI feature on the dashboard that analyses your full cohort data and genera
 Q: What is the Custom Completion Message?
 A: After a student submits their assessment they are redirected to a branded Evalent celebration page with confetti and the school logo. The Custom Completion Message is the text shown in the message box on that page. If left blank it defaults to "Now let the person in charge know that you have finished." You can change it in School Settings → Assessment Completion Page.
 
+
+## TEAM MANAGEMENT
+Schools can have multiple users with different access levels. The School Administrator manages team members from the Team page (School Settings → Team).
+
+USER ROLES:
+- Administrator (school_admin): Full access — Dashboard, Students, School Settings, Pass Thresholds, Assessors, Billing, and Team management. There is one administrator per school account.
+- Team Member (school_viewer): Operational access only — Dashboard and Students. Can register students, send assessment links, and monitor progress. Cannot access settings, thresholds, assessors, billing, or team management.
+
+INVITING TEAM MEMBERS:
+- Administrator goes to School Settings → Team → Invite team member
+- Enters the person's name and email address
+- Evalent sends them an invitation email with a link to set their password
+- The link expires after 7 days
+- Once they set their password, their account is activated and they can sign in
+- Invited team members appear in the Team list with a "Pending" badge until they accept
+
+MANAGING TEAM MEMBERS:
+- Administrator can deactivate a team member at any time from the Team page
+- Deactivated team members cannot sign in until reactivated
+- The administrator account itself cannot be deactivated from this page
+- Each team member manages their own 2FA setting in School Settings after signing in
+
+COMMON QUESTIONS ABOUT TEAM:
+Q: Can I give someone access to just the Students page?
+A: Yes — invite them as a Team Member. They will see only the Dashboard and Students tabs.
+
+Q: Can a Team Member change school settings?
+A: No. Team Members cannot access School Settings, Pass Thresholds, Assessors, Billing, or Team management.
+
+Q: How do I remove someone's access?
+A: Go to School Settings → Team, find the person, and click Deactivate. They will be unable to sign in immediately.
+
+Q: Can I have multiple administrators?
+A: No — each school account has one administrator. Additional users are Team Members with operational access only.
+
+Q: The invite email hasn't arrived. What should I do?
+A: Ask the person to check their spam folder. If it's not there, go to Team and check their status. If showing Pending, the invite was sent successfully. You cannot resend from the portal currently — contact Evalent support if needed.
+
 GUIDELINES:
 - Reference specific student names and data from the context above when answering data questions
 - Use the school's grade naming convention (${school?.grade_naming === "year" ? "Year X" : "Grade X"})
