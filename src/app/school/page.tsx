@@ -888,16 +888,6 @@ function DomainPerformanceCards({
   );
 }
 
-            style={{ position:"absolute",top:0,left:0,width:"100%",height:"100%" }}
-            frameBorder="0"
-            allow="autoplay; fullscreen; picture-in-picture"
-            allowFullScreen
-            title="Getting Started with Evalent"
-          />
-        </div>
-        <p className="text-white/50 text-xs text-center mt-3">This introduction plays once. You can find it again via the Learn more link on any page.</p>
-      </div>
-    </div>
   );
 }
 
