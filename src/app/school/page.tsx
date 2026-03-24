@@ -1203,24 +1203,6 @@ export default function SchoolDashboard() {
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // Show getting-started video on first visit
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const seen = localStorage.getItem('evalent_welcome_seen');
-    if (seen) return;
-    fetch('/api/admin/help-videos')
-      .then(r => r.ok ? r.json() : [])
-      .then((videos: any[]) => {
-        const v = videos.find((v: any) => v.id === 'getting_started');
-        if (v?.url) {
-          setWelcomeVideoUrl(v.url);
-          setShowWelcome(true);
-          localStorage.setItem('evalent_welcome_seen', '1');
-        }
-      })
-      .catch(() => {});
-  }, []);
-
 
   return (
     <>
