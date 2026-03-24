@@ -152,6 +152,7 @@ export default function ContentStudioPage() {
   const [angle, setAngle] = useState("");
   const [generating, setGenerating] = useState(false);
   const [blogCategory, setBlogCategory] = useState("admissions-strategy");
+  const [publishDate, setPublishDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [blogTags, setBlogTags] = useState("");
   const [publishingBlog, setPublishingBlog] = useState<string | null>(null);
   const [editingDate, setEditingDate] = useState<Record<string, string>>({});
@@ -333,6 +334,7 @@ export default function ContentStudioPage() {
           id: post.id,
           blog_category: blogCategory,
           tags: blogTags.split(",").map((t: string) => t.trim()).filter(Boolean),
+          published_at: new Date(publishDate).toISOString(),
         }),
       });
       const res = await fetch("/api/admin/content/publish-blog", {
@@ -743,6 +745,12 @@ export default function ContentStudioPage() {
                           <input type="text" value={blogTags} onChange={e => setBlogTags(e.target.value)}
                             placeholder="e.g. IB, writing assessment, EAL"
                             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand" />
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold text-gray-600 block mb-1">Publish date</label>
+                          <input type="date" value={publishDate} onChange={e => setPublishDate(e.target.value)}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand bg-white" />
+                          <p className="text-[11px] text-gray-400 mt-0.5">Set a past date to back-populate</p>
                         </div>
                       </div>
                     )}
