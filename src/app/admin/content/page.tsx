@@ -151,6 +151,10 @@ export default function ContentStudioPage() {
   const [tone, setTone] = useState("thought leadership");
   const [angle, setAngle] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [blogCategory, setBlogCategory] = useState("admissions-strategy");
+  const [blogTags, setBlogTags] = useState("");
+  const [publishingBlog, setPublishingBlog] = useState<string | null>(null);
+  const [publishResult, setPublishResult] = useState<Record<string, any>>({});
   const [suggestionOffset, setSuggestionOffset] = useState(0);
   const [suggestionCurriculum, setSuggestionCurriculum] = useState("all");
   const [curricula, setCurricula] = useState<{name: string; label: string}[]>([]);
@@ -316,6 +320,41 @@ export default function ContentStudioPage() {
 
   // Use a ref-based set so saves never get blocked by stale state
   const savingSet = useRef(new Set<string>());
+
+  const publishToEvalentBlog = async (post: any) => {
+    setPublishingBlog(post.id);
+    try {
+      // Save category/tags first
+      await fetch("/api/admin/content", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: post.id,
+          blog_category: blogCategory,
+          tags: blogTags.split(",").map((t: string) => t.trim()).filter(Boolean),
+        }),
+      });
+      const res = await fetch("/api/admin/content/publish-blog", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ post_id: post.id }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setPosts(p => p.map(x => x.id === post.id
+          ? { ...x, status: "published", slug: data.slug, cover_image_url: data.cover_image_url, published_at: data.published_at }
+          : x
+        ));
+        setPublishResult(r => ({ ...r, [post.id]: data }));
+      } else {
+        alert("Publish failed: " + (data.error || "Unknown error"));
+      }
+    } catch (e: any) {
+      alert("Publish failed: " + e.message);
+    } finally {
+      setPublishingBlog(null);
+    }
+  };
 
   const handleSave = async (post: any, shareWithPartners = false) => {
     const key = post._id || post.id || Math.random().toString();
@@ -674,6 +713,28 @@ export default function ContentStudioPage() {
 
                     {/* Blog: category picker */}
                     {type === "blog" && (
+                      <div className="space-y-3 mb-3 p-3 bg-purple-50 border border-purple-100 rounded-xl">
+                        <div>
+                          <label className="text-xs font-semibold text-gray-600 block mb-1">Blog Category</label>
+                          <select value={blogCategory} onChange={e => setBlogCategory(e.target.value)}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand bg-white">
+                            <option value="admissions-strategy">Admissions Strategy</option>
+                            <option value="ai-assessment">AI & Assessment</option>
+                            <option value="school-leadership">School Leadership</option>
+                            <option value="international-schools">International Schools</option>
+                            <option value="product-updates">Product Updates</option>
+                            <option value="research">Research</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold text-gray-600 block mb-1">Tags <span className="font-normal text-gray-400">(comma separated)</span></label>
+                          <input type="text" value={blogTags} onChange={e => setBlogTags(e.target.value)}
+                            placeholder="e.g. IB, writing assessment, EAL"
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand" />
+                        </div>
+                      </div>
+                    )}
+                    {type === "blog_DISABLED" && (
                       <div className="flex items-center gap-2">
                         <label className="text-xs text-gray-500">WordPress Category:</label>
                         <select className="text-xs rounded border border-gray-200 px-2 py-1 bg-white focus:outline-none">
@@ -816,13 +877,24 @@ export default function ContentStudioPage() {
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1 justify-end">
+                              {post.type === "blog" && post.status === "published" && post.slug && (
+                                <div className="mt-2 p-2 bg-green-50 rounded-lg text-xs text-green-700">
+                                  ✅ Live at{" "}
+                                  <a href={`https://evalent.io/blog/${post.slug}`} target="_blank"
+                                    className="underline font-medium">
+                                    evalent.io/blog/{post.slug}
+                                  </a>
+                                </div>
+                              )}
                               {post.type === "blog" && post.status !== "published" && (
-                                <button onClick={() => handlePushWP(post)} disabled={pushingWP === post.id}
-                                  className="flex items-center gap-1 text-xs rounded-lg px-2 py-1.5 text-purple-600 bg-purple-50 hover:bg-purple-100 transition-colors"
-                                  title="Push to WordPress as draft">
-                                  {pushingWP === post.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Globe className="h-3.5 w-3.5" />}
-                                  Push to WP
-                                </button>
+                                <button
+                                    className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold bg-purple-700 hover:bg-purple-800 text-white transition-colors"
+                                    onClick={() => publishToEvalentBlog(post)}
+                                    disabled={publishingBlog === post.id}
+                                  >
+                                    {publishingBlog === post.id ? <Loader2 className="h-3 w-3 animate-spin" /> : <Globe className="h-3 w-3" />}
+                                    {publishingBlog === post.id ? "Publishing…" : "Publish to Blog"}
+                                  </button>
                               )}
                               {post.type === "video_script" && !post.heygen_video_id && (
                                 <button onClick={() => handleSendToHeygen(post.id, post.id)} disabled={sendingHeygen === post.id}
