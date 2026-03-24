@@ -898,25 +898,6 @@ export default function ContentStudioPage() {
                                 </div>
                               )}
                               {post.type === "blog" && post.status !== "published" && (
-                                {post.type === "blog" && post.status === "published" && (
-                                  <div className="flex items-center gap-1.5 mr-2">
-                                    <span className="text-xs text-gray-500">Published:</span>
-                                    <input
-                                      type="date"
-                                      defaultValue={post.published_at ? post.published_at.slice(0, 10) : ""}
-                                      onChange={e => setEditingDate(d => ({ ...d, [post.id]: e.target.value }))}
-                                      className="border border-gray-300 rounded px-1.5 py-1 text-xs text-gray-700 bg-white focus:outline-none focus:ring-1 focus:ring-brand"
-                                    />
-                                    {editingDate[post.id] && editingDate[post.id] !== post.published_at?.slice(0, 10) && (
-                                      <button
-                                        onClick={() => saveDateChange(post.id, editingDate[post.id])}
-                                        className="text-xs font-bold px-2.5 py-1 bg-brand text-white rounded hover:bg-blue-700"
-                                      >
-                                        Save date
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
                                 <button
                                     className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold bg-purple-700 hover:bg-purple-800 text-white transition-colors"
                                     onClick={() => publishToEvalentBlog(post)}
