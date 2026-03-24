@@ -478,7 +478,6 @@ export default function GradeConfigPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900">Assessment Thresholds</h1>
           <p className="mt-1 text-gray-500">Start with a preset or set thresholds manually. Fine-tune any grade after.</p>
-          <LearnMoreLink featureId="grade_thresholds" title="Understanding Threshold Presets" />
         </div>
         <div className="flex flex-col items-end gap-2">
           <div className="flex items-center gap-2">

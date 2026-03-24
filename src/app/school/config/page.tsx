@@ -157,11 +157,13 @@ export default function SchoolConfigPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900">School Settings</h1>
           <p className="mt-1 text-gray-500">Manage your school profile, curriculum, notifications, and account security.</p>
-        <LearnMoreLink featureId="school_config" title="School Settings" />
         </div>
+        <div className="flex flex-col items-end gap-2">
         <Badge variant={school.is_active ? "default" : "secondary"} className="mt-1">
           {school.is_active ? "Active" : "Inactive"}
         </Badge>
+        <LearnMoreLink featureId="school_config" title="School Settings" />
+        </div>
       </div>
 
       {/* ── 1. School profile ─────────────────────────────────────────────── */}

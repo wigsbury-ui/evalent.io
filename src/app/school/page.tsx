@@ -1216,7 +1216,6 @@ export default function SchoolDashboard() {
           <p className="text-sm text-gray-500 mt-0.5">
             Admissions overview and student progress
           </p>
-            <LearnMoreLink featureId="dashboard" title="School Dashboard" />
         </div>
         <Link href="/school/students/new">
           <Button
