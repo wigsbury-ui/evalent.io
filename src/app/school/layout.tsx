@@ -4,6 +4,7 @@ import { createServerClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { SchoolSidebar as Sidebar } from "@/components/school/sidebar"
 import { EvalentChat } from '@/components/school/evalent-chat'
+import { WelcomeVideo } from '@/components/school/welcome-video'
 import { TopBar } from '@/components/school/top-bar'
 
 export const revalidate = 0
@@ -43,6 +44,7 @@ export default async function SchoolLayout({ children }: { children: React.React
         </main>
       </div>
       <EvalentChat />
+      <WelcomeVideo />
     </div>
   )
 }

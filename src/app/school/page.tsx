@@ -888,22 +888,6 @@ function DomainPerformanceCards({
   );
 }
 
-// ── Welcome Modal (Getting Started video — shown once per browser) ────────────
-function WelcomeVideoModal({ url, onClose }: { url: string; onClose: () => void }) {
-  const vimeoId = url.match(/vimeo\.com\/(\d+)/)?.[1];
-  const embedUrl = vimeoId
-    ? `https://player.vimeo.com/video/${vimeoId}?autoplay=1&badge=0&autopause=0`
-    : url;
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={onClose}>
-      <div className="relative w-full max-w-4xl mx-4" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-white font-semibold text-sm">Welcome to Evalent — Getting Started</p>
-          <button onClick={onClose} className="text-white/70 hover:text-white text-2xl leading-none">&times;</button>
-        </div>
-        <div className="relative rounded-xl overflow-hidden shadow-2xl" style={{ paddingTop: "56.25%" }}>
-          <iframe
-            src={embedUrl}
             style={{ position:"absolute",top:0,left:0,width:"100%",height:"100%" }}
             frameBorder="0"
             allow="autoplay; fullscreen; picture-in-picture"
@@ -919,8 +903,6 @@ function WelcomeVideoModal({ url, onClose }: { url: string; onClose: () => void 
 
 export default function SchoolDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
-  const [showWelcome, setShowWelcome] = useState(false);
-  const [welcomeVideoUrl, setWelcomeVideoUrl] = useState<string | null>(null);
   const [gradeConfigs, setGradeConfigs] = useState<GradeConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -1251,7 +1233,6 @@ export default function SchoolDashboard() {
       .catch(() => {});
   }, []);
 
-  const dismissWelcome = () => setShowWelcome(false);
 
   return (
     <>
@@ -1773,7 +1754,6 @@ export default function SchoolDashboard() {
         </CardContent>
       </Card>
     </div>
-    {showWelcome && welcomeVideoUrl && <WelcomeVideoModal url={welcomeVideoUrl} onClose={dismissWelcome} />}
     </>
   );
 }
