@@ -5,7 +5,7 @@
 
 // --- Enums ---
 
-export type UserRole = "super_admin" | "school_admin" | "assessor";
+export type UserRole = "super_admin" | "school_admin" | "school_viewer" | "assessor";
 
 export type CurriculumType = "UK" | "US" | "IB";
 
