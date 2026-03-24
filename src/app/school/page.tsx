@@ -1773,7 +1773,7 @@ export default function SchoolDashboard() {
         </CardContent>
       </Card>
     </div>
-    </>
     {showWelcome && welcomeVideoUrl && <WelcomeVideoModal url={welcomeVideoUrl} onClose={dismissWelcome} />}
+    </>
   );
 }
