@@ -33,7 +33,7 @@ interface HelpVideo {
 // All possible feature locations where a "Learn more" link can appear
 const FEATURE_SLOTS: { id: string; label: string; description: string }[] = [
   { id: "grade_thresholds", label: "Grade Thresholds", description: "Shown on the Pass Thresholds page next to School Presets" },
-  { id: "school_config", label: "School Settingsuration", description: "Shown on the School Settings page" },
+  { id: "school_config", label: "School Settings", description: "Shown on the School Settings page" },
   { id: "dashboard", label: "School Dashboard", description: "Shown on the main school dashboard" },
   { id: "student_registration", label: "Student Registration", description: "Shown on the student registration form" },
   { id: "assessors", label: "Assessors", description: "Shown on the Assessors management page" },

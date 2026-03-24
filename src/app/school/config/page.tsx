@@ -8,6 +8,7 @@ import {
   GraduationCap, Save, Check, CalendarDays, Plus, X, ShieldCheck,
   Settings,
 } from "lucide-react";
+import { LearnMoreLink } from "@/components/ui/learn-more-link";
 
 interface SchoolConfig {
   id: string; name: string; slug: string; curriculum: string; locale: string;
@@ -156,6 +157,7 @@ export default function SchoolConfigPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-gray-900">School Settings</h1>
           <p className="mt-1 text-gray-500">Manage your school profile, curriculum, notifications, and account security.</p>
+        <LearnMoreLink featureId="school_config" title="School Settings" />
         </div>
         <Badge variant={school.is_active ? "default" : "secondary"} className="mt-1">
           {school.is_active ? "Active" : "Inactive"}
