@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
   return new NextResponse(JSON.stringify(data || []), {
     headers: {
       "Content-Type": "application/json",
-      "Access-Control-Allow-Origin": "https://evalent.io",
+      "Access-Control-Allow-Origin": "*",
     },
   });
 }
