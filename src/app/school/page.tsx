@@ -1217,15 +1217,18 @@ export default function SchoolDashboard() {
             Admissions overview and student progress
           </p>
         </div>
-        <Link href="/school/students/new">
-          <Button
-            className="text-white"
-            style={{ backgroundColor: "#1a2b6b" }}
-          >
-            <UserPlus className="w-4 h-4 mr-2" />
-            Register Student
-          </Button>
-        </Link>
+        <div className="flex flex-col items-end gap-2">
+          <Link href="/school/students/new">
+            <Button
+              className="text-white"
+              style={{ backgroundColor: "#1a2b6b" }}
+            >
+              <UserPlus className="w-4 h-4 mr-2" />
+              Register Student
+            </Button>
+          </Link>
+          <LearnMoreLink featureId="dashboard" title="School Dashboard" />
+        </div>
       </div>
 
       {/* ── Row 1: KPI Cards ── */}
