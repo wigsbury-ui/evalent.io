@@ -131,28 +131,96 @@ const WP_CATEGORIES = [
 
 const ALL_TOPIC_SUGGESTIONS: Record<string, string[]> = {
   all: [
-    "Why international schools are moving to structured admissions",
     "The problem with subjective admissions processes",
     "The case for criterion-referenced assessments",
     "What great admissions decisions look like",
-    "Supporting EAL students in the admissions process",
     "Building a defensible admissions process",
     "Why gut-feel admissions is costing schools great students",
     "How to assess the whole child — not just test scores",
     "The hidden cost of a bad admissions decision",
-    "How to make admissions fairer for international families",
     "Admissions in the age of AI — what changes, what doesn't",
-    "How top international schools are using data to decide",
     "The 3 things every admissions report should include",
     "Why mindset matters more than grades in admissions",
     "How to build an admissions process your board will trust",
     "What parents don't see behind your admissions decision",
-    "Reducing bias in international school admissions",
+    "Reducing bias in school admissions",
     "How Evalent helps admissions teams work smarter",
     "Why writing tasks reveal more than multiple choice",
     "The admissions mistakes even great schools make",
     "How to handle high-volume admissions without losing quality",
-    "Why structured testing is fairer for international families",
+    "Why structured testing is fairer for all families",
+    "How schools are using AI to improve admissions decisions",
+    "What a modern admissions report should contain",
+    "How to make your admissions process more consistent",
+    "The link between admissions quality and school culture",
+  ],
+  "uk-independent": [
+    "How UK independent schools approach 11-plus and 13-plus admissions",
+    "What Prep school leavers really need to demonstrate at Common Entrance",
+    "Why independent school registrars are moving to structured assessment",
+    "How to assess Year 7 readiness beyond exam results",
+    "What HMC schools look for beyond academic ability",
+    "The case for standardised assessment in UK independent schools",
+    "How UK independent schools are tackling admissions bias",
+    "Year 9 entry — what senior independent schools should be testing",
+    "Why the 13-plus assessment needs to evolve",
+    "How to identify scholarship potential at Year 6 entry",
+    "What makes a strong independent school applicant in 2026",
+    "How to build a defensible admissions process for your ISC school",
+    "Supporting EAL pupils in independent school admissions",
+    "How Prep schools can better prepare pupils for senior entry",
+    "Why boarding school admissions needs objective assessment",
+  ],
+  "us-private": [
+    "How US private schools approach Middle School admissions",
+    "What NAIS schools look for beyond SSAT scores",
+    "Why private school admissions directors are moving past standardised tests",
+    "How to assess Grade 6 readiness at independent schools",
+    "What makes a strong Upper School applicant at a US private school",
+    "The case for structured assessment in US independent schools",
+    "How private schools are reducing admissions bias",
+    "Supporting diverse learners in independent school admissions",
+    "How to identify college-prep readiness at middle school entry",
+    "What the ISEE and SSAT miss about student potential",
+    "Why writing assessment matters for independent school admissions",
+    "How to build a more consistent admissions process for your school",
+    "What US private school heads need from their admissions data",
+    "Grade 9 entry — what senior independent schools should be testing",
+    "How independent schools can make admissions fairer for all families",
+  ],
+  "australian-independent": [
+    "How Australian independent schools approach Year 7 admissions",
+    "What AISNSW schools look for beyond NAPLAN results",
+    "Why Australian independent school principals are adopting structured assessment",
+    "How to assess Year 7 readiness at independent schools",
+    "What makes a strong independent school applicant in Australia",
+    "The case for criterion-referenced admissions in Australian schools",
+    "How Australian schools are tackling admissions consistency",
+    "Supporting EAL students in Australian independent school admissions",
+    "How to identify academic potential beyond primary school results",
+    "What Year 10 entry assessment should look like in 2026",
+    "Why admissions data matters for Australian school leaders",
+    "How to build a defensible admissions process for AIS members",
+    "What boarding school admissions looks like in regional Australia",
+    "How to use assessment data to improve Year 7 cohort outcomes",
+    "Why writing tasks reveal more than NAPLAN scores",
+  ],
+  "nz-independent": [
+    "How New Zealand independent schools approach Year 7 admissions",
+    "What NZ school principals look for beyond primary school reports",
+    "Why structured assessment is changing NZ independent school admissions",
+    "How to assess Year 9 readiness at NZ secondary schools",
+    "What makes a strong applicant for a NZ integrated school",
+    "The case for criterion-referenced admissions in New Zealand",
+    "How NZ schools are improving admissions consistency",
+    "Supporting EAL learners in NZ independent school admissions",
+    "How to use assessment data to support Year 7 transition",
+    "What NZ school boards expect from their admissions process",
+    "Why writing assessment matters for NZ secondary entry",
+    "How to build a defensible admissions process for NZ schools",
+    "What the NZC expects of students at Year 7 and Year 9 entry points",
+    "How NZ independent schools can reduce admissions subjectivity",
+    "Why mindset assessment matters for NZ school admissions",
   ],
   IB: [
     "What IB schools look for in a Grade 6 applicant",
@@ -257,6 +325,7 @@ export default function ContentStudioPage() {
   const [angle, setAngle] = useState("");
   const [generating, setGenerating] = useState(false);
   const [blogCategory, setBlogCategory] = useState("admissions-strategy");
+  const [schoolType, setSchoolType] = useState("international");
   const [publishDate, setPublishDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [blogTags, setBlogTags] = useState("");
   const [publishingBlog, setPublishingBlog] = useState<string | null>(null);
@@ -416,7 +485,7 @@ export default function ContentStudioPage() {
     const res = await fetch("/api/admin/content/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type, topic, tone, angle, duration: videoDuration, platform: videoPlatform, curriculum: suggestionCurriculum }),
+      body: JSON.stringify({ type, topic, tone, angle, duration: videoDuration, platform: videoPlatform, curriculum: suggestionCurriculum, schoolType }),
     });
     const data = await res.json();
     if (data.posts) {
@@ -732,6 +801,19 @@ export default function ContentStudioPage() {
                   onKeyDown={e => e.key === "Enter" && handleGenerate()} />
                 {/* Suggestions */}
                 <div className="mt-2 space-y-2">
+                  {/* School type selector — always visible, drives AI context */}
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs font-semibold text-gray-500">School type:</span>
+                    <select value={schoolType} onChange={e => setSchoolType(e.target.value)}
+                      className="text-xs rounded-lg border border-gray-200 px-2.5 py-1.5 bg-white text-gray-700 font-semibold focus:outline-none focus:ring-1 focus:ring-blue-400">
+                      <option value="international">International schools</option>
+                      <option value="uk-independent">UK independent schools</option>
+                      <option value="us-private">US private schools</option>
+                      <option value="australian-independent">Australian independent schools</option>
+                      <option value="nz-independent">NZ independent schools</option>
+                    </select>
+                  </div>
+
                   {/* Blog category selector — shown inline above suggestions when Blog Post is selected */}
                   {type === "blog" && (
                     <div className="flex items-center gap-2 mb-1">
@@ -765,7 +847,7 @@ export default function ContentStudioPage() {
                       onClick={() => {
                         const pool = (type === "blog" && BLOG_CATEGORY_SUGGESTIONS[blogCategory])
                           ? BLOG_CATEGORY_SUGGESTIONS[blogCategory]
-                          : (ALL_TOPIC_SUGGESTIONS[suggestionCurriculum] || ALL_TOPIC_SUGGESTIONS.all);
+                          : (ALL_TOPIC_SUGGESTIONS[schoolType] || ALL_TOPIC_SUGGESTIONS[suggestionCurriculum] || ALL_TOPIC_SUGGESTIONS.all);
                         setSuggestionOffset(o => (o + 4) % pool.length);
                       }}
                       className="text-gray-400 hover:text-blue-500 transition-colors ml-auto flex-shrink-0 flex items-center gap-1"
@@ -778,7 +860,7 @@ export default function ContentStudioPage() {
                     {(() => {
                       const pool = (type === "blog" && BLOG_CATEGORY_SUGGESTIONS[blogCategory])
                         ? BLOG_CATEGORY_SUGGESTIONS[blogCategory]
-                        : (ALL_TOPIC_SUGGESTIONS[suggestionCurriculum] || ALL_TOPIC_SUGGESTIONS.all);
+                        : (ALL_TOPIC_SUGGESTIONS[schoolType] || ALL_TOPIC_SUGGESTIONS[suggestionCurriculum] || ALL_TOPIC_SUGGESTIONS.all);
                       const start = suggestionOffset % pool.length;
                       const items = [...pool.slice(start, start + 4), ...pool.slice(0, Math.max(0, start + 4 - pool.length))].slice(0, 4);
                       return items.map(s => (
