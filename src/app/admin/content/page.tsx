@@ -814,12 +814,12 @@ export default function ContentStudioPage() {
                     </select>
                   </div>
 
-                  {/* Blog category selector — shown inline above suggestions when Blog Post is selected */}
+                  {/* Blog category selector */}
                   {type === "blog" && (
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-semibold text-purple-600">Category:</span>
+                      <span className="text-xs font-semibold text-gray-500">Category:</span>
                       <select value={blogCategory} onChange={e => { setBlogCategory(e.target.value); setSuggestionOffset(0); }}
-                        className="text-xs rounded-lg border border-purple-200 px-2.5 py-1.5 bg-purple-50 text-purple-700 font-semibold focus:outline-none focus:ring-1 focus:ring-purple-400">
+                        className="text-xs rounded-lg border border-gray-200 px-2.5 py-1.5 bg-white text-gray-700 font-semibold focus:outline-none focus:ring-1 focus:ring-blue-400">
                         <option value="admissions-strategy">Admissions Strategy</option>
                         <option value="ai-assessment">AI & Assessment</option>
                         <option value="school-leadership">School Leadership</option>
@@ -827,7 +827,6 @@ export default function ContentStudioPage() {
                         <option value="product-updates">Product Updates</option>
                         <option value="research">Research</option>
                       </select>
-                      <span className="text-xs text-purple-400">→ suggested topics below</span>
                     </div>
                   )}
                   <div className="flex items-center gap-2">
@@ -936,7 +935,7 @@ export default function ContentStudioPage() {
 
                     {/* Blog: category picker */}
                     {type === "blog" && (
-                      <div className="space-y-3 mb-3 p-3 bg-purple-50 border border-purple-100 rounded-xl">
+                      <div className="space-y-3 mb-3 p-3 bg-gray-50 border border-gray-200 rounded-xl">
                         <div>
                           <label className="text-xs font-semibold text-gray-600 block mb-1">Blog Category</label>
                           <select value={blogCategory} onChange={e => { setBlogCategory(e.target.value); setSuggestionOffset(0); }}
