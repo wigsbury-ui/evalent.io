@@ -144,7 +144,7 @@ export async function POST(req: NextRequest) {
   const updates: Record<string, any> = {
     slug,
     status: "published",
-    published_at: new Date().toISOString(),
+    published_at: post.published_at || new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
   if (coverImageUrl) updates.cover_image_url = coverImageUrl;
