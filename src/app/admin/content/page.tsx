@@ -732,16 +732,34 @@ export default function ContentStudioPage() {
                   onKeyDown={e => e.key === "Enter" && handleGenerate()} />
                 {/* Suggestions */}
                 <div className="mt-2 space-y-2">
+                  {/* Blog category selector — shown inline above suggestions when Blog Post is selected */}
+                  {type === "blog" && (
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-semibold text-purple-600">Category:</span>
+                      <select value={blogCategory} onChange={e => { setBlogCategory(e.target.value); setSuggestionOffset(0); }}
+                        className="text-xs rounded-lg border border-purple-200 px-2.5 py-1.5 bg-purple-50 text-purple-700 font-semibold focus:outline-none focus:ring-1 focus:ring-purple-400">
+                        <option value="admissions-strategy">Admissions Strategy</option>
+                        <option value="ai-assessment">AI & Assessment</option>
+                        <option value="school-leadership">School Leadership</option>
+                        <option value="international-schools">International Schools</option>
+                        <option value="product-updates">Product Updates</option>
+                        <option value="research">Research</option>
+                      </select>
+                      <span className="text-xs text-purple-400">→ suggested topics below</span>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2">
-                    <select
-                      value={suggestionCurriculum}
-                      onChange={e => { setSuggestionCurriculum(e.target.value); setSuggestionOffset(0); }}
-                      className="text-xs rounded-lg border border-gray-200 px-2.5 py-1.5 bg-white text-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-400">
-                      <option value="all">All programmes</option>
-                      {curricula.map(curr => (
-                        <option key={curr.name} value={curr.name}>{curr.label}</option>
-                      ))}
-                    </select>
+                    {type !== "blog" && (
+                      <select
+                        value={suggestionCurriculum}
+                        onChange={e => { setSuggestionCurriculum(e.target.value); setSuggestionOffset(0); }}
+                        className="text-xs rounded-lg border border-gray-200 px-2.5 py-1.5 bg-white text-gray-600 focus:outline-none focus:ring-1 focus:ring-blue-400">
+                        <option value="all">All programmes</option>
+                        {curricula.map(curr => (
+                          <option key={curr.name} value={curr.name}>{curr.label}</option>
+                        ))}
+                      </select>
+                    )}
                     <span className="text-xs text-gray-400">Topic ideas:</span>
                     <button
                       onClick={() => {
