@@ -18,6 +18,111 @@ const TYPE_CONFIG: Record<string, { label: string; icon: any; colour: string; bg
   video_script:  { label: "Video Script",   icon: Video,          colour: "text-rose-600",   bg: "bg-rose-50" },
 };
 
+const BLOG_CATEGORY_SUGGESTIONS: Record<string, string[]> = {
+  "admissions-strategy": [
+    "Five admissions bottlenecks that slow down your pipeline",
+    "How to run a faster, fairer admissions cycle",
+    "What your admissions data is telling you (and you're ignoring)",
+    "Building an admissions process your board will trust",
+    "Why gut-feel admissions is costing schools great students",
+    "How to handle high-volume admissions without losing quality",
+    "The admissions mistakes even great schools make",
+    "What parents don't see behind your admissions decision",
+    "How to make admissions fairer for international families",
+    "The hidden cost of a bad admissions decision",
+    "How top international schools are using data to decide",
+    "Reducing bias in international school admissions",
+    "The case for criterion-referenced assessments",
+    "What great admissions decisions actually look like",
+    "How to build a defensible admissions process",
+  ],
+  "ai-assessment": [
+    "How AI is changing admissions for international schools",
+    "Why writing tasks reveal more than multiple choice",
+    "The 3 things every admissions report should include",
+    "How AI evaluates extended writing — and why it matters",
+    "Admissions in the age of AI — what changes, what doesn't",
+    "Why AI-scored assessments are more consistent than human marking",
+    "How Evalent generates a report in under 2 minutes",
+    "The difference between AI scoring and AI replacing teachers",
+    "What criterion-referenced scoring actually means",
+    "How to use AI assessment data to make better decisions",
+    "Why structured testing is fairer for international families",
+    "The problem with subjective admissions processes",
+    "AI and admissions — separating hype from reality",
+    "How machine learning identifies writing quality",
+    "What analytic rubrics reveal that holistic marking misses",
+  ],
+  "school-leadership": [
+    "What every head should know about their admissions data",
+    "How to present admissions decisions to your board",
+    "Building a high-performing admissions team",
+    "Why admissions is a strategic function, not an admin one",
+    "How school leaders can reduce admissions risk",
+    "The link between admissions quality and school culture",
+    "How to align admissions with your school's mission",
+    "What great admissions leadership looks like in practice",
+    "Why your admissions process reflects your school's values",
+    "How to handle difficult admissions decisions confidently",
+    "Building accountability into your admissions process",
+    "The reputational risk of inconsistent admissions",
+    "How to communicate admissions decisions to families",
+    "What data-driven school leaders do differently",
+    "Why admissions season doesn't have to be chaotic",
+  ],
+  "international-schools": [
+    "Assessing EAL students fairly — what the evidence says",
+    "How international schools manage high-mobility applicant pools",
+    "Why IB admissions needs curriculum-specific assessment",
+    "The challenge of assessing students from 20 different curricula",
+    "How to evaluate a student whose report card is in Arabic",
+    "What EAL students reveal about your assessment process",
+    "How to separate language proficiency from academic ability",
+    "Why Gulf schools need different admissions tools",
+    "Admissions for the IB MYP — what really matters",
+    "How British curriculum schools approach Year 7 entry",
+    "What makes a great international school applicant",
+    "Why cultural adaptability matters in admissions",
+    "How to build an inclusive admissions process globally",
+    "The diversity case for structured admissions",
+    "What international families expect from your admissions process",
+  ],
+  "product-updates": [
+    "What's new in Evalent — March 2026",
+    "How we built the Evalent report in under 2 minutes",
+    "New feature: grade-level pass threshold customisation",
+    "Introducing the Evalent Content Studio",
+    "How we designed the assessor decision workflow",
+    "Behind the scenes: how Evalent generates AI narratives",
+    "New: multi-user team access for school accounts",
+    "How we built the Evalent partner programme",
+    "What we learned from our first 1,000 assessments",
+    "New curricula supported: Australian and New Zealand",
+    "How we approach data security at Evalent",
+    "Introducing Evalent Insights — AI analysis of your cohort",
+    "Why we built a criterion-referenced scoring engine",
+    "How Evalent handles EAL students differently",
+    "What's coming to Evalent in Q2 2026",
+  ],
+  "research": [
+    "What the research says about structured admissions",
+    "Does mindset assessment predict school success?",
+    "The evidence for extended writing in admissions",
+    "What longitudinal data tells us about admissions accuracy",
+    "Why standardised assessment reduces admissions bias",
+    "The research behind criterion-referenced scoring",
+    "What we know about EAL and academic potential",
+    "Does reasoning score predict IB performance?",
+    "The link between admissions quality and student retention",
+    "What makes an admissions assessment valid and reliable",
+    "How schools are using data to improve admission outcomes",
+    "The case for separating language from academic assessment",
+    "What growth mindset research means for admissions",
+    "Why holistic admissions is harder than it sounds",
+    "The data behind international school admissions trends",
+  ],
+}
+
 const WP_CATEGORIES = [
   { id: 13, name: "Features" },
   { id: 16, name: "Curriculum" },
@@ -640,7 +745,9 @@ export default function ContentStudioPage() {
                     <span className="text-xs text-gray-400">Topic ideas:</span>
                     <button
                       onClick={() => {
-                        const pool = ALL_TOPIC_SUGGESTIONS[suggestionCurriculum] || ALL_TOPIC_SUGGESTIONS.all;
+                        const pool = (type === "blog" && BLOG_CATEGORY_SUGGESTIONS[blogCategory])
+                          ? BLOG_CATEGORY_SUGGESTIONS[blogCategory]
+                          : (ALL_TOPIC_SUGGESTIONS[suggestionCurriculum] || ALL_TOPIC_SUGGESTIONS.all);
                         setSuggestionOffset(o => (o + 4) % pool.length);
                       }}
                       className="text-gray-400 hover:text-blue-500 transition-colors ml-auto flex-shrink-0 flex items-center gap-1"
@@ -651,7 +758,9 @@ export default function ContentStudioPage() {
                   </div>
                   <div className="flex flex-wrap gap-1.5">
                     {(() => {
-                      const pool = ALL_TOPIC_SUGGESTIONS[suggestionCurriculum] || ALL_TOPIC_SUGGESTIONS.all;
+                      const pool = (type === "blog" && BLOG_CATEGORY_SUGGESTIONS[blogCategory])
+                        ? BLOG_CATEGORY_SUGGESTIONS[blogCategory]
+                        : (ALL_TOPIC_SUGGESTIONS[suggestionCurriculum] || ALL_TOPIC_SUGGESTIONS.all);
                       const start = suggestionOffset % pool.length;
                       const items = [...pool.slice(start, start + 4), ...pool.slice(0, Math.max(0, start + 4 - pool.length))].slice(0, 4);
                       return items.map(s => (
@@ -730,7 +839,7 @@ export default function ContentStudioPage() {
                       <div className="space-y-3 mb-3 p-3 bg-purple-50 border border-purple-100 rounded-xl">
                         <div>
                           <label className="text-xs font-semibold text-gray-600 block mb-1">Blog Category</label>
-                          <select value={blogCategory} onChange={e => setBlogCategory(e.target.value)}
+                          <select value={blogCategory} onChange={e => { setBlogCategory(e.target.value); setSuggestionOffset(0); }}
                             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-brand bg-white">
                             <option value="admissions-strategy">Admissions Strategy</option>
                             <option value="ai-assessment">AI & Assessment</option>
