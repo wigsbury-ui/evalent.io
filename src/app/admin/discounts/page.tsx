@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
-import { Tag, Plus, CheckCircle, XCircle, Copy, Pencil } from 'lucide-react'
+import { Tag, Plus, CheckCircle, XCircle, Copy, Pencil, Trash2 } from 'lucide-react'
 
 interface DiscountCode {
   id: string
@@ -49,6 +49,8 @@ export default function DiscountsPage() {
   const [editForm, setEditForm] = useState(emptyForm)
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState<DiscountCode | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => { load(); loadPartners() }, [])
 
@@ -130,6 +132,18 @@ export default function DiscountsPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id, is_active }),
     })
+    load()
+  }
+
+  async function deleteCode(id: string) {
+    setDeleting(true)
+    await fetch('/api/admin/discounts', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    })
+    setConfirmDelete(null)
+    setDeleting(false)
     load()
   }
 
