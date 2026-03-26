@@ -29,7 +29,7 @@ const securityHeaders = [
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: blob: https://*.supabase.co https://avatars.githubusercontent.com",
+      "img-src 'self' data: blob: https://*.supabase.co https://avatars.githubusercontent.com https://*.vimeocdn.com",
       "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
       "frame-src 'self' https://player.vimeo.com https://form.jotform.com",
       "media-src 'self' https://player.vimeo.com https://*.supabase.co",
