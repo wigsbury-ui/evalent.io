@@ -221,6 +221,34 @@ export default function DiscountsPage() {
   return (
     <div className="p-8 max-w-6xl mx-auto">
 
+      {/* Delete confirm modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+            <h2 className="text-base font-bold text-gray-900 mb-2">Delete discount code?</h2>
+            <p className="text-sm text-gray-500 mb-1">
+              <span className="font-mono font-bold text-gray-900">{confirmDelete.code}</span> will be permanently deleted.
+            </p>
+            <p className="text-xs text-red-500 mb-5">This cannot be undone.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => deleteCode(confirmDelete.id)}
+                disabled={deleting}
+                className="bg-red-600 text-white text-sm font-bold px-5 py-2.5 rounded-md hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {deleting ? 'Deleting…' : 'Yes, delete'}
+              </button>
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="text-sm text-gray-500 px-4 py-2.5 rounded-xl hover:bg-gray-100 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Edit modal */}
       {editCode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
