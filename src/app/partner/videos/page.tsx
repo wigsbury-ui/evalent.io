@@ -1,15 +1,15 @@
 "use client";
 import { useState, useEffect } from "react";
-import { Copy, Check, Linkedin, MessageCircle, Share2, ChevronDown, ChevronUp, Pencil, X } from "lucide-react";
+import { Copy, Check, Linkedin, MessageCircle, Share2, ChevronDown, ChevronUp, Pencil, X, LayoutGrid, List } from "lucide-react";
 
 const CATEGORY_COLOURS: Record<string, string> = {
-  "Product Demo":         "bg-blue-100 text-blue-700",
-  "How to Pitch":         "bg-purple-100 text-purple-700",
+  "Product Demo": "bg-blue-100 text-blue-700",
+  "How to Pitch": "bg-purple-100 text-purple-700",
   "Platform Walkthrough": "bg-indigo-100 text-indigo-700",
-  "School Testimonial":   "bg-green-100 text-green-700",
-  "Social Media":         "bg-pink-100 text-pink-700",
-  "Training":             "bg-orange-100 text-orange-700",
-  "General":              "bg-gray-100 text-gray-600",
+  "School Testimonial": "bg-green-100 text-green-700",
+  "Social Media": "bg-pink-100 text-pink-700",
+  "Training": "bg-orange-100 text-orange-700",
+  "General": "bg-gray-100 text-gray-600",
 };
 
 export default function PartnerVideosPage() {
@@ -20,6 +20,7 @@ export default function PartnerVideosPage() {
   const [playing, setPlaying] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [editCaption, setEditCaption] = useState<string | null>(null);
   const [captionDraft, setCaptionDraft] = useState("");
 
@@ -38,7 +39,8 @@ export default function PartnerVideosPage() {
 
   const copy = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
-    setCopied(key); setTimeout(() => setCopied(null), 2000);
+    setCopied(key);
+    setTimeout(() => setCopied(null), 2000);
   };
 
   const shareLinkedIn = (video: any) => {
@@ -56,27 +58,38 @@ export default function PartnerVideosPage() {
   const filtered = activeCategory === "All" ? videos : videos.filter((v: any) => v.category === activeCategory);
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <div className="p-6 max-w-6xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Video Library</h1>
         <p className="text-sm text-gray-400 mt-1">Share these videos with schools. Every signup through your link is tracked automatically.</p>
       </div>
 
-      {/* Category filters */}
+      {/* Category filters + view toggle */}
       {!loading && videos.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {categories.map(cat => (
-            <button key={cat} onClick={() => setActiveCategory(cat)}
-              className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${activeCategory === cat ? "bg-[#0d52dd] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
-              {cat}
-              {cat !== "All" && <span className="ml-1.5 text-xs opacity-70">{videos.filter((v: any) => v.category === cat).length}</span>}
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap gap-2">
+            {categories.map(cat => (
+              <button key={cat} onClick={() => setActiveCategory(cat)}
+                className={`rounded-full px-3 py-1 text-sm font-medium transition-colors ${activeCategory === cat ? "bg-[#0d52dd] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}>
+                {cat} {cat !== "All" && <span className="ml-1.5 text-xs opacity-70">{videos.filter((v: any) => v.category === cat).length}</span>}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+            <button onClick={() => setViewMode("grid")} title="Grid view"
+              className={`p-1.5 rounded-md transition-colors ${viewMode === "grid" ? "bg-white shadow-sm text-[#0d52dd]" : "text-gray-400 hover:text-gray-600"}`}>
+              <LayoutGrid className="w-4 h-4" />
             </button>
-          ))}
+            <button onClick={() => setViewMode("list")} title="List view"
+              className={`p-1.5 rounded-md transition-colors ${viewMode === "list" ? "bg-white shadow-sm text-[#0d52dd]" : "text-gray-400 hover:text-gray-600"}`}>
+              <List className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
 
       {loading ? (
-        <div className="grid grid-cols-2 gap-5 animate-pulse">
+        <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 animate-pulse">
           {[...Array(4)].map((_, i) => <div key={i} className="h-52 bg-gray-100 rounded-xl" />)}
         </div>
       ) : filtered.length === 0 ? (
@@ -84,27 +97,36 @@ export default function PartnerVideosPage() {
           <p className="text-gray-400 text-sm">{videos.length === 0 ? "No videos available yet — check back soon." : "No videos in this category."}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-5">
+        <div className={viewMode === "list" ? "flex flex-col gap-3" : "grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4"}>
           {filtered.map((video: any) => (
-            <div key={video.id} className="bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-sm transition-shadow">
+            <div key={video.id} className={`bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-sm transition-shadow${viewMode === "list" ? " flex flex-row" : ""}`}>
+
               {/* Player / Thumbnail */}
-              <div className="relative bg-gray-900 cursor-pointer" style={{ aspectRatio: "16/9" }}
+              <div className={`relative bg-gray-900 cursor-pointer flex-shrink-0${viewMode === "list" ? " w-48" : ""}`}
+                style={{ aspectRatio: "16/9" }}
                 onClick={() => setPlaying(playing === video.id ? null : video.id)}>
                 {playing === video.id ? (
-                  <iframe src={`https://player.vimeo.com/video/${video.vimeo_id}?autoplay=1&title=0&byline=0&portrait=0`}
-                    className="w-full h-full" allow="autoplay; fullscreen; picture-in-picture" allowFullScreen />
+                  <iframe
+                    src={`https://player.vimeo.com/video/${video.vimeo_id}?autoplay=1&title=0&byline=0&portrait=0`}
+                    className="w-full h-full"
+                    allow="autoplay; fullscreen; picture-in-picture"
+                    allowFullScreen
+                  />
                 ) : (
                   <>
-                    <img src={video.thumbnail_url || `https://vumbnail.com/${video.vimeo_id}.jpg`} alt={video.title}
+                    <img
+                      src={video.thumbnail_url || `https://vumbnail.com/${video.vimeo_id}.jpg`}
+                      alt={video.title}
                       className="w-full h-full object-cover"
                       onError={e => {
-                    const img = e.target as HTMLImageElement;
-                    if (!img.src.includes('vimeocdn')) {
-                      img.src = `https://i.vimeocdn.com/video/${video.vimeo_id}_640.jpg`;
-                    } else {
-                      img.style.display = 'none';
-                    }
-                  }} />
+                        const img = e.target as HTMLImageElement;
+                        if (!img.src.includes("vimeocdn")) {
+                          img.src = `https://i.vimeocdn.com/video/${video.vimeo_id}_640.jpg`;
+                        } else {
+                          img.style.display = "none";
+                        }
+                      }}
+                    />
                     <div className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/30 transition-colors">
                       <div className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
                         <div className="w-0 h-0 border-t-[9px] border-t-transparent border-b-[9px] border-b-transparent border-l-[16px] border-l-gray-900 ml-1" />
@@ -115,7 +137,7 @@ export default function PartnerVideosPage() {
               </div>
 
               {/* Info */}
-              <div className="p-4">
+              <div className="p-4 flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-2">
                   <p className="font-medium text-gray-900 text-sm leading-snug">{video.title}</p>
                   <span className={`flex-shrink-0 text-xs rounded-full px-2 py-0.5 font-medium ${CATEGORY_COLOURS[video.category] ?? "bg-gray-100 text-gray-600"}`}>
@@ -136,7 +158,6 @@ export default function PartnerVideosPage() {
                 {/* Share panel */}
                 {shareOpen === video.id && (
                   <div className="mt-2 space-y-3 pt-3 border-t border-gray-50">
-                    {/* Share link */}
                     <div>
                       <p className="text-xs font-medium text-gray-500 mb-1.5">Your share link (tracked)</p>
                       <div className="flex gap-2">
@@ -149,8 +170,6 @@ export default function PartnerVideosPage() {
                         </button>
                       </div>
                     </div>
-
-                    {/* One-click share buttons */}
                     <div className="flex gap-2">
                       <button onClick={() => shareLinkedIn(video)}
                         className="flex-1 flex items-center justify-center gap-1.5 bg-[#0077B5] text-white rounded-lg px-3 py-2 text-xs font-medium hover:bg-[#006097] transition-colors">
@@ -161,8 +180,6 @@ export default function PartnerVideosPage() {
                         <MessageCircle className="h-3.5 w-3.5" />WhatsApp
                       </button>
                     </div>
-
-                    {/* Caption */}
                     <div>
                       <div className="flex items-center justify-between mb-1.5">
                         <p className="text-xs font-medium text-gray-500">Caption to copy</p>
