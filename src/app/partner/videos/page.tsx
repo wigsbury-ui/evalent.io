@@ -129,8 +129,8 @@ export default function PartnerVideosPage() {
                       }}
                     />
                     <div className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/30 transition-colors">
-                      <div className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
-                        <div className="w-0 h-0 border-t-[9px] border-t-transparent border-b-[9px] border-b-transparent border-l-[16px] border-l-gray-900 ml-1" />
+                      <div className="w-7 h-7 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
+                        <div className="w-0 h-0 border-t-[5px] border-t-transparent border-b-[5px] border-b-transparent border-l-[8px] border-l-gray-900 ml-0.5" />
                       </div>
                     </div>
                   </>
