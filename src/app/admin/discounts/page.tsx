@@ -351,9 +351,13 @@ export default function DiscountsPage() {
                               </button>
                               <button onClick={() => toggleActive(c.id, !c.is_active)}
                                 className={`flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors ${
-                                  c.is_active ? 'text-red-600 bg-red-50 hover:bg-red-100' : 'text-green-700 bg-green-50 hover:bg-green-100'
+                                  c.is_active ? 'text-amber-600 bg-amber-50 hover:bg-amber-100' : 'text-green-700 bg-green-50 hover:bg-green-100'
                                 }`}>
-                                {c.is_active ? <><XCircle className="w-3.5 h-3.5" /> Deactivate</> : <><CheckCircle className="w-3.5 h-3.5" /> Activate</>}
+                                {c.is_active ? <><XCircle className="w-3.5 h-3.5" /> Suspend</> : <><CheckCircle className="w-3.5 h-3.5" /> Activate</>}
+                              </button>
+                              <button onClick={() => setConfirmDelete(c)} className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition-colors text-red-600 bg-red-50 hover:bg-red-100">
+                                <Trash2 className="w-3.5 h-3.5" />
+                                Delete
                               </button>
                             </div>
                           </td>
