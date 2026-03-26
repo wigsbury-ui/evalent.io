@@ -19,6 +19,7 @@ export default function PartnerVideosPage() {
   const [activeCategory, setActiveCategory] = useState("All");
   const [playing, setPlaying] = useState<string | null>(null);
   const [shareOpen, setShareOpen] = useState<string | null>(null);
+  const [descOpen, setDescOpen] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [editCaption, setEditCaption] = useState<string | null>(null);
@@ -138,13 +139,27 @@ export default function PartnerVideosPage() {
 
               {/* Info */}
               <div className="p-4 flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2">
-                  <p className="font-medium text-gray-900 text-sm leading-snug">{video.title}</p>
-                  <span className={`flex-shrink-0 text-xs rounded-full px-2 py-0.5 font-medium ${CATEGORY_COLOURS[video.category] ?? "bg-gray-100 text-gray-600"}`}>
-                    {video.category}
-                  </span>
-                </div>
-                {video.description && <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">{video.description}</p>}
+
+                {/* Title full width + category badge below */}
+                <p className="font-medium text-gray-900 text-sm leading-snug w-full">{video.title}</p>
+                <span className={`inline-block mt-1.5 text-xs rounded-full px-2 py-0.5 font-medium ${CATEGORY_COLOURS[video.category] ?? "bg-gray-100 text-gray-600"}`}>
+                  {video.category}
+                </span>
+
+                {/* Description — collapsible */}
+                {video.description && (
+                  <div className="mt-2">
+                    <button
+                      onClick={() => setDescOpen(descOpen === video.id ? null : video.id)}
+                      className="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 transition-colors">
+                      {descOpen === video.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                      {descOpen === video.id ? "Hide description" : "Show description"}
+                    </button>
+                    {descOpen === video.id && (
+                      <p className="text-xs text-gray-400 mt-1.5 leading-relaxed">{video.description}</p>
+                    )}
+                  </div>
+                )}
 
                 {/* Share toggle */}
                 <button
