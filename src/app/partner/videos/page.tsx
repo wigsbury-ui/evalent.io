@@ -97,7 +97,14 @@ export default function PartnerVideosPage() {
                   <>
                     <img src={video.thumbnail_url || `https://vumbnail.com/${video.vimeo_id}.jpg`} alt={video.title}
                       className="w-full h-full object-cover"
-                      onError={e => { (e.target as HTMLImageElement).src = `https://vumbnail.com/${video.vimeo_id}.jpg`; }} />
+                      onError={e => {
+                    const img = e.target as HTMLImageElement;
+                    if (!img.src.includes('vimeocdn')) {
+                      img.src = `https://i.vimeocdn.com/video/${video.vimeo_id}_640.jpg`;
+                    } else {
+                      img.style.display = 'none';
+                    }
+                  }} />
                     <div className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/30 transition-colors">
                       <div className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
                         <div className="w-0 h-0 border-t-[9px] border-t-transparent border-b-[9px] border-b-transparent border-l-[16px] border-l-gray-900 ml-1" />
