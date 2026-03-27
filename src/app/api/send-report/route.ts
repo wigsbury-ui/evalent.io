@@ -99,7 +99,16 @@ export async function POST(req: NextRequest) {
     });
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://app.evalent.io";
-    const reportUrl = `${appUrl}/report?id=${submission_id}`;
+
+    // Generate a time-limited report token (30 days)
+    const reportToken = crypto.randomUUID()
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString()
+    await supabase.from('report_tokens').insert({
+      token: reportToken,
+      submission_id,
+      expires_at: expiresAt,
+    })
+    const reportUrl = `${appUrl}/report?token=${reportToken}`;
     const decisionBaseUrl = `${appUrl}/api/decision?token=${token}`;
 
     // Format test date

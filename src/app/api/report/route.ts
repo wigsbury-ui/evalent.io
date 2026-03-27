@@ -119,23 +119,51 @@ function formatDate(isoString: string | null): string {
 
 export async function GET(req: NextRequest) {
   try {
-    const submissionId = req.nextUrl.searchParams.get("submission_id");
+    const submissionIdParam = req.nextUrl.searchParams.get("submission_id");
+    const tokenParam = req.nextUrl.searchParams.get("token");
     const format = req.nextUrl.searchParams.get("format") || "html";
 
-    if (!submissionId) {
+    if (!submissionIdParam && !tokenParam) {
       return NextResponse.json(
-        { error: "submission_id required" },
+        { error: "submission_id or token required" },
         { status: 400 }
       );
     }
 
     const supabase = createServerClient();
 
+    let submissionId = submissionIdParam;
+
+    // Token-based access — validate and resolve to submission_id
+    if (tokenParam) {
+      const { data: tokenRow } = await supabase
+        .from('report_tokens')
+        .select('submission_id, expires_at')
+        .eq('token', tokenParam)
+        .single()
+
+      if (!tokenRow) {
+        return new NextResponse(
+          '<html><body style="font-family:sans-serif;text-align:center;padding:60px"><h2>Link not found</h2><p>This report link is invalid.</p></body></html>',
+          { status: 404, headers: { 'Content-Type': 'text/html' } }
+        )
+      }
+
+      if (new Date(tokenRow.expires_at) < new Date()) {
+        return new NextResponse(
+          '<html><body style="font-family:sans-serif;text-align:center;padding:60px"><h2>Link expired</h2><p>This report link expired on ' + new Date(tokenRow.expires_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) + '.</p><p style="color:#666;font-size:14px">Please contact your school administrator for a new link.</p></body></html>',
+          { status: 410, headers: { 'Content-Type': 'text/html' } }
+        )
+      }
+
+      submissionId = tokenRow.submission_id
+    }
+
     // Fetch submission
     const { data: submission, error: subError } = await supabase
       .from("submissions")
       .select("*")
-      .eq("id", submissionId)
+      .eq("id", submissionId!)
       .single();
 
     if (subError || !submission) {

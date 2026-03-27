@@ -38,7 +38,9 @@ function VideoModal({ url, onClose }: { url: string; onClose: () => void }) {
 
 function ReportViewer() {
   const params = useSearchParams();
-  const submissionId = params.get("id");
+  const token = params.get("token");
+  const legacyId = params.get("id"); // backwards compat for old links
+  const submissionId = token ? null : legacyId; // resolved below
   const [showGuide, setShowGuide] = useState(false);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [showVideo, setShowVideo] = useState(false);
@@ -53,16 +55,18 @@ function ReportViewer() {
       .catch(() => {});
   }, []);
 
-  if (!submissionId) {
+  if (!token && !submissionId) {
     return (
       <div style={{ padding:"40px",textAlign:"center",fontFamily:"Arial" }}>
         <h1>Evalent Report Viewer</h1>
-        <p>No submission ID provided. Add ?id=xxx to the URL.</p>
+        <p>No report link provided.</p>
       </div>
     );
   }
 
-  const reportUrl = "/api/report?submission_id=" + submissionId;
+  const reportUrl = token
+    ? "/api/report?token=" + token
+    : "/api/report?submission_id=" + submissionId;
 
   return (
     <div style={{ height:"100vh",display:"flex",flexDirection:"column" }}>
