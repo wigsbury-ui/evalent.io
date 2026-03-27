@@ -25,6 +25,7 @@ export default async function BillingPage() {
       subscription_cancel_at_period_end,
       tier_cap, assessment_count_month,
       assessment_count_year,
+      assessment_credits,
       paddle_subscription_id
     `)
     .eq('id', session.user.schoolId)
@@ -40,6 +41,7 @@ export default async function BillingPage() {
     tier_cap:                          school.tier_cap ?? 9999,
     assessment_count_month:            school.assessment_count_month ?? 0,
     assessment_count_year:             school.assessment_count_year ?? 0,
+    assessment_credits:            school.assessment_credits ?? 0,
     paddle_subscription_id:            school.paddle_subscription_id ?? null,
     user_email:                        session.user.email ?? '',
   } : null
