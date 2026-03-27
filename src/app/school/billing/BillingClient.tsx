@@ -165,6 +165,8 @@ function UsageBar({ used, cap }: { used: number; cap: number }) {
 export default function BillingClient({ billing }: { billing: BillingInfo | null }) {
   const [currency, setCurrency] = useState<'USD' | 'GBP'>('USD')
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
+  const [invoiceRequested, setInvoiceRequested] = useState(false)
+  const [invoiceLoading, setInvoiceLoading] = useState(false)
   const isSuccess = typeof window !== 'undefined' &&
     new URLSearchParams(window.location.search).get('success') === 'true'
 
@@ -181,6 +183,29 @@ export default function BillingClient({ billing }: { billing: BillingInfo | null
       setTimeout(() => clearInterval(poll), 5000)
     }
   }, [])
+
+  async function handleInvoiceRequest(plan: typeof PLANS[0]) {
+    setInvoiceLoading(true)
+    try {
+      await fetch('/api/school/invoice-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          school_id: billing?.school_id,
+          school_name: billing?.school_name,
+          email: billing?.user_email,
+          plan: plan.name,
+          price_usd: plan.priceUSD,
+          price_gbp: plan.priceGBP,
+        }),
+      })
+      setInvoiceRequested(true)
+    } catch {
+      alert('Failed to send request. Please email team@evalent.io directly.')
+    } finally {
+      setInvoiceLoading(false)
+    }
+  }
 
   async function handleSubscribe(plan: typeof PLANS[0]) {
     if (!billing) return
@@ -421,6 +446,34 @@ export default function BillingClient({ billing }: { billing: BillingInfo | null
           </a>
         </div>
       )}
+
+      {/* ── Invoice request section ── */}
+      <div className="bg-gray-50 rounded-xl border border-gray-200 p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="font-semibold text-gray-900 mb-1">Need to pay by invoice?</h2>
+            <p className="text-sm text-gray-500">If your school requires a purchase order or bank transfer, request an invoice and we'll get back to you within one business day.</p>
+          </div>
+          {invoiceRequested ? (
+            <div className="flex-shrink-0 flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-2 text-sm font-medium">
+              ✅ Request sent
+            </div>
+          ) : (
+            <div className="flex-shrink-0 flex flex-col gap-2">
+              {PLANS.map(plan => (
+                <button
+                  key={plan.id}
+                  onClick={() => handleInvoiceRequest(plan)}
+                  disabled={invoiceLoading}
+                  className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+                >
+                  {invoiceLoading ? 'Sending…' : `Request invoice — ${plan.name}`}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
 
       <p className="text-center text-sm text-gray-400">
         Questions about billing? Email{' '}
