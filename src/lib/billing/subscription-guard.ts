@@ -15,13 +15,13 @@ export async function checkAssessmentAllowed(schoolId: string): Promise<{
 }> {
   const { data: school } = await supabase
     .from('schools')
-    .select('subscription_status, subscription_tier, tier_cap, assessment_count_year, subscription_current_period_end')
+    .select('subscription_status, subscription_tier, tier_cap, assessment_count_year, assessment_credits, subscription_current_period_end')
     .eq('id', schoolId)
     .single()
 
   if (!school) return { allowed: false, reason: 'School not found' }
 
-  const { subscription_status, tier_cap, assessment_count_year, subscription_current_period_end } = school
+  const { subscription_status, tier_cap, assessment_count_year, assessment_credits, subscription_current_period_end } = school
 
   // Trial schools — always allowed (super admin managed)
   if (subscription_status === 'active' && tier_cap === 9999) {
@@ -56,11 +56,20 @@ export async function checkAssessmentAllowed(schoolId: string): Promise<{
     }
   }
 
-  // Cap check
+  // Cap check — use credits if available before blocking
   if (tier_cap !== 9999 && assessment_count_year >= tier_cap) {
+    const credits = assessment_credits ?? 0
+    if (credits > 0) {
+      // Deduct one credit and allow
+      await supabase
+        .from('schools')
+        .update({ assessment_credits: credits - 1 })
+        .eq('id', schoolId)
+      return { allowed: true }
+    }
     return {
       allowed: false,
-      reason: `You have reached your assessment limit of ${tier_cap} students for this year. Please upgrade your plan to continue.`,
+      reason: `You have reached your assessment limit of ${tier_cap} students for this year. Purchase assessment credits or upgrade your plan to continue.`,
     }
   }
 
