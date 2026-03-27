@@ -165,8 +165,8 @@ function UsageBar({ used, cap }: { used: number; cap: number }) {
 export default function BillingClient({ billing }: { billing: BillingInfo | null }) {
   const [currency, setCurrency] = useState<'USD' | 'GBP'>('USD')
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
-  const [invoiceRequested, setInvoiceRequested] = useState(false)
-  const [invoiceLoading, setInvoiceLoading] = useState(false)
+  const [invoiceRequested, setInvoiceRequested] = useState<string | null>(null)
+  const [invoiceLoading, setInvoiceLoading] = useState<string | null>(null)
   const isSuccess = typeof window !== 'undefined' &&
     new URLSearchParams(window.location.search).get('success') === 'true'
 
@@ -185,7 +185,7 @@ export default function BillingClient({ billing }: { billing: BillingInfo | null
   }, [])
 
   async function handleInvoiceRequest(plan: typeof PLANS[0]) {
-    setInvoiceLoading(true)
+    setInvoiceLoading(plan.id)
     try {
       await fetch('/api/school/invoice-request', {
         method: 'POST',
@@ -199,11 +199,11 @@ export default function BillingClient({ billing }: { billing: BillingInfo | null
           price_gbp: plan.priceGBP,
         }),
       })
-      setInvoiceRequested(true)
+      setInvoiceRequested(plan.id)
     } catch {
       alert('Failed to send request. Please email team@evalent.io directly.')
     } finally {
-      setInvoiceLoading(false)
+      setInvoiceLoading(null)
     }
   }
 
@@ -428,10 +428,10 @@ export default function BillingClient({ billing }: { billing: BillingInfo | null
                 {!isCurrent && (
                   <button
                     onClick={() => handleInvoiceRequest(plan)}
-                    disabled={invoiceLoading}
+                    disabled={invoiceLoading === plan.id}
                     className="w-full text-center text-xs text-gray-400 hover:text-blue-600 transition-colors mt-2 py-1"
                   >
-                    {invoiceRequested ? '✅ Invoice request sent' : invoiceLoading ? 'Sending…' : 'Request invoice payment'}
+                    {invoiceRequested === plan.id ? '✅ Invoice request sent' : invoiceLoading === plan.id ? 'Sending…' : 'Request invoice payment'}
                   </button>
                 )}
               </div>
