@@ -17,7 +17,7 @@ export default function PartnerVideosPage() {
   const [partnerSlug, setPartnerSlug] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState("All");
-  const [playing, setPlaying] = useState<string | null>(null);
+  const [modalVideo, setModalVideo] = useState<any | null>(null);
   const [shareOpen, setShareOpen] = useState<string | null>(null);
   const [descOpen, setDescOpen] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
@@ -31,6 +31,13 @@ export default function PartnerVideosPage() {
       setPartnerSlug(d.partnerSlug || null);
       setLoading(false);
     });
+  }, []);
+
+  // Close modal on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") setModalVideo(null); };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
   }, []);
 
   const watchUrl = (video: any) => {
@@ -60,6 +67,49 @@ export default function PartnerVideosPage() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
+
+      {/* Video modal */}
+      {modalVideo && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 px-4"
+          onClick={() => setModalVideo(null)}
+        >
+          <div
+            className="relative w-full max-w-4xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <button
+              onClick={() => setModalVideo(null)}
+              className="absolute -top-10 right-0 text-white/70 hover:text-white flex items-center gap-1.5 text-sm"
+            >
+              <X className="w-5 h-5" /> Close
+            </button>
+            <div className="relative bg-black rounded-xl overflow-hidden" style={{ aspectRatio: "16/9" }}>
+              <iframe
+                src={`https://player.vimeo.com/video/${modalVideo.vimeo_id}?autoplay=1&title=0&byline=0&portrait=0`}
+                className="w-full h-full"
+                allow="autoplay; fullscreen; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+            <div className="mt-3 flex items-start justify-between gap-4">
+              <div>
+                <p className="text-white font-semibold text-base">{modalVideo.title}</p>
+                <span className={`inline-block mt-1 text-xs rounded-full px-2 py-0.5 font-medium ${CATEGORY_COLOURS[modalVideo.category] ?? "bg-gray-100 text-gray-600"}`}>
+                  {modalVideo.category}
+                </span>
+              </div>
+              <button
+                onClick={() => { setModalVideo(null); setTimeout(() => setShareOpen(modalVideo.id), 100); }}
+                className="flex-shrink-0 flex items-center gap-1.5 bg-[#0d52dd] text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Share2 className="w-4 h-4" /> Share
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Video Library</h1>
         <p className="text-sm text-gray-400 mt-1">Share these videos with schools. Every signup through your link is tracked automatically.</p>
@@ -102,51 +152,40 @@ export default function PartnerVideosPage() {
           {filtered.map((video: any) => (
             <div key={video.id} className={`bg-white rounded-xl border border-gray-100 overflow-hidden hover:shadow-sm transition-shadow${viewMode === "list" ? " flex flex-row" : ""}`}>
 
-              {/* Player / Thumbnail */}
-              <div className={`relative bg-gray-900 cursor-pointer flex-shrink-0${viewMode === "list" ? " w-48" : ""}`}
+              {/* Thumbnail — opens modal */}
+              <div
+                className={`relative bg-gray-900 cursor-pointer flex-shrink-0${viewMode === "list" ? " w-48" : ""}`}
                 style={{ aspectRatio: "16/9" }}
-                onClick={() => setPlaying(playing === video.id ? null : video.id)}>
-                {playing === video.id ? (
-                  <iframe
-                    src={`https://player.vimeo.com/video/${video.vimeo_id}?autoplay=1&title=0&byline=0&portrait=0`}
-                    className="w-full h-full"
-                    allow="autoplay; fullscreen; picture-in-picture"
-                    allowFullScreen
-                  />
-                ) : (
-                  <>
-                    <img
-                      src={video.thumbnail_url || `https://vumbnail.com/${video.vimeo_id}.jpg`}
-                      alt={video.title}
-                      className="w-full h-full object-cover"
-                      onError={e => {
-                        const img = e.target as HTMLImageElement;
-                        if (!img.src.includes("vimeocdn")) {
-                          img.src = `https://i.vimeocdn.com/video/${video.vimeo_id}_640.jpg`;
-                        } else {
-                          img.style.display = "none";
-                        }
-                      }}
-                    />
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/30 transition-colors">
-                      <div className="w-7 h-7 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
-                        <div className="w-0 h-0 border-t-[5px] border-t-transparent border-b-[5px] border-b-transparent border-l-[8px] border-l-gray-900 ml-0.5" />
-                      </div>
-                    </div>
-                  </>
-                )}
+                onClick={() => setModalVideo(video)}
+              >
+                <img
+                  src={video.thumbnail_url || `https://vumbnail.com/${video.vimeo_id}.jpg`}
+                  alt={video.title}
+                  className="w-full h-full object-cover"
+                  onError={e => {
+                    const img = e.target as HTMLImageElement;
+                    if (!img.src.includes("vimeocdn")) {
+                      img.src = `https://i.vimeocdn.com/video/${video.vimeo_id}_640.jpg`;
+                    } else {
+                      img.style.display = "none";
+                    }
+                  }}
+                />
+                <div className="absolute inset-0 flex items-center justify-center bg-black/20 hover:bg-black/40 transition-colors">
+                  <div className="w-7 h-7 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
+                    <div className="w-0 h-0 border-t-[5px] border-t-transparent border-b-[5px] border-b-transparent border-l-[8px] border-l-gray-900 ml-0.5" />
+                  </div>
+                </div>
               </div>
 
               {/* Info */}
               <div className="p-4 flex-1 min-w-0">
-
-                {/* Title full width + category badge below */}
                 <p className="font-medium text-gray-900 text-sm leading-snug w-full">{video.title}</p>
                 <span className={`inline-block mt-1.5 text-xs rounded-full px-2 py-0.5 font-medium ${CATEGORY_COLOURS[video.category] ?? "bg-gray-100 text-gray-600"}`}>
                   {video.category}
                 </span>
 
-                {/* Description — collapsible */}
+                {/* Description collapsible */}
                 {video.description && (
                   <div className="mt-2">
                     <button
