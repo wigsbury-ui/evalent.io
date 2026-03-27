@@ -425,6 +425,15 @@ export default function BillingClient({ billing }: { billing: BillingInfo | null
                     : isUpgrade ? `Upgrade to ${plan.name}`
                     : `Switch to ${plan.name}`}
                 </button>
+                {!isCurrent && (
+                  <button
+                    onClick={() => handleInvoiceRequest(plan)}
+                    disabled={invoiceLoading}
+                    className="w-full text-center text-xs text-gray-400 hover:text-blue-600 transition-colors mt-2 py-1"
+                  >
+                    {invoiceRequested ? '✅ Invoice request sent' : invoiceLoading ? 'Sending…' : 'Request invoice payment'}
+                  </button>
+                )}
               </div>
             )
           })}
@@ -446,34 +455,6 @@ export default function BillingClient({ billing }: { billing: BillingInfo | null
           </a>
         </div>
       )}
-
-      {/* ── Invoice request section ── */}
-      <div className="bg-gray-50 rounded-xl border border-gray-200 p-5">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="font-semibold text-gray-900 mb-1">Need to pay by invoice?</h2>
-            <p className="text-sm text-gray-500">If your school requires a purchase order or bank transfer, request an invoice and we'll get back to you within one business day.</p>
-          </div>
-          {invoiceRequested ? (
-            <div className="flex-shrink-0 flex items-center gap-2 text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-2 text-sm font-medium">
-              ✅ Request sent
-            </div>
-          ) : (
-            <div className="flex-shrink-0 flex flex-col gap-2">
-              {PLANS.map(plan => (
-                <button
-                  key={plan.id}
-                  onClick={() => handleInvoiceRequest(plan)}
-                  disabled={invoiceLoading}
-                  className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
-                >
-                  {invoiceLoading ? 'Sending…' : `Request invoice — ${plan.name}`}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
 
       <p className="text-center text-sm text-gray-400">
         Questions about billing? Email{' '}
