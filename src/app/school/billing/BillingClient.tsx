@@ -456,6 +456,10 @@ export default function BillingClient({ billing }: { billing: BillingInfo | null
         </div>
       )}
 
+      <p className="text-center text-xs text-gray-400">
+        All prices are exclusive of tax. Local taxes (including VAT where applicable) will be calculated at checkout based on your location.
+      </p>
+
       <p className="text-center text-sm text-gray-400">
         Questions about billing? Email{' '}
         <a href="mailto:team@evalent.io" className="text-blue-600 hover:underline">team@evalent.io</a>
