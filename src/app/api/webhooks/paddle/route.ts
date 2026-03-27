@@ -7,6 +7,12 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+const CREDIT_PRICE_MAP: Record<string, number> = {
+  'pri_01kmqcvza63bv1nrx86nspynm6': 10,  // 10-pack
+  'pri_01kmqcxapdyzj2abs2fca3wsvm': 20,  // 20-pack
+  'pri_01kmqcyqaxg9zkbqzcjaqrxxw6': 50,  // 50-pack
+}
+
 const PRICE_TIER_MAP: Record<string, { tier: string; cap: number }> = {
   'pri_01kkewsnaqf6bv6vdxqns6xb31': { tier: 'essentials',   cap: 100  },
   'pri_01kkewydf4pdtgsjx40j4yf82j': { tier: 'essentials',   cap: 100  },
@@ -341,6 +347,21 @@ export async function POST(request: NextRequest) {
 
       // ── Transaction Completed (renewal) ───────────────────────────────────
       case 'transaction.completed': {
+        // ── One-time credit top-up ──────────────────────────────────────
+        const topupPriceId = data.items?.[0]?.price?.id
+        const topupCredits = CREDIT_PRICE_MAP[topupPriceId]
+        if (topupCredits && !data.subscription_id) {
+          const schoolId = data.custom_data?.school_id
+          if (schoolId) {
+            await supabase.rpc('add_assessment_credits', {
+              p_school_id: schoolId,
+              p_credits: topupCredits,
+            })
+            console.log(`[Paddle Webhook] Added ${topupCredits} credits to school ${schoolId}`)
+          }
+          break
+        }
+        // ── Subscription renewal (fall through) ─────────────────────────
         const subscriptionId = data.subscription_id
         const transactionId  = data.id
         if (!subscriptionId) break
