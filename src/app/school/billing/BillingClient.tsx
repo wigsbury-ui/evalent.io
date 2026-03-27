@@ -24,9 +24,9 @@ interface BillingInfo {
 }
 
 const PLANS = [
-  { id: 'essentials', name: 'Essentials', cap: 100, priceUSD: '$2,900', priceGBP: '\u00a32,300', priceIdUSD: 'pri_01kkewsnaqf6bv6vdxqns6xb31', priceIdGBP: 'pri_01kkewydf4pdtgsjx40j4yf82j', description: 'Up to 100 student assessments per year', features: ['Full assessment pipeline', 'AI-generated reports', 'Email delivery', 'School admin portal'], color: 'blue' },
-  { id: 'professional', name: 'Professional', cap: 250, priceUSD: '$5,500', priceGBP: '\u00a34,400', priceIdUSD: 'pri_01kkex5maczqnsr07rwg63wgfp', priceIdGBP: 'pri_01kkex7n7grjvtj5ckf5mc0qb7', description: 'Up to 250 student assessments per year', features: ['Everything in Essentials', 'Priority support', 'Advanced reporting', 'Multiple assessors'], color: 'purple' },
-  { id: 'enterprise', name: 'Enterprise', cap: 9999, priceUSD: '$9,500', priceGBP: '\u00a37,600', priceIdUSD: 'pri_01kkex9jph5mn28mw25tyqj4cw', priceIdGBP: 'pri_01kkexbe8tk3t6z9nqyqsh1w2e', description: '500+ student assessments per year', features: ['Everything in Professional', 'Unlimited assessments', 'Dedicated support', 'Custom onboarding'], color: 'amber' },
+  { id: 'essentials', name: 'Essentials', cap: 100, priceUSD: '$2,900', priceGBP: '£2,300', priceIdUSD: 'pri_01kkewsnaqf6bv6vdxqns6xb31', priceIdGBP: 'pri_01kkewydf4pdtgsjx40j4yf82j', description: 'Up to 100 student assessments per year', features: ['Full assessment pipeline', 'AI-generated reports', 'Email delivery', 'School admin portal'], color: 'blue' },
+  { id: 'professional', name: 'Professional', cap: 250, priceUSD: '$5,500', priceGBP: '£4,400', priceIdUSD: 'pri_01kkex5maczqnsr07rwg63wgfp', priceIdGBP: 'pri_01kkex7n7grjvtj5ckf5mc0qb7', description: 'Up to 250 student assessments per year', features: ['Everything in Essentials', 'Priority support', 'Advanced reporting', 'Multiple assessors'], color: 'purple' },
+  { id: 'enterprise', name: 'Enterprise', cap: 9999, priceUSD: '$9,500', priceGBP: '£7,600', priceIdUSD: 'pri_01kkex9jph5mn28mw25tyqj4cw', priceIdGBP: 'pri_01kkexbe8tk3t6z9nqyqsh1w2e', description: '500+ student assessments per year', features: ['Everything in Professional', 'Unlimited assessments', 'Dedicated support', 'Custom onboarding'], color: 'amber' },
 ]
 
 const CREDIT_PACKS = [
@@ -74,7 +74,7 @@ function UsageRing({ used, cap, label }: { used: number; cap: number; label: str
           )}
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          {isUnlimited ? <span className="text-lg font-bold text-gray-700">\u221e</span> : <span className="text-lg font-bold" style={{ color }}>{pct}%</span>}
+          {isUnlimited ? <span className="text-lg font-bold text-gray-700">∞</span> : <span className="text-lg font-bold" style={{ color }}>{pct}%</span>}
         </div>
       </div>
       <div className="text-center">
@@ -97,7 +97,7 @@ function UsageBar({ used, cap }: { used: number; cap: number }) {
           <span className="text-sm font-medium text-gray-700">Annual usage</span>
           {!isUnlimited && pct >= 80 && (
             <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
-              {pct >= 95 ? '\ud83d\udd34 Critical' : '\u26a0\ufe0f High usage'}
+              {pct >= 95 ? '🔴 Critical' : '⚠️ High usage'}
             </span>
           )}
         </div>
@@ -221,13 +221,13 @@ export default function BillingClient({ billing }: { billing: BillingInfo | null
 
       {isSuccess && (
         <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-green-800 font-medium">
-          \u2705 Subscription activated! Welcome to Evalent.
+          ✅ Subscription activated! Welcome to Evalent.
         </div>
       )}
 
       {isCreditsSuccess && (
         <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-green-800 font-medium">
-          \u2705 Credits added! Your assessment balance has been updated.
+          ✅ Credits added! Your assessment balance has been updated.
         </div>
       )}
 
@@ -258,7 +258,7 @@ export default function BillingClient({ billing }: { billing: BillingInfo | null
             <p className="font-medium text-gray-900">
               {billing.subscription_current_period_end
                 ? new Date(billing.subscription_current_period_end).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
-                : '\u2014'}
+                : '—'}
             </p>
           </div>
         </div>
@@ -272,7 +272,7 @@ export default function BillingClient({ billing }: { billing: BillingInfo | null
                 <div className="flex gap-8">
                   <div className="text-center"><p className="text-3xl font-bold text-gray-900">{billing.assessment_count_year}</p><p className="text-xs text-gray-500 mt-1">This year</p></div>
                   <div className="text-center"><p className="text-3xl font-bold text-gray-900">{billing.assessment_count_month}</p><p className="text-xs text-gray-500 mt-1">This month</p></div>
-                  <div className="text-center"><p className="text-3xl font-bold text-green-600">\u221e</p><p className="text-xs text-gray-500 mt-1">Unlimited</p></div>
+                  <div className="text-center"><p className="text-3xl font-bold text-green-600">∞</p><p className="text-xs text-gray-500 mt-1">Unlimited</p></div>
                 </div>
               </div>
             </div>
@@ -305,10 +305,61 @@ export default function BillingClient({ billing }: { billing: BillingInfo | null
       {/* Past due warning */}
       {billing.subscription_status === 'past_due' && (
         <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-red-800">
-          <p className="font-semibold">\u26a0\ufe0f Payment overdue</p>
+          <p className="font-semibold">⚠️ Payment overdue</p>
           <p className="text-sm mt-1">New student registrations are paused. Please update your payment method.</p>
         </div>
       )}
+
+
+
+      {/* Plans section */}
+      <div id="plans-section">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-gray-900">Base Plans</h2>
+          <div className="flex rounded-lg border border-gray-200 overflow-hidden">
+            {(['USD', 'GBP'] as const).map(c => (
+              <button key={c} onClick={() => setCurrency(c)}
+                className={`px-4 py-1.5 text-sm font-medium transition-colors ${currency === c ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
+                {c === 'USD' ? '$ USD' : '£ GBP'}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {PLANS.map((plan, planIdx) => {
+            const isCurrent = billing.subscription_tier === plan.id
+            const isUpgrade = currentPlanIdx < planIdx
+            return (
+              <div key={plan.id} className={`bg-white rounded-xl border-2 p-6 flex flex-col transition-shadow hover:shadow-md ${isCurrent ? 'border-blue-500' : 'border-gray-200'}`}>
+                {isCurrent && <span className="inline-block bg-blue-600 text-white text-xs font-semibold px-2 py-0.5 rounded-full mb-3 self-start">Current plan</span>}
+                <h3 className="text-lg font-bold text-gray-900">{plan.name}</h3>
+                <p className="text-sm text-gray-500 mt-1 mb-4">{plan.description}</p>
+                <div className="mb-5">
+                  <span className="text-3xl font-bold text-gray-900">{currency === 'GBP' ? plan.priceGBP : plan.priceUSD}</span>
+                  <span className="text-gray-500 text-sm"> / year</span>
+                </div>
+                <ul className="space-y-2 mb-6 flex-1">
+                  {plan.features.map(f => (
+                    <li key={f} className="flex items-start gap-2 text-sm text-gray-600">
+                      <span className="text-green-500 mt-0.5">✓</span>{f}
+                    </li>
+                  ))}
+                </ul>
+                <button onClick={() => handleSubscribe(plan)} disabled={isCurrent || checkoutLoading === plan.id}
+                  className={`w-full py-2.5 rounded-lg font-semibold text-sm transition-colors ${isCurrent ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'}`}>
+                  {checkoutLoading === plan.id ? 'Opening checkout...' : isCurrent ? 'Current plan' : billing.subscription_tier === 'trial' ? `Subscribe — ${currency === 'GBP' ? plan.priceGBP : plan.priceUSD}/yr` : isUpgrade ? `Upgrade to ${plan.name}` : `Switch to ${plan.name}`}
+                </button>
+                {!isCurrent && (
+                  <button onClick={() => handleInvoiceRequest(plan)} disabled={invoiceLoading === plan.id}
+                    className="w-full text-center text-xs text-gray-400 hover:text-blue-600 transition-colors mt-2 py-1">
+                    {invoiceRequested === plan.id ? '✅ Invoice request sent' : invoiceLoading === plan.id ? 'Sending…' : 'Request invoice payment'}
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      </div>
 
       {/* Assessment Credits */}
       <div className={`bg-white rounded-xl border-2 p-6 transition-all ${!isOnPaidPlan ? 'border-gray-100 opacity-60' : 'border-gray-200'}`}>
@@ -317,7 +368,7 @@ export default function BillingClient({ billing }: { billing: BillingInfo | null
             Assessment Credits
             {!isOnPaidPlan && (
               <span className="text-xs font-normal bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
-                \ud83d\udd12 Available once subscribed
+                🔒 Available once subscribed
               </span>
             )}
           </h2>
@@ -347,58 +398,9 @@ export default function BillingClient({ billing }: { billing: BillingInfo | null
               <span className="text-lg font-black">{pack.label}</span>
               <span className="text-sm text-gray-500 mt-0.5">{pack.price}</span>
               <span className="text-xs text-gray-400 mt-1">$39 / assessment</span>
-              {creditLoading === pack.id && <span className="text-xs text-blue-600 mt-1">Opening checkout\u2026</span>}
+              {creditLoading === pack.id && <span className="text-xs text-blue-600 mt-1">Opening checkout…</span>}
             </button>
           ))}
-        </div>
-      </div>
-
-      {/* Plans section */}
-      <div id="plans-section">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-gray-900">Plans</h2>
-          <div className="flex rounded-lg border border-gray-200 overflow-hidden">
-            {(['USD', 'GBP'] as const).map(c => (
-              <button key={c} onClick={() => setCurrency(c)}
-                className={`px-4 py-1.5 text-sm font-medium transition-colors ${currency === c ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>
-                {c === 'USD' ? '$ USD' : '\u00a3 GBP'}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-          {PLANS.map((plan, planIdx) => {
-            const isCurrent = billing.subscription_tier === plan.id
-            const isUpgrade = currentPlanIdx < planIdx
-            return (
-              <div key={plan.id} className={`bg-white rounded-xl border-2 p-6 flex flex-col transition-shadow hover:shadow-md ${isCurrent ? 'border-blue-500' : 'border-gray-200'}`}>
-                {isCurrent && <span className="inline-block bg-blue-600 text-white text-xs font-semibold px-2 py-0.5 rounded-full mb-3 self-start">Current plan</span>}
-                <h3 className="text-lg font-bold text-gray-900">{plan.name}</h3>
-                <p className="text-sm text-gray-500 mt-1 mb-4">{plan.description}</p>
-                <div className="mb-5">
-                  <span className="text-3xl font-bold text-gray-900">{currency === 'GBP' ? plan.priceGBP : plan.priceUSD}</span>
-                  <span className="text-gray-500 text-sm"> / year</span>
-                </div>
-                <ul className="space-y-2 mb-6 flex-1">
-                  {plan.features.map(f => (
-                    <li key={f} className="flex items-start gap-2 text-sm text-gray-600">
-                      <span className="text-green-500 mt-0.5">\u2713</span>{f}
-                    </li>
-                  ))}
-                </ul>
-                <button onClick={() => handleSubscribe(plan)} disabled={isCurrent || checkoutLoading === plan.id}
-                  className={`w-full py-2.5 rounded-lg font-semibold text-sm transition-colors ${isCurrent ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-blue-600 text-white hover:bg-blue-700 cursor-pointer'}`}>
-                  {checkoutLoading === plan.id ? 'Opening checkout...' : isCurrent ? 'Current plan' : billing.subscription_tier === 'trial' ? `Subscribe \u2014 ${currency === 'GBP' ? plan.priceGBP : plan.priceUSD}/yr` : isUpgrade ? `Upgrade to ${plan.name}` : `Switch to ${plan.name}`}
-                </button>
-                {!isCurrent && (
-                  <button onClick={() => handleInvoiceRequest(plan)} disabled={invoiceLoading === plan.id}
-                    className="w-full text-center text-xs text-gray-400 hover:text-blue-600 transition-colors mt-2 py-1">
-                    {invoiceRequested === plan.id ? '\u2705 Invoice request sent' : invoiceLoading === plan.id ? 'Sending\u2026' : 'Request invoice payment'}
-                  </button>
-                )}
-              </div>
-            )
-          })}
         </div>
       </div>
 
@@ -409,7 +411,7 @@ export default function BillingClient({ billing }: { billing: BillingInfo | null
           <p className="text-sm text-gray-500 mb-3">Update payment method, download invoices, or cancel.</p>
           <a href="https://billing.paddle.com" target="_blank" rel="noopener noreferrer"
             className="inline-block px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-            Open billing portal \u2192
+            Open billing portal →
           </a>
         </div>
       )}
