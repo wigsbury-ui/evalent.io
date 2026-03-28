@@ -3,7 +3,6 @@ import { authOptions } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { SchoolSidebar as Sidebar } from "@/components/school/sidebar"
-import { EvalentChat } from '@/components/school/evalent-chat'
 import { WelcomeVideo } from '@/components/school/welcome-video'
 import { TopBar } from '@/components/school/top-bar'
 import { MobileBottomNav } from '@/components/school/MobileBottomNav'
@@ -65,7 +64,6 @@ export default async function SchoolLayout({ children }: { children: React.React
       {/* Mobile bottom nav */}
       <MobileBottomNav />
 
-      <EvalentChat />
       <WelcomeVideo />
     </div>
   )
