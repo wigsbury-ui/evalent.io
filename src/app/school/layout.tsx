@@ -6,14 +6,14 @@ import { SchoolSidebar as Sidebar } from "@/components/school/sidebar"
 import { EvalentChat } from '@/components/school/evalent-chat'
 import { WelcomeVideo } from '@/components/school/welcome-video'
 import { TopBar } from '@/components/school/top-bar'
+import { MobileBottomNav } from '@/components/school/MobileBottomNav'
+import { MobileHeader } from '@/components/school/MobileHeader'
 
 export const revalidate = 0
 
 export default async function SchoolLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions)
-  if (!session || !session.user.schoolId) {
-    redirect('/login')
-  }
+  if (!session || !session.user.schoolId) { redirect('/login') }
 
   const supabase = createServerClient()
   const [{ data: school }, { data: gradeConfigs }, { data: students }] = await Promise.all([
@@ -24,25 +24,47 @@ export default async function SchoolLayout({ children }: { children: React.React
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
-      <Sidebar
-        schoolName={school?.name ?? 'School Admin'}
-        logoUrl={school?.logo_url ?? null}
-        role={session.user.role}
-      />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <TopBar
-          used={school?.assessment_count_year ?? 0}
-          cap={school?.tier_cap ?? 9999}
-          tier={school?.subscription_tier ?? 'trial'}
-          hasGradeConfigs={(gradeConfigs?.length ?? 0) > 0}
-          hasAssessors={!!(school?.default_assessor_email)}
-          hasStudents={(students?.length ?? 0) > 0}
-          schoolId={session.user.schoolId}
+      {/* Desktop sidebar — hidden on mobile */}
+      <div className="hidden md:flex md:contents">
+        <Sidebar
+          schoolName={school?.name ?? 'School Admin'}
+          logoUrl={school?.logo_url ?? null}
+          role={session.user.role}
         />
-        <main className="flex-1 overflow-y-auto"><div className="max-w-[1400px] mx-auto px-6 py-6">
-          {children}</div>
+      </div>
+
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Desktop top bar */}
+        <div className="hidden md:block">
+          <TopBar
+            used={school?.assessment_count_year ?? 0}
+            cap={school?.tier_cap ?? 9999}
+            tier={school?.subscription_tier ?? 'trial'}
+            hasGradeConfigs={(gradeConfigs?.length ?? 0) > 0}
+            hasAssessors={!!(school?.default_assessor_email)}
+            hasStudents={(students?.length ?? 0) > 0}
+            schoolId={session.user.schoolId}
+          />
+        </div>
+
+        {/* Mobile header */}
+        <MobileHeader
+          schoolName={school?.name ?? 'School Admin'}
+          logoUrl={school?.logo_url ?? null}
+        />
+
+        {/* Main content */}
+        <main className="flex-1 overflow-y-auto">
+          {/* Desktop: normal padding, Mobile: top padding for fixed header + bottom padding for nav */}
+          <div className="max-w-[1400px] mx-auto px-4 py-4 md:px-6 md:py-6 pt-[72px] pb-24 md:pt-4 md:pb-6">
+            {children}
+          </div>
         </main>
       </div>
+
+      {/* Mobile bottom nav */}
+      <MobileBottomNav />
+
       <EvalentChat />
       <WelcomeVideo />
     </div>

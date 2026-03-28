@@ -43,7 +43,7 @@ export function TopBar({ used, cap, tier, hasGradeConfigs, hasAssessors, hasStud
   const pct = Math.min(100, Math.round((used / cap) * 100))
 
   return (
-    <div className="w-full" style={{ background: '#eef1f8', borderBottom: '1px solid #d0d8ee', height: 48 }}>
+    <div className="w-full hidden md:block" style={{ background: '#eef1f8', borderBottom: '1px solid #d0d8ee', height: 48 }}>
       <div style={{ maxWidth: "1400px", margin: "0 auto", padding: "0 24px", width: "100%", height: "100%", display: "flex", alignItems: "center", gap: 20 }}>
 
         {isTrial && (

@@ -32,8 +32,8 @@ export function SchoolSidebar({
 
   return (
     <>
-      <div className="fixed left-0 top-0 h-screen w-14 bg-white border-r border-gray-100 z-50 flex flex-col shrink-0" />
-      <div className="w-14 shrink-0" />
+      <div className="hidden md:flex fixed left-0 top-0 h-screen w-14 bg-white border-r border-gray-100 z-50 flex-col shrink-0" />
+      <div className="hidden md:flex w-14 shrink-0" />
       <aside
         onMouseEnter={() => setExpanded(true)}
         onMouseLeave={() => setExpanded(false)}
