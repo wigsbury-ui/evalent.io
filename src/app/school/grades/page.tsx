@@ -424,7 +424,7 @@ export default function GradeConfigPage() {
   if (configs.length === 0) {
     return (
       <div className="space-y-6">
-        <div><h1 className="text-3xl font-bold tracking-tight text-gray-900">Assessment Thresholds</h1><p className="mt-1 text-gray-500">Configure pass thresholds for each grade.</p></div>
+        <div><h1 className="hidden sm:block text-3xl font-bold tracking-tight text-gray-900">Assessment Thresholds</h1><p className="mt-1 text-gray-500">Configure pass thresholds for each grade.</p></div>
         <Card><CardContent className="flex flex-col items-center justify-center py-16"><GraduationCap className="h-12 w-12 text-gray-300" /><p className="mt-3 text-sm text-gray-500">No grade configurations found.</p><p className="mt-1 text-xs text-gray-400">Contact your platform administrator to set up grade configs.</p></CardContent></Card>
       </div>
     );
@@ -474,13 +474,13 @@ export default function GradeConfigPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Assessment Thresholds</h1>
-          <p className="mt-1 text-gray-500">Start with a preset or set thresholds manually. Fine-tune any grade after.</p>
+          <h1 className="hidden sm:block text-3xl font-bold tracking-tight text-gray-900">Assessment Thresholds</h1>
+          <p className="hidden sm:block mt-1 text-gray-500">Start with a preset or set thresholds manually. Fine-tune any grade after.</p>
         </div>
-        <div className="flex flex-col items-end gap-2">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col items-start sm:items-end gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button variant="outline" onClick={() => setShowSaveModal(true)} className="text-gray-600">
               <BookmarkPlus className="mr-2 h-4 w-4" />Save as Preset
             </Button>
