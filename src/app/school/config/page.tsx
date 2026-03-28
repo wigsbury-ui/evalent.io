@@ -65,6 +65,7 @@ export default function SchoolConfigPage() {
   const [completionMessage, setCompletionMessage] = useState("");
   const [chartRetention, setChartRetention]   = useState<number>(4);
   const [logoUrl, setLogoUrl]                 = useState("");
+  const [logoTimestamp, setLogoTimestamp] = useState(Date.now());
   const [uploading, setUploading]             = useState(false);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [saving2fa, setSaving2fa]             = useState(false);
