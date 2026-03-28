@@ -1,68 +1,20 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  UserPlus,
-  Users,
-  ExternalLink,
-  Copy,
-  CheckCircle2,
-  FileText,
-  RefreshCw,
-  ChevronUp,
-  ChevronDown,
-  ChevronsUpDown,
-  ChevronLeft,
-  ChevronRight,
-  Download,
-  Trash2,
-  RotateCcw,
-} from "lucide-react";
+import { UserPlus, Users, ExternalLink, Copy, CheckCircle2, FileText, RefreshCw, ChevronUp, ChevronDown, ChevronsUpDown, ChevronLeft, ChevronRight, Download, Trash2, RotateCcw } from "lucide-react";
 import { LearnMoreLink } from "@/components/ui/learn-more-link";
 
 interface StudentData {
-  id: string;
-  first_name: string;
-  last_name: string;
-  grade_applied: number;
-  student_ref: string;
-  jotform_link: string | null;
-  created_at: string;
-  pipeline_status: string;
-  admission_year: number | null;
-  admission_term: string | null;
-  submission: {
-    id: string;
-    overall_academic_pct: number | null;
-    recommendation_band: string | null;
-    processing_status: string;
-  } | null;
-  decision: {
-    decision: string;
-    decided_at: string;
-  } | null;
+  id: string; first_name: string; last_name: string; grade_applied: number;
+  student_ref: string; jotform_link: string | null; created_at: string;
+  pipeline_status: string; admission_year: number | null; admission_term: string | null;
+  submission: { id: string; overall_academic_pct: number | null; recommendation_band: string | null; processing_status: string; } | null;
+  decision: { decision: string; decided_at: string; } | null;
 }
-
-type SortKey =
-  | "name"
-  | "grade"
-  | "admission"
-  | "ref"
-  | "status"
-  | "score"
-  | "recommendation"
-  | "decision"
-  | "date";
+type SortKey = "name" | "grade" | "admission" | "ref" | "status" | "score" | "recommendation" | "decision" | "date";
 type SortDir = "asc" | "desc";
 
 const statusConfig: Record<string, { label: string; color: string }> = {
@@ -71,57 +23,26 @@ const statusConfig: Record<string, { label: string; color: string }> = {
   pending: { label: "Pending", color: "bg-blue-100 text-blue-700" },
   scoring: { label: "Scoring", color: "bg-amber-100 text-amber-700" },
   ai_evaluation: { label: "AI Eval", color: "bg-amber-100 text-amber-700" },
-  generating_report: {
-    label: "Report Gen",
-    color: "bg-purple-100 text-purple-700",
-  },
+  generating_report: { label: "Report Gen", color: "bg-purple-100 text-purple-700" },
   sending: { label: "Sending", color: "bg-purple-100 text-purple-700" },
   scored: { label: "Scored", color: "bg-green-100 text-green-700" },
   complete: { label: "Complete", color: "bg-green-100 text-green-700" },
-  report_sent: {
-    label: "Report Sent",
-    color: "bg-evalent-100 text-evalent-700",
-  },
+  report_sent: { label: "Report Sent", color: "bg-evalent-100 text-evalent-700" },
   decided: { label: "Decided", color: "bg-emerald-100 text-emerald-700" },
   error: { label: "Error", color: "bg-red-100 text-red-700" },
 };
+const STATUS_ORDER: Record<string, number> = { error: -1, registered: 0, submitted: 1, pending: 2, scoring: 3, ai_evaluation: 4, generating_report: 5, sending: 6, scored: 7, complete: 8, report_sent: 9, decided: 10 };
+const REC_ORDER: Record<string, number> = { "not yet ready": 1, "borderline": 2, "ready to admit": 3 };
 
-const STATUS_ORDER: Record<string, number> = {
-  error: -1,
-  registered: 0,
-  submitted: 1,
-  pending: 2,
-  scoring: 3,
-  ai_evaluation: 4,
-  generating_report: 5,
-  sending: 6,
-  scored: 7,
-  complete: 8,
-  report_sent: 9,
-  decided: 10,
-};
-
-const REC_ORDER: Record<string, number> = {
-  "not yet ready": 1,
-  "borderline": 2,
-  "ready to admit": 3,
-};
-
-function getRecommendationVariant(
-  band: string
-): "success" | "warning" | "destructive" | "info" | "secondary" {
+function getRecommendationVariant(band: string): "success" | "warning" | "destructive" | "info" | "secondary" {
   const lower = band.toLowerCase();
   if (lower.startsWith("ready to admit")) return "success";
   if (lower.includes("borderline")) return "warning";
-  if (lower.includes("not yet ready") || lower.includes("not ready"))
-    return "destructive";
+  if (lower.includes("not yet ready") || lower.includes("not ready")) return "destructive";
   if (lower.includes("support")) return "info";
   return "secondary";
 }
-
-function getDecisionVariant(
-  decision: string
-): "success" | "info" | "warning" | "destructive" | "secondary" {
+function getDecisionVariant(decision: string): "success" | "info" | "warning" | "destructive" | "secondary" {
   const d = decision.toLowerCase();
   if (d === "admit") return "success";
   if (d === "admit_with_support") return "info";
@@ -129,100 +50,41 @@ function getDecisionVariant(
   if (d === "reject") return "destructive";
   return "secondary";
 }
-
 function formatDecision(decision: string): string {
-  return decision
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
+  return decision.split("_").map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
 }
-
-/* ── Sort comparator ──────────────────────────────────────────── */
-function getSortValue(
-  student: StudentData,
-  key: SortKey
-): string | number {
+function getSortValue(student: StudentData, key: SortKey): string | number {
   switch (key) {
-    case "name":
-      return `${student.first_name} ${student.last_name}`.toLowerCase();
-    case "grade":
-      return student.grade_applied;
-    case "admission":
-      return student.admission_year
-        ? `${student.admission_year}-${student.admission_term || ""}`
-        : "zzz";
-    case "ref":
-      return student.student_ref.toLowerCase();
-    case "status":
-      return STATUS_ORDER[student.pipeline_status] ?? 99;
-    case "score":
-      return student.submission?.overall_academic_pct ?? -1;
+    case "name": return `${student.first_name} ${student.last_name}`.toLowerCase();
+    case "grade": return student.grade_applied;
+    case "admission": return student.admission_year ? `${student.admission_year}-${student.admission_term || ""}` : "zzz";
+    case "ref": return student.student_ref.toLowerCase();
+    case "status": return STATUS_ORDER[student.pipeline_status] ?? 99;
+    case "score": return student.submission?.overall_academic_pct ?? -1;
     case "recommendation": {
-      const band =
-        student.submission?.recommendation_band?.toLowerCase() || "";
-      for (const [k, val] of Object.entries(REC_ORDER)) {
-        if (band.includes(k)) return val;
-      }
+      const band = student.submission?.recommendation_band?.toLowerCase() || "";
+      for (const [k, val] of Object.entries(REC_ORDER)) { if (band.includes(k)) return val; }
       return 0;
     }
-    case "date":
-      return student.created_at || "";
-    case "decision":
-      return student.decision?.decision || "zzz";
-    default:
-      return "";
+    case "date": return student.created_at || "";
+    case "decision": return student.decision?.decision || "zzz";
+    default: return "";
   }
 }
-
-function sortStudents(
-  students: StudentData[],
-  key: SortKey,
-  dir: SortDir
-): StudentData[] {
+function sortStudents(students: StudentData[], key: SortKey, dir: SortDir): StudentData[] {
   return [...students].sort((a, b) => {
-    const aVal = getSortValue(a, key);
-    const bVal = getSortValue(b, key);
-    let cmp = 0;
-    if (typeof aVal === "number" && typeof bVal === "number") {
-      cmp = aVal - bVal;
-    } else {
-      cmp = String(aVal).localeCompare(String(bVal));
-    }
+    const aVal = getSortValue(a, key), bVal = getSortValue(b, key);
+    let cmp = typeof aVal === "number" && typeof bVal === "number" ? aVal - bVal : String(aVal).localeCompare(String(bVal));
     return dir === "asc" ? cmp : -cmp;
   });
 }
-
-/* ── Sortable header component ────────────────────────────────── */
-function SortHeader({
-  label,
-  sortKey,
-  currentSort,
-  currentDir,
-  onSort,
-}: {
-  label: string;
-  sortKey: SortKey;
-  currentSort: SortKey;
-  currentDir: SortDir;
-  onSort: (key: SortKey) => void;
-}) {
+function SortHeader({ label, sortKey, currentSort, currentDir, onSort }: { label: string; sortKey: SortKey; currentSort: SortKey; currentDir: SortDir; onSort: (key: SortKey) => void }) {
   const isActive = currentSort === sortKey;
   return (
-    <th
-      className="pb-3 font-medium cursor-pointer select-none hover:text-gray-900 transition-colors"
-      onClick={() => onSort(sortKey)}
-    >
+    <th className="pb-3 font-medium cursor-pointer select-none hover:text-gray-900 transition-colors" onClick={() => onSort(sortKey)}>
       <div className="flex items-center gap-1">
         {label}
-        {isActive ? (
-          currentDir === "asc" ? (
-            <ChevronUp className="h-3.5 w-3.5 text-evalent-600" />
-          ) : (
-            <ChevronDown className="h-3.5 w-3.5 text-evalent-600" />
-          )
-        ) : (
-          <ChevronsUpDown className="h-3.5 w-3.5 text-gray-300" />
-        )}
+        {isActive ? (currentDir === "asc" ? <ChevronUp className="h-3.5 w-3.5 text-evalent-600" /> : <ChevronDown className="h-3.5 w-3.5 text-evalent-600" />) : <ChevronsUpDown className="h-3.5 w-3.5 text-gray-300" />}
       </div>
     </th>
   );
@@ -250,349 +112,129 @@ export default function StudentsPage() {
       const res = await fetch("/api/school/dashboard");
       const data = await res.json();
       setStudents(data?.pipeline || []);
-      if (data?.school?.admission_terms) {
-        setAdmissionTerms(data.school.admission_terms);
-      }
-    } catch {
-      setStudents([]);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
+      if (data?.school?.admission_terms) setAdmissionTerms(data.school.admission_terms);
+    } catch { setStudents([]); } finally { setLoading(false); setRefreshing(false); }
   };
-
   const updateAdmission = async (studentId: string, term: string, year: number) => {
     try {
-      await fetch(`/api/school/students/${studentId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ admission_term: term, admission_year: year }),
-      });
-      // Update local state
-      setStudents((prev) =>
-        prev.map((s) =>
-          s.id === studentId ? { ...s, admission_term: term, admission_year: year } : s
-        )
-      );
-    } catch (e) {
-      console.error("Failed to update admission:", e);
-    }
+      await fetch(`/api/school/students/${studentId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ admission_term: term, admission_year: year }) });
+      setStudents((prev) => prev.map((s) => s.id === studentId ? { ...s, admission_term: term, admission_year: year } : s));
+    } catch (e) { console.error("Failed to update admission:", e); }
     setEditingAdmission(null);
   };
-
   const resendReport = async (submissionId: string) => {
     setResendingReport(submissionId);
     try {
-      const res = await fetch("/api/send-report", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ submission_id: submissionId }),
-      });
-      if (res.ok) {
-        setResent(submissionId);
-        setTimeout(() => setResent(null), 3000);
-      }
-    } catch (e) {
-      console.error("Failed to resend report:", e);
-    }
+      const res = await fetch("/api/send-report", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ submission_id: submissionId }) });
+      if (res.ok) { setResent(submissionId); setTimeout(() => setResent(null), 3000); }
+    } catch (e) { console.error("Failed to resend report:", e); }
     setResendingReport(null);
   };
-
-  useEffect(() => {
-    fetchStudents();
-  }, []);
-
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchStudents();
-  };
-
+  useEffect(() => { fetchStudents(); }, []);
+  const handleRefresh = () => { setRefreshing(true); fetchStudents(); };
   const handleSort = (key: SortKey) => {
-    if (key === sortKey) {
-      setSortDir(sortDir === "asc" ? "desc" : "asc");
-    } else {
-      setSortKey(key);
-      setSortDir("asc");
-    }
+    if (key === sortKey) setSortDir(sortDir === "asc" ? "desc" : "asc");
+    else { setSortKey(key); setSortDir("asc"); }
     setCurrentPage(1);
   };
-
-  const copyLink = (link: string, id: string) => {
-    navigator.clipboard.writeText(link);
-    setCopied(id);
-    setTimeout(() => setCopied(null), 2000);
-  };
-
+  const copyLink = (link: string, id: string) => { navigator.clipboard.writeText(link); setCopied(id); setTimeout(() => setCopied(null), 2000); };
   const handleDelete = async (studentId: string, studentName: string) => {
-    if (
-      !confirm(
-        "Delete " +
-          studentName +
-          "? This will also remove their submissions. This cannot be undone."
-      )
-    )
-      return;
+    if (!confirm("Delete " + studentName + "? This will also remove their submissions. This cannot be undone.")) return;
     try {
-      const res = await fetch("/api/students?id=" + studentId, {
-        method: "DELETE",
-      });
+      const res = await fetch("/api/students?id=" + studentId, { method: "DELETE" });
       if (!res.ok) throw new Error("Delete failed");
       setStudents((prev) => prev.filter((s) => s.id !== studentId));
-    } catch (err) {
-      console.error("Delete error:", err);
-      alert("Failed to delete student");
-    }
+    } catch (err) { console.error("Delete error:", err); alert("Failed to delete student"); }
   };
-
   const handleRescore = async (student: StudentData) => {
-    if (!student.submission?.id) {
-      alert("No submission found for this student. They must complete the assessment first.");
-      return;
-    }
-    if (
-      !confirm(
-        "Re-evaluate " +
-          student.first_name +
-          " " +
-          student.last_name +
-          "?\n\nThis will re-run the full scoring pipeline (MCQ scoring, AI writing evaluation, MCQ analysis, executive summary) and generate a new report.\n\nThis may take 30–60 seconds."
-      )
-    )
-      return;
-
+    if (!student.submission?.id) { alert("No submission found for this student."); return; }
+    if (!confirm("Re-evaluate " + student.first_name + " " + student.last_name + "?\n\nThis will re-run the full scoring pipeline and generate a new report.\n\nThis may take 30–60 seconds.")) return;
     setRescoring(student.id);
     try {
-      const res = await fetch("/api/school/rescore", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ submission_id: student.submission.id }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Re-score failed");
-      }
-      // Refresh the list to show updated status
+      const res = await fetch("/api/school/rescore", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ submission_id: student.submission.id }) });
+      if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || "Re-score failed"); }
       await fetchStudents();
-      alert(
-        "Re-evaluation complete for " +
-          student.first_name +
-          " " +
-          student.last_name +
-          ".\n\nThe report has been regenerated. Click the report icon to view it."
-      );
-    } catch (err: any) {
-      console.error("Rescore error:", err);
-      alert("Re-evaluation failed: " + (err.message || "Unknown error"));
-      // Refresh anyway to see current state
-      await fetchStudents();
-    } finally {
-      setRescoring(null);
-    }
+      alert("Re-evaluation complete for " + student.first_name + " " + student.last_name + ".\n\nThe report has been regenerated.");
+    } catch (err: any) { console.error("Rescore error:", err); alert("Re-evaluation failed: " + (err.message || "Unknown error")); await fetchStudents(); }
+    finally { setRescoring(null); }
   };
-
-  /* ── Export helpers ──────────────────────────────────────────── */
   const handleExport = async (format: "xlsx" | "csv" | "pdf") => {
-    setExporting(true);
-    setShowExport(false);
+    setExporting(true); setShowExport(false);
     try {
       if (format === "csv") {
         const res = await fetch("/api/school/export?format=csv");
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download =
-          res.headers
-            .get("Content-Disposition")
-            ?.match(/filename="(.+)"/)?.[1] || "students.csv";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        const a = document.createElement("a"); a.href = url;
+        a.download = res.headers.get("Content-Disposition")?.match(/filename="(.+)"/)?.[1] || "students.csv";
+        document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
       } else if (format === "xlsx") {
         const res = await fetch("/api/school/export?format=json");
         const data = await res.json();
         const XLSX = await import("xlsx");
         const ws = XLSX.utils.json_to_sheet(data.rows);
-        const colWidths = Object.keys(data.rows[0] || {}).map((key) => {
-          const maxLen = Math.max(
-            key.length,
-            ...data.rows.map((r: any) => String(r[key] || "").length)
-          );
-          return { wch: Math.min(maxLen + 2, 40) };
-        });
+        const colWidths = Object.keys(data.rows[0] || {}).map((key) => ({ wch: Math.min(Math.max(key.length, ...data.rows.map((r: any) => String(r[key] || "").length)) + 2, 40) }));
         ws["!cols"] = colWidths;
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, "Students");
-        const dateStr = new Date().toISOString().slice(0, 10);
-        const filename = `${data.schoolName.replace(/[^a-zA-Z0-9]/g, "_")}_Students_${dateStr}.xlsx`;
-        XLSX.writeFile(wb, filename);
+        const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Students");
+        XLSX.writeFile(wb, `${data.schoolName.replace(/[^a-zA-Z0-9]/g, "_")}_Students_${new Date().toISOString().slice(0, 10)}.xlsx`);
       } else if (format === "pdf") {
         const res = await fetch("/api/school/export?format=json");
         const data = await res.json();
-        const { default: jsPDF } = await import("jspdf");
-        await import("jspdf-autotable");
-        const doc = new jsPDF({
-          orientation: "landscape",
-          unit: "mm",
-          format: "a4",
-        });
-
-        // Header
-        doc.setFontSize(16);
-        doc.setTextColor(30, 58, 138); // evalent navy
-        doc.text(data.schoolName, 14, 15);
-        doc.setFontSize(10);
-        doc.setTextColor(107, 114, 128); // gray
-        doc.text(
-          `Student Report — Exported ${new Date().toLocaleDateString("en-GB")}`,
-          14,
-          22
-        );
-
-        // Table columns (skip Registered Date to save space)
-        const columns = [
-          "Student",
-          "Grade",
-          "Admission",
-          "Ref",
-          "Status",
-          "Score (%)",
-          "Recommendation",
-          "Decision",
-          "Decision Date",
-        ];
-        const rows = data.rows.map((r: any) =>
-          columns.map((col) => r[col] || "—")
-        );
-
-        (doc as any).autoTable({
-          head: [columns],
-          body: rows,
-          startY: 28,
-          styles: { fontSize: 8, cellPadding: 2 },
-          headStyles: {
-            fillColor: [30, 58, 138],
-            textColor: 255,
-            fontStyle: "bold",
-            fontSize: 8,
-          },
-          alternateRowStyles: { fillColor: [245, 247, 250] },
-          columnStyles: {
-            0: { cellWidth: 35 },
-            3: { cellWidth: 35, fontSize: 7 },
-            5: { halign: "center" as const },
-          },
-          margin: { left: 14, right: 14 },
-        });
-
-        // Footer
+        const { default: jsPDF } = await import("jspdf"); await import("jspdf-autotable");
+        const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+        doc.setFontSize(16); doc.setTextColor(30, 58, 138); doc.text(data.schoolName, 14, 15);
+        doc.setFontSize(10); doc.setTextColor(107, 114, 128); doc.text(`Student Report — Exported ${new Date().toLocaleDateString("en-GB")}`, 14, 22);
+        const columns = ["Student", "Grade", "Admission", "Ref", "Status", "Score (%)", "Recommendation", "Decision", "Decision Date"];
+        (doc as any).autoTable({ head: [columns], body: data.rows.map((r: any) => columns.map((col) => r[col] || "—")), startY: 28, styles: { fontSize: 8, cellPadding: 2 }, headStyles: { fillColor: [30, 58, 138], textColor: 255, fontStyle: "bold", fontSize: 8 }, alternateRowStyles: { fillColor: [245, 247, 250] }, columnStyles: { 0: { cellWidth: 35 }, 3: { cellWidth: 35, fontSize: 7 }, 5: { halign: "center" as const } }, margin: { left: 14, right: 14 } });
         const pageCount = (doc as any).internal.getNumberOfPages();
-        for (let i = 1; i <= pageCount; i++) {
-          doc.setPage(i);
-          doc.setFontSize(8);
-          doc.setTextColor(156, 163, 175);
-          doc.text(
-            `Page ${i} of ${pageCount} — Generated by Evalent`,
-            14,
-            doc.internal.pageSize.height - 8
-          );
-        }
-
-        const dateStr = new Date().toISOString().slice(0, 10);
-        doc.save(
-          `${data.schoolName.replace(/[^a-zA-Z0-9]/g, "_")}_Students_${dateStr}.pdf`
-        );
+        for (let i = 1; i <= pageCount; i++) { doc.setPage(i); doc.setFontSize(8); doc.setTextColor(156, 163, 175); doc.text(`Page ${i} of ${pageCount} — Generated by Evalent`, 14, doc.internal.pageSize.height - 8); }
+        doc.save(`${data.schoolName.replace(/[^a-zA-Z0-9]/g, "_")}_Students_${new Date().toISOString().slice(0, 10)}.pdf`);
       }
-    } catch (err) {
-      console.error("Export failed:", err);
-    } finally {
-      setExporting(false);
-    }
+    } catch (err) { console.error("Export failed:", err); } finally { setExporting(false); }
   };
 
   const sorted = sortStudents(students, sortKey, sortDir);
-
-  // Pagination
   const totalPages = Math.ceil(sorted.length / rowsPerPage);
   const startIndex = (currentPage - 1) * rowsPerPage;
   const paginated = sorted.slice(startIndex, startIndex + rowsPerPage);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-evalent-600 border-t-transparent" />
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="flex items-center justify-center py-20">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-evalent-600 border-t-transparent" />
+    </div>
+  );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
+
+      {/* Page header — hide title/subtitle on mobile (shown in MobileHeader) */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-gray-900">
-            Students
-          </h1>
-          <p className="mt-1 text-gray-500">
-            Manage registered students and track assessment progress.
-          </p>
+        <div className="hidden md:block">
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">Students</h1>
+          <p className="mt-1 text-gray-500">Manage registered students and track assessment progress.</p>
         </div>
-        <div className="flex flex-col items-end gap-2">
-          <div className="flex items-center gap-3">
-          <div className="relative">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowExport(!showExport)}
-              disabled={exporting || students.length === 0}
-            >
-              <Download
-                className={`mr-2 h-4 w-4 ${exporting ? "animate-pulse" : ""}`}
-              />
-              {exporting ? "Exporting…" : "Export"}
+        <div className="flex flex-col items-end gap-2 ml-auto md:ml-0">
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <Button variant="outline" size="sm" onClick={() => setShowExport(!showExport)} disabled={exporting || students.length === 0}>
+                <Download className={`mr-2 h-4 w-4 ${exporting ? "animate-pulse" : ""}`} />
+                {exporting ? "Exporting…" : "Export"}
+              </Button>
+              {showExport && (
+                <div className="absolute right-0 top-full z-10 mt-1 w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
+                  <button onClick={() => handleExport("xlsx")} className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"><FileText className="h-4 w-4 text-green-600" /> Excel (.xlsx)</button>
+                  <button onClick={() => handleExport("csv")} className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"><FileText className="h-4 w-4 text-blue-600" /> CSV (.csv)</button>
+                  <button onClick={() => handleExport("pdf")} className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"><FileText className="h-4 w-4 text-red-600" /> PDF (.pdf)</button>
+                </div>
+              )}
+            </div>
+            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing}>
+              <RefreshCw className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`} /> Refresh
             </Button>
-            {showExport && (
-              <div className="absolute right-0 top-full z-10 mt-1 w-44 rounded-lg border border-gray-200 bg-white py-1 shadow-lg">
-                <button
-                  onClick={() => handleExport("xlsx")}
-                  className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                >
-                  <FileText className="h-4 w-4 text-green-600" /> Excel
-                  (.xlsx)
-                </button>
-                <button
-                  onClick={() => handleExport("csv")}
-                  className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                >
-                  <FileText className="h-4 w-4 text-blue-600" /> CSV (.csv)
-                </button>
-                <button
-                  onClick={() => handleExport("pdf")}
-                  className="flex w-full items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                >
-                  <FileText className="h-4 w-4 text-red-600" /> PDF (.pdf)
-                </button>
-              </div>
-            )}
+            <Link href="/school/students/new" className="hidden md:inline-flex">
+              <Button><UserPlus className="mr-2 h-4 w-4" /> Register Student</Button>
+            </Link>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRefresh}
-            disabled={refreshing}
-          >
-            <RefreshCw
-              className={`mr-2 h-4 w-4 ${refreshing ? "animate-spin" : ""}`}
-            />
-            Refresh
-          </Button>
-          <Link href="/school/students/new">
-            <Button>
-              <UserPlus className="mr-2 h-4 w-4" />
-              Register Student
-            </Button>
-          </Link>
-        </div>
           <LearnMoreLink featureId="student_registration" title="Managing Students" />
         </div>
       </div>
@@ -601,610 +243,216 @@ export default function StudentsPage() {
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
             <Users className="h-16 w-16 text-gray-300" />
-            <h3 className="mt-4 text-lg font-semibold text-gray-900">
-              No students registered
-            </h3>
-            <p className="mt-2 max-w-sm text-center text-sm text-gray-500">
-              Register students to generate their unique assessment links
-              and begin the admissions process.
-            </p>
-            <Link href="/school/students/new" className="mt-6">
-              <Button>
-                <UserPlus className="mr-2 h-4 w-4" />
-                Register First Student
-              </Button>
-            </Link>
+            <h3 className="mt-4 text-lg font-semibold text-gray-900">No students registered</h3>
+            <p className="mt-2 max-w-sm text-center text-sm text-gray-500">Register students to generate their unique assessment links and begin the admissions process.</p>
+            <Link href="/school/students/new" className="mt-6"><Button><UserPlus className="mr-2 h-4 w-4" /> Register First Student</Button></Link>
           </CardContent>
         </Card>
       ) : (
-
-        {/* ── MOBILE: card list ── */}
-        <div className="md:hidden space-y-3">
-          {paginated.map((student) => {
-            const sc = statusConfig[student.pipeline_status] || statusConfig.registered
-            const hasSubmission = !!student.submission?.id
-            const isRescoring = rescoring === student.id
-            return (
-              <div key={student.id} className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="font-semibold text-gray-900">{student.first_name} {student.last_name}</p>
-                    <p className="text-xs text-gray-400 font-mono mt-0.5">{student.student_ref}</p>
+        <>
+          {/* ── MOBILE: card list ─────────────────────────────────── */}
+          <div className="md:hidden space-y-3">
+            {paginated.map((student) => {
+              const sc = statusConfig[student.pipeline_status] || statusConfig.registered;
+              const isRescoring = rescoring === student.id;
+              return (
+                <div key={student.id} className="bg-white rounded-xl border border-gray-200 p-4 space-y-3 shadow-sm">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-semibold text-gray-900">{student.first_name} {student.last_name}</p>
+                      <p className="text-xs text-gray-400 font-mono mt-0.5">{student.student_ref}</p>
+                    </div>
+                    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium flex-shrink-0 ${sc.color}`}>
+                      {isRescoring ? "Re-scoring…" : sc.label}
+                    </span>
                   </div>
-                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium flex-shrink-0 ${sc.color}`}>
-                    {isRescoring ? 'Re-scoring…' : sc.label}
-                  </span>
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-xs">
-                  <div>
-                    <p className="text-gray-400 mb-0.5">Grade</p>
-                    <p className="font-semibold text-gray-700">G{student.grade_applied}</p>
+                  <div className="grid grid-cols-3 gap-2 text-xs">
+                    <div>
+                      <p className="text-gray-400 mb-0.5">Grade</p>
+                      <p className="font-semibold text-gray-700">G{student.grade_applied}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 mb-0.5">Score</p>
+                      <p className="font-semibold text-gray-700">
+                        {student.submission?.overall_academic_pct != null ? `${student.submission.overall_academic_pct.toFixed(1)}%` : "—"}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 mb-0.5">Intake</p>
+                      <p className="font-semibold text-gray-700 text-[11px]">
+                        {student.admission_term?.toLowerCase() === "now" ? "Now" : student.admission_year && student.admission_term ? `${student.admission_term} ${student.admission_year}` : "—"}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-gray-400 mb-0.5">Score</p>
-                    <p className="font-semibold text-gray-700">
-                      {student.submission?.overall_academic_pct != null ? `${student.submission.overall_academic_pct.toFixed(1)}%` : '—'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400 mb-0.5">Intake</p>
-                    <p className="font-semibold text-gray-700 text-[11px]">
-                      {student.admission_term?.toLowerCase() === 'now' ? 'Now' : student.admission_year && student.admission_term ? `${student.admission_term} ${student.admission_year}` : '—'}
-                    </p>
-                  </div>
-                </div>
-                {student.submission?.recommendation_band && (
-                  <Badge variant={getRecommendationVariant(student.submission.recommendation_band)} className="text-xs">
-                    {student.submission.recommendation_band}
-                  </Badge>
-                )}
-                <div className="flex items-center gap-3 pt-1 border-t border-gray-100">
-                  {student.jotform_link && student.pipeline_status === 'registered' && (
-                    <button onClick={() => copyLink(student.jotform_link!, student.id)}
-                      className="flex items-center gap-1 text-xs text-[#002ec1] font-medium">
-                      {copied === student.id ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-                      {copied === student.id ? 'Copied!' : 'Copy link'}
-                    </button>
+                  {student.submission?.recommendation_band && (
+                    <Badge variant={getRecommendationVariant(student.submission.recommendation_band)} className="text-xs">
+                      {student.submission.recommendation_band}
+                    </Badge>
                   )}
-                  {student.submission?.id && ['scored','complete','generating_report','report_sent','decided'].includes(student.pipeline_status) && (
-                    <a href={`/report?id=${student.submission.id}`} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-xs text-[#002ec1] font-medium">
-                      <FileText className="h-4 w-4" /> View report
-                    </a>
-                  )}
-                  <button onClick={() => handleDelete(student.id, `${student.first_name} ${student.last_name}`)}
-                    className="ml-auto p-1 text-gray-300 hover:text-red-500">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            )
-          })}
-          {/* Mobile pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-2 px-1">
-              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
-                className="text-sm text-[#002ec1] font-medium disabled:opacity-30">← Prev</button>
-              <span className="text-xs text-gray-400">{currentPage} / {totalPages}</span>
-              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
-                className="text-sm text-[#002ec1] font-medium disabled:opacity-30">Next →</button>
-            </div>
-          )}
-        </div>
-
-        {/* ── DESKTOP: table ── */}
-        <div className="hidden md:block">
-
-        {/* ── MOBILE: card list ── */}
-        <div className="md:hidden space-y-3">
-          {paginated.map((student) => {
-            const sc = statusConfig[student.pipeline_status] || statusConfig.registered
-            const hasSubmission = !!student.submission?.id
-            const isRescoring = rescoring === student.id
-            return (
-              <div key={student.id} className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="font-semibold text-gray-900">{student.first_name} {student.last_name}</p>
-                    <p className="text-xs text-gray-400 font-mono mt-0.5">{student.student_ref}</p>
-                  </div>
-                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium flex-shrink-0 ${sc.color}`}>
-                    {isRescoring ? 'Re-scoring…' : sc.label}
-                  </span>
-                </div>
-                <div className="grid grid-cols-3 gap-2 text-xs">
-                  <div>
-                    <p className="text-gray-400 mb-0.5">Grade</p>
-                    <p className="font-semibold text-gray-700">G{student.grade_applied}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400 mb-0.5">Score</p>
-                    <p className="font-semibold text-gray-700">
-                      {student.submission?.overall_academic_pct != null ? `${student.submission.overall_academic_pct.toFixed(1)}%` : '—'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-gray-400 mb-0.5">Intake</p>
-                    <p className="font-semibold text-gray-700 text-[11px]">
-                      {student.admission_term?.toLowerCase() === 'now' ? 'Now' : student.admission_year && student.admission_term ? `${student.admission_term} ${student.admission_year}` : '—'}
-                    </p>
-                  </div>
-                </div>
-                {student.submission?.recommendation_band && (
-                  <Badge variant={getRecommendationVariant(student.submission.recommendation_band)} className="text-xs">
-                    {student.submission.recommendation_band}
-                  </Badge>
-                )}
-                <div className="flex items-center gap-3 pt-1 border-t border-gray-100">
-                  {student.jotform_link && student.pipeline_status === 'registered' && (
-                    <button onClick={() => copyLink(student.jotform_link!, student.id)}
-                      className="flex items-center gap-1 text-xs text-[#002ec1] font-medium">
-                      {copied === student.id ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
-                      {copied === student.id ? 'Copied!' : 'Copy link'}
-                    </button>
-                  )}
-                  {student.submission?.id && ['scored','complete','generating_report','report_sent','decided'].includes(student.pipeline_status) && (
-                    <a href={`/report?id=${student.submission.id}`} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-1 text-xs text-[#002ec1] font-medium">
-                      <FileText className="h-4 w-4" /> View report
-                    </a>
-                  )}
-                  <button onClick={() => handleDelete(student.id, `${student.first_name} ${student.last_name}`)}
-                    className="ml-auto p-1 text-gray-300 hover:text-red-500">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
-            )
-          })}
-          {/* Mobile pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-2 px-1">
-              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
-                className="text-sm text-[#002ec1] font-medium disabled:opacity-30">← Prev</button>
-              <span className="text-xs text-gray-400">{currentPage} / {totalPages}</span>
-              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
-                className="text-sm text-[#002ec1] font-medium disabled:opacity-30">Next →</button>
-            </div>
-          )}
-        </div>
-
-        {/* ── DESKTOP: table ── */}
-        <div className="hidden md:block">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">
-              All Students ({students.length})
-            </CardTitle>
-            <CardDescription>
-              Click a column header to sort. Click the report icon to view
-              a student&apos;s assessment report.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gray-200 text-left text-gray-500">
-                    <SortHeader
-                      label="Student"
-                      sortKey="name"
-                      currentSort={sortKey}
-                      currentDir={sortDir}
-                      onSort={handleSort}
-                    />
-                    <SortHeader
-                      label="Grade"
-                      sortKey="grade"
-                      currentSort={sortKey}
-                      currentDir={sortDir}
-                      onSort={handleSort}
-                    />
-                    <SortHeader
-                      label="Admission"
-                      sortKey="admission"
-                      currentSort={sortKey}
-                      currentDir={sortDir}
-                      onSort={handleSort}
-                    />
-                    <SortHeader
-                      label="Status"
-                      sortKey="status"
-                      currentSort={sortKey}
-                      currentDir={sortDir}
-                      onSort={handleSort}
-                    />
-                    <SortHeader
-                      label="Score"
-                      sortKey="score"
-                      currentSort={sortKey}
-                      currentDir={sortDir}
-                      onSort={handleSort}
-                    />
-                    <SortHeader
-                      label="Recommendation"
-                      sortKey="recommendation"
-                      currentSort={sortKey}
-                      currentDir={sortDir}
-                      onSort={handleSort}
-                    />
-                    <SortHeader
-                      label="Decision"
-                      sortKey="decision"
-                      currentSort={sortKey}
-                      currentDir={sortDir}
-                      onSort={handleSort}
-                    />
-                    <th className="pb-3 font-medium">Link</th>
-                    <th className="pb-3 font-medium">Report</th>
-                    <th className="pb-3 w-20"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {paginated.map((student) => {
-                    const sc =
-                      statusConfig[student.pipeline_status] ||
-                      statusConfig.registered;
-                    const isRescoring = rescoring === student.id;
-                    const hasSubmission = !!student.submission?.id;
-                    return (
-                      <tr
-                        key={student.id}
-                        className="hover:bg-gray-50"
-                      >
-                        <td className="py-3 font-medium text-gray-900">
-                          <span
-                            className="group relative cursor-default"
-                            title={student.student_ref}
-                          >
-                            {student.first_name} {student.last_name}
-                            <span className="pointer-events-none absolute -top-8 left-0 z-20 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-xs font-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-                              {student.student_ref}
-                            </span>
-                          </span>
-                        </td>
-                        <td className="py-3 text-gray-600">
-                          G{student.grade_applied}
-                        </td>
-                        <td className="py-3 text-gray-600 text-xs">
-                          {editingAdmission === student.id ? (
-                            <select
-                              autoFocus
-                              className="rounded border border-gray-300 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-evalent-500"
-                              defaultValue={student.admission_term && student.admission_year ? `${student.admission_term}|${student.admission_year}` : ""}
-                              onChange={(e) => {
-                                if (e.target.value === "") {
-                                  setEditingAdmission(null);
-                                  return;
-                                }
-                                const [term, yr] = e.target.value.split("|");
-                                updateAdmission(student.id, term, parseInt(yr));
-                              }}
-                              onBlur={() => setEditingAdmission(null)}
-                            >
-                              <option value="">Select…</option>
-                              {admissionTerms.flatMap((term) => {
-                                if (term.toLowerCase() === "now") {
-                                  return [(
-                                    <option key="now" value={`Now|${new Date().getFullYear()}`}>
-                                      Now
-                                    </option>
-                                  )];
-                                }
-                                const currentYear = new Date().getFullYear();
-                                return [currentYear, currentYear + 1, currentYear + 2].map((yr) => (
-                                  <option key={`${term}|${yr}`} value={`${term}|${yr}`}>
-                                    {term} {yr}
-                                  </option>
-                                ));
-                              })}
-                            </select>
-                          ) : (
-                            <span
-                              className="cursor-pointer hover:text-evalent-600 group inline-flex items-center gap-1"
-                              onClick={() => setEditingAdmission(student.id)}
-                            >
-                              {student.admission_term?.toLowerCase() === "now"
-                                ? "Now"
-                                : student.admission_year && student.admission_term
-                                  ? `${student.admission_term} ${student.admission_year}`
-                                  : student.admission_year
-                                    ? String(student.admission_year)
-                                    : "—"}
-                              <svg className="w-3 h-3 text-gray-300 group-hover:text-evalent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                              </svg>
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3">
-                          <span
-                            className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${sc.color}`}
-                          >
-                            {isRescoring ? "Re-scoring…" : sc.label}
-                          </span>
-                        </td>
-                        <td className="py-3 text-gray-600">
-                          {student.submission?.overall_academic_pct !=
-                          null
-                            ? `${student.submission.overall_academic_pct.toFixed(1)}%`
-                            : "—"}
-                        </td>
-                        <td className="py-3">
-                          {student.submission
-                            ?.recommendation_band ? (
-                            <Badge
-                              variant={getRecommendationVariant(
-                                student.submission
-                                  .recommendation_band
-                              )}
-                            >
-                              {
-                                student.submission
-                                  .recommendation_band
-                              }
-                            </Badge>
-                          ) : (
-                            <span className="text-gray-400">
-                              —
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3">
-                          {student.decision ? (
-                            <Badge
-                              variant={getDecisionVariant(
-                                student.decision.decision
-                              )}
-                            >
-                              {formatDecision(
-                                student.decision.decision
-                              )}
-                            </Badge>
-                          ) : student.submission && ["complete", "report_sent"].includes(student.pipeline_status) ? (
-                            resent === student.submission.id ? (
-                              <span className="text-xs text-green-600 font-medium">Sent ✓</span>
-                            ) : (
-                              <button
-                                onClick={() => resendReport(student.submission!.id)}
-                                disabled={resendingReport === student.submission.id}
-                                className="text-xs text-gray-400 hover:text-evalent-600 transition-colors cursor-pointer"
-                              >
-                                {resendingReport === student.submission.id ? "Sending…" : "Resend"}
-                              </button>
-                            )
-                          ) : (
-                            <span className="text-gray-400">
-                              —
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3">
-                          {student.jotform_link &&
-                          student.pipeline_status ===
-                            "registered" ? (
-                            <div className="flex items-center gap-1">
-                              <a
-                                href={student.jotform_link}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-evalent-600 hover:text-evalent-700"
-                              >
-                                <ExternalLink className="h-4 w-4" />
-                              </a>
-                              <button
-                                onClick={() =>
-                                  copyLink(
-                                    student.jotform_link!,
-                                    student.id
-                                  )
-                                }
-                                className="text-gray-400 hover:text-gray-600"
-                              >
-                                {copied === student.id ? (
-                                  <CheckCircle2 className="h-4 w-4 text-green-500" />
-                                ) : (
-                                  <Copy className="h-4 w-4" />
-                                )}
-                              </button>
-                            </div>
-                          ) : (
-                            <span className="text-gray-400 text-xs">
-                              {student.pipeline_status !==
-                              "registered"
-                                ? "Done"
-                                : "—"}
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3">
-                          {student.submission?.id &&
-                          [
-                            "scored",
-                            "complete",
-                            "generating_report",
-                            "report_sent",
-                            "decided",
-                          ].includes(student.pipeline_status) ? (
-                            <a
-                              href={`/report?id=${student.submission.id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-evalent-600 hover:text-evalent-700"
-                            >
-                              <FileText className="h-4 w-4" />
-                            </a>
-                          ) : (
-                            <span className="text-gray-400">
-                              —
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3">
-                          <div className="flex items-center gap-1">
-                            {/* Re-evaluate button (testing tool) */}
-                            <button
-                              onClick={() => handleRescore(student)}
-                              disabled={!hasSubmission || isRescoring}
-                              className={`p-1 transition-colors ${
-                                hasSubmission && !isRescoring
-                                  ? "text-gray-400 hover:text-amber-600"
-                                  : "text-gray-200 cursor-not-allowed"
-                              }`}
-                              title={
-                                hasSubmission
-                                  ? "Re-evaluate (re-run scoring pipeline)"
-                                  : "No submission to re-evaluate"
-                              }
-                            >
-                              <RotateCcw
-                                className={`h-4 w-4 ${isRescoring ? "animate-spin" : ""}`}
-                              />
-                            </button>
-                            {/* Delete button */}
-                            <button
-                              onClick={() =>
-                                handleDelete(
-                                  student.id,
-                                  student.first_name +
-                                    " " +
-                                    student.last_name
-                                )
-                              }
-                              className="p-1 text-gray-400 hover:text-red-600 transition-colors"
-                              title="Delete student"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Pagination */}
-            {sorted.length > 10 && (
-              <div className="flex items-center justify-between border-t border-gray-200 pt-4 mt-4">
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <span>Show</span>
-                  <select
-                    value={rowsPerPage}
-                    onChange={(e) => {
-                      setRowsPerPage(Number(e.target.value));
-                      setCurrentPage(1);
-                    }}
-                    className="rounded border border-gray-300 px-2 py-1 text-sm focus:border-evalent-500 focus:outline-none"
-                  >
-                    {[10, 25, 50, 100].map((n) => (
-                      <option key={n} value={n}>
-                        {n}
-                      </option>
-                    ))}
-                  </select>
-                  <span>per page</span>
-                  <span className="ml-4 text-gray-400">
-                    {startIndex + 1}–
-                    {Math.min(
-                      startIndex + rowsPerPage,
-                      sorted.length
-                    )}{" "}
-                    of {sorted.length}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setCurrentPage(1)}
-                    disabled={currentPage === 1}
-                    className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30 disabled:hover:bg-transparent"
-                  >
-                    <ChevronsUpDown className="h-4 w-4 rotate-90" />
-                  </button>
-                  <button
-                    onClick={() =>
-                      setCurrentPage(currentPage - 1)
-                    }
-                    disabled={currentPage === 1}
-                    className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30 disabled:hover:bg-transparent"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </button>
-
-                  {/* Page numbers */}
-                  {Array.from(
-                    { length: totalPages },
-                    (_, i) => i + 1
-                  )
-                    .filter((page) => {
-                      if (totalPages <= 7) return true;
-                      if (page === 1 || page === totalPages)
-                        return true;
-                      if (Math.abs(page - currentPage) <= 1)
-                        return true;
-                      return false;
-                    })
-                    .reduce<(number | string)[]>(
-                      (acc, page, idx, arr) => {
-                        if (
-                          idx > 0 &&
-                          page - (arr[idx - 1] as number) > 1
-                        ) {
-                          acc.push("...");
-                        }
-                        acc.push(page);
-                        return acc;
-                      },
-                      []
-                    )
-                    .map((item, idx) =>
-                      item === "..." ? (
-                        <span
-                          key={`ellipsis-${idx}`}
-                          className="px-1 text-sm text-gray-400"
-                        >
-                          …
-                        </span>
-                      ) : (
-                        <button
-                          key={item}
-                          onClick={() =>
-                            setCurrentPage(item as number)
-                          }
-                          className={`min-w-[32px] rounded px-2 py-1 text-sm ${
-                            currentPage === item
-                              ? "bg-evalent-600 text-white font-medium"
-                              : "text-gray-600 hover:bg-gray-100"
-                          }`}
-                        >
-                          {item}
-                        </button>
-                      )
+                  <div className="flex items-center gap-3 pt-1 border-t border-gray-100">
+                    {student.jotform_link && student.pipeline_status === "registered" && (
+                      <button onClick={() => copyLink(student.jotform_link!, student.id)} className="flex items-center gap-1 text-xs text-[#002ec1] font-medium">
+                        {copied === student.id ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                        {copied === student.id ? "Copied!" : "Copy link"}
+                      </button>
                     )}
-
-                  <button
-                    onClick={() =>
-                      setCurrentPage(currentPage + 1)
-                    }
-                    disabled={currentPage === totalPages}
-                    className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30 disabled:hover:bg-transparent"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => setCurrentPage(totalPages)}
-                    disabled={currentPage === totalPages}
-                    className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30 disabled:hover:bg-transparent"
-                  >
-                    <ChevronsUpDown className="h-4 w-4 rotate-90" />
-                  </button>
+                    {student.submission?.id && ["scored","complete","generating_report","report_sent","decided"].includes(student.pipeline_status) && (
+                      <a href={`/report?id=${student.submission.id}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-[#002ec1] font-medium">
+                        <FileText className="h-4 w-4" /> View report
+                      </a>
+                    )}
+                    <button onClick={() => handleDelete(student.id, `${student.first_name} ${student.last_name}`)} className="ml-auto p-1 text-gray-300 hover:text-red-500">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
+              );
+            })}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between pt-2 px-1">
+                <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="text-sm text-[#002ec1] font-medium disabled:opacity-30">&#8592; Prev</button>
+                <span className="text-xs text-gray-400">{currentPage} / {totalPages}</span>
+                <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="text-sm text-[#002ec1] font-medium disabled:opacity-30">Next &#8594;</button>
               </div>
             )}
-          </CardContent>
-        </Card>
-        </div>{/* end desktop */}
+          </div>
+
+          {/* ── DESKTOP: table ────────────────────────────────────── */}
+          <div className="hidden md:block">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">All Students ({students.length})</CardTitle>
+                <CardDescription>Click a column header to sort. Click the report icon to view a student&apos;s assessment report.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-200 text-left text-gray-500">
+                        <SortHeader label="Student" sortKey="name" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+                        <SortHeader label="Grade" sortKey="grade" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+                        <SortHeader label="Admission" sortKey="admission" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+                        <SortHeader label="Status" sortKey="status" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+                        <SortHeader label="Score" sortKey="score" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+                        <SortHeader label="Recommendation" sortKey="recommendation" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+                        <SortHeader label="Decision" sortKey="decision" currentSort={sortKey} currentDir={sortDir} onSort={handleSort} />
+                        <th className="pb-3 font-medium">Link</th>
+                        <th className="pb-3 font-medium">Report</th>
+                        <th className="pb-3 w-20"></th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {paginated.map((student) => {
+                        const sc = statusConfig[student.pipeline_status] || statusConfig.registered;
+                        const isRescoring = rescoring === student.id;
+                        const hasSubmission = !!student.submission?.id;
+                        return (
+                          <tr key={student.id} className="hover:bg-gray-50">
+                            <td className="py-3 font-medium text-gray-900">
+                              <span className="group relative cursor-default" title={student.student_ref}>
+                                {student.first_name} {student.last_name}
+                                <span className="pointer-events-none absolute -top-8 left-0 z-20 whitespace-nowrap rounded bg-gray-800 px-2 py-1 text-xs font-normal text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">{student.student_ref}</span>
+                              </span>
+                            </td>
+                            <td className="py-3 text-gray-600">G{student.grade_applied}</td>
+                            <td className="py-3 text-gray-600 text-xs">
+                              {editingAdmission === student.id ? (
+                                <select autoFocus className="rounded border border-gray-300 bg-white px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-evalent-500"
+                                  defaultValue={student.admission_term && student.admission_year ? `${student.admission_term}|${student.admission_year}` : ""}
+                                  onChange={(e) => { if (e.target.value === "") { setEditingAdmission(null); return; } const [term, yr] = e.target.value.split("|"); updateAdmission(student.id, term, parseInt(yr)); }}
+                                  onBlur={() => setEditingAdmission(null)}>
+                                  <option value="">Select…</option>
+                                  {admissionTerms.flatMap((term) => {
+                                    if (term.toLowerCase() === "now") return [<option key="now" value={`Now|${new Date().getFullYear()}`}>Now</option>];
+                                    const currentYear = new Date().getFullYear();
+                                    return [currentYear, currentYear + 1, currentYear + 2].map((yr) => (<option key={`${term}|${yr}`} value={`${term}|${yr}`}>{term} {yr}</option>));
+                                  })}
+                                </select>
+                              ) : (
+                                <span className="cursor-pointer hover:text-evalent-600 group inline-flex items-center gap-1" onClick={() => setEditingAdmission(student.id)}>
+                                  {student.admission_term?.toLowerCase() === "now" ? "Now" : student.admission_year && student.admission_term ? `${student.admission_term} ${student.admission_year}` : student.admission_year ? String(student.admission_year) : "—"}
+                                  <svg className="w-3 h-3 text-gray-300 group-hover:text-evalent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-3">
+                              <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${sc.color}`}>{isRescoring ? "Re-scoring…" : sc.label}</span>
+                            </td>
+                            <td className="py-3 text-gray-600">{student.submission?.overall_academic_pct != null ? `${student.submission.overall_academic_pct.toFixed(1)}%` : "—"}</td>
+                            <td className="py-3">
+                              {student.submission?.recommendation_band ? <Badge variant={getRecommendationVariant(student.submission.recommendation_band)}>{student.submission.recommendation_band}</Badge> : <span className="text-gray-400">—</span>}
+                            </td>
+                            <td className="py-3">
+                              {student.decision ? (
+                                <Badge variant={getDecisionVariant(student.decision.decision)}>{formatDecision(student.decision.decision)}</Badge>
+                              ) : student.submission && ["complete","report_sent"].includes(student.pipeline_status) ? (
+                                resent === student.submission.id ? <span className="text-xs text-green-600 font-medium">Sent ✓</span> : (
+                                  <button onClick={() => resendReport(student.submission!.id)} disabled={resendingReport === student.submission.id} className="text-xs text-gray-400 hover:text-evalent-600 transition-colors cursor-pointer">
+                                    {resendingReport === student.submission.id ? "Sending…" : "Resend"}
+                                  </button>
+                                )
+                              ) : <span className="text-gray-400">—</span>}
+                            </td>
+                            <td className="py-3">
+                              {student.jotform_link && student.pipeline_status === "registered" ? (
+                                <div className="flex items-center gap-1">
+                                  <a href={student.jotform_link} target="_blank" rel="noopener noreferrer" className="text-evalent-600 hover:text-evalent-700"><ExternalLink className="h-4 w-4" /></a>
+                                  <button onClick={() => copyLink(student.jotform_link!, student.id)} className="text-gray-400 hover:text-gray-600">
+                                    {copied === student.id ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                                  </button>
+                                </div>
+                              ) : <span className="text-gray-400 text-xs">{student.pipeline_status !== "registered" ? "Done" : "—"}</span>}
+                            </td>
+                            <td className="py-3">
+                              {student.submission?.id && ["scored","complete","generating_report","report_sent","decided"].includes(student.pipeline_status) ? (
+                                <a href={`/report?id=${student.submission.id}`} target="_blank" rel="noopener noreferrer" className="text-evalent-600 hover:text-evalent-700"><FileText className="h-4 w-4" /></a>
+                              ) : <span className="text-gray-400">—</span>}
+                            </td>
+                            <td className="py-3">
+                              <div className="flex items-center gap-1">
+                                <button onClick={() => handleRescore(student)} disabled={!hasSubmission || isRescoring}
+                                  className={`p-1 transition-colors ${hasSubmission && !isRescoring ? "text-gray-400 hover:text-amber-600" : "text-gray-200 cursor-not-allowed"}`}
+                                  title={hasSubmission ? "Re-evaluate" : "No submission to re-evaluate"}>
+                                  <RotateCcw className={`h-4 w-4 ${isRescoring ? "animate-spin" : ""}`} />
+                                </button>
+                                <button onClick={() => handleDelete(student.id, student.first_name + " " + student.last_name)} className="p-1 text-gray-400 hover:text-red-600 transition-colors" title="Delete student">
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                {sorted.length > 10 && (
+                  <div className="flex items-center justify-between border-t border-gray-200 pt-4 mt-4">
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <span>Show</span>
+                      <select value={rowsPerPage} onChange={(e) => { setRowsPerPage(Number(e.target.value)); setCurrentPage(1); }} className="rounded border border-gray-300 px-2 py-1 text-sm focus:border-evalent-500 focus:outline-none">
+                        {[10, 25, 50, 100].map((n) => <option key={n} value={n}>{n}</option>)}
+                      </select>
+                      <span>per page</span>
+                      <span className="ml-4 text-gray-400">{startIndex + 1}–{Math.min(startIndex + rowsPerPage, sorted.length)} of {sorted.length}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1} className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30"><ChevronsUpDown className="h-4 w-4 rotate-90" /></button>
+                      <button onClick={() => setCurrentPage(currentPage - 1)} disabled={currentPage === 1} className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30"><ChevronLeft className="h-4 w-4" /></button>
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).filter((page) => { if (totalPages <= 7) return true; if (page === 1 || page === totalPages) return true; return Math.abs(page - currentPage) <= 1; }).reduce<(number | string)[]>((acc, page, idx, arr) => { if (idx > 0 && page - (arr[idx - 1] as number) > 1) acc.push("..."); acc.push(page); return acc; }, []).map((item, idx) =>
+                        item === "..." ? <span key={`e-${idx}`} className="px-1 text-sm text-gray-400">…</span> : (
+                          <button key={item} onClick={() => setCurrentPage(item as number)} className={`min-w-[32px] rounded px-2 py-1 text-sm ${currentPage === item ? "bg-evalent-600 text-white font-medium" : "text-gray-600 hover:bg-gray-100"}`}>{item}</button>
+                        )
+                      )}
+                      <button onClick={() => setCurrentPage(currentPage + 1)} disabled={currentPage === totalPages} className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30"><ChevronRight className="h-4 w-4" /></button>
+                      <button onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages} className="rounded p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-30"><ChevronsUpDown className="h-4 w-4 rotate-90" /></button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </>
       )}
     </div>
   );
