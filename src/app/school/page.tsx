@@ -1329,7 +1329,7 @@ export default function SchoolDashboard() {
                 </CardDescription>
               </div>
               {intakePeriods.length > 0 && (
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
                   <button
                     onClick={() => setIntakeFilter("all")}
                     className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
