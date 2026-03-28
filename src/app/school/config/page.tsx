@@ -132,7 +132,8 @@ export default function SchoolConfigPage() {
     try {
       const fd = new FormData(); fd.append("file", file); fd.append("school_id", school.id);
       const res = await fetch("/api/school/logo-upload", { method: "POST", body: fd });
-      if (res.ok) { const { url } = await res.json(); setLogoUrl(url); }
+      if (res.ok) { const { url } = await res.json(); setLogoUrl(url);
+        setLogoTimestamp(Date.now()); }
       else { alert((await res.json()).error || "Failed to upload logo"); }
     } finally { setUploading(false); }
   };
@@ -188,7 +189,7 @@ export default function SchoolConfigPage() {
             <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50 p-4 min-h-[120px]">
               {logoUrl ? (
                 <div className="flex flex-col items-center gap-3">
-                  <img src={logoUrl} alt="School logo" className="max-h-14 max-w-[140px] object-contain"
+                  <img src={`${logoUrl}?t=${logoTimestamp}`} alt="School logo" className="max-h-14 max-w-[140px] object-contain"
                     onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
                   <label className="cursor-pointer text-xs text-evalent-600 hover:text-evalent-700 font-medium">
                     {uploading ? "Uploading…" : "Change logo"}
