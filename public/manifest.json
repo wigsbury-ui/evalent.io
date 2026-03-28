@@ -1,0 +1,28 @@
+{
+  "name": "Evalent — Admissions Intelligence",
+  "short_name": "Evalent",
+  "description": "AI-powered admissions assessment platform for international schools",
+  "start_url": "/school",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#07112e",
+  "theme_color": "#07112e",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "Students",
+      "short_name": "Students",
+      "url": "/school/students",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "url": "/school",
+      "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

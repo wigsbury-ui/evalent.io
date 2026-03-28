@@ -41,7 +41,18 @@ export default function RootLayout({
       lang="en"
       className={`${figtree.variable} ${openSans.variable} ${jetbrainsMono.variable}`}
     >
-      <body className="min-h-screen font-sans">{children}</body>
+      <body className="min-h-screen font-sans">
+        {children}
+        <script dangerouslySetInnerHTML={{ __html: `
+          if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+              navigator.serviceWorker.register('/sw.js')
+                .then(r => console.log('SW registered'))
+                .catch(e => console.log('SW failed', e))
+            })
+          }
+        ` }} />
+      </body>
     </html>
   );
 }
