@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { createServerClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import SchoolsClient from './SchoolsClient'
 
 export const dynamic = 'force-dynamic'
 
@@ -54,7 +55,7 @@ export default async function AdminSchoolsPage() {
         </Link>
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <SchoolsClient initialSchools={schools ?? []} />      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>

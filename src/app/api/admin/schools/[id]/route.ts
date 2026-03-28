@@ -1,39 +1,44 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { createServerClient } from "@/lib/supabase/server";
+import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { createClient } from '@supabase/supabase-js'
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "super_admin") return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const supabase = createServerClient();
-  const { data, error } = await supabase.from("schools").select("*").eq("id", params.id).single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 404 });
-  return NextResponse.json(data);
-}
+// Use service role to bypass RLS for admin deletions
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions);
-  if (!session || session.user.role !== "super_admin") return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const body = await req.json();
-  const supabase = createServerClient();
-  const allowed = ["name","slug","curriculum","locale","contact_email","subscription_tier","tier_cap","is_active"];
-  const updates: Record<string, any> = {};
-  for (const key of allowed) { if (body[key] !== undefined) updates[key] = body[key]; }
-  const { data, error } = await supabase.from("schools").update(updates).eq("id", params.id).select().single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  const session = await getServerSession(authOptions)
+  if (!session || session.user.role !== 'super_admin') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
 
-  const action = body.is_active === false ? "suspend_school"
-               : body.is_active === true  ? "reactivate_school"
-               : "update_school";
-  await supabase.from("audit_log").insert({
-    actor_id: session.user.id,
-    actor_email: session.user.email,
-    action,
-    entity_type: "school",
-    entity_id: params.id,
-    details: updates,
-  });
+  const { id } = params
 
-  return NextResponse.json(data);
+  try {
+    // Delete in order to respect FK constraints
+    await supabase.from('audit_log').delete().eq('entity_id', id)
+    await supabase.from('report_tokens')
+      .delete()
+      .in('submission_id',
+        (await supabase.from('submissions').select('id').eq('school_id', id)).data?.map(s => s.id) ?? []
+      )
+    await supabase.from('submissions').delete().eq('school_id', id)
+    await supabase.from('students').delete().eq('school_id', id)
+    await supabase.from('grade_configs').delete().eq('school_id', id)
+    await supabase.from('users').delete().eq('school_id', id)
+    
+    const { error } = await supabase.from('schools').delete().eq('id', id)
+    if (error) throw error
+
+    return NextResponse.json({ success: true })
+  } catch (err) {
+    console.error('[ADMIN DELETE SCHOOL]', err)
+    return NextResponse.json({ error: String(err) }, { status: 500 })
+  }
 }
