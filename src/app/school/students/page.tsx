@@ -694,6 +694,83 @@ export default function StudentsPage() {
 
         {/* ── DESKTOP: table ── */}
         <div className="hidden md:block">
+
+        {/* ── MOBILE: card list ── */}
+        <div className="md:hidden space-y-3">
+          {paginated.map((student) => {
+            const sc = statusConfig[student.pipeline_status] || statusConfig.registered
+            const hasSubmission = !!student.submission?.id
+            const isRescoring = rescoring === student.id
+            return (
+              <div key={student.id} className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-semibold text-gray-900">{student.first_name} {student.last_name}</p>
+                    <p className="text-xs text-gray-400 font-mono mt-0.5">{student.student_ref}</p>
+                  </div>
+                  <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium flex-shrink-0 ${sc.color}`}>
+                    {isRescoring ? 'Re-scoring…' : sc.label}
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div>
+                    <p className="text-gray-400 mb-0.5">Grade</p>
+                    <p className="font-semibold text-gray-700">G{student.grade_applied}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400 mb-0.5">Score</p>
+                    <p className="font-semibold text-gray-700">
+                      {student.submission?.overall_academic_pct != null ? `${student.submission.overall_academic_pct.toFixed(1)}%` : '—'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400 mb-0.5">Intake</p>
+                    <p className="font-semibold text-gray-700 text-[11px]">
+                      {student.admission_term?.toLowerCase() === 'now' ? 'Now' : student.admission_year && student.admission_term ? `${student.admission_term} ${student.admission_year}` : '—'}
+                    </p>
+                  </div>
+                </div>
+                {student.submission?.recommendation_band && (
+                  <Badge variant={getRecommendationVariant(student.submission.recommendation_band)} className="text-xs">
+                    {student.submission.recommendation_band}
+                  </Badge>
+                )}
+                <div className="flex items-center gap-3 pt-1 border-t border-gray-100">
+                  {student.jotform_link && student.pipeline_status === 'registered' && (
+                    <button onClick={() => copyLink(student.jotform_link!, student.id)}
+                      className="flex items-center gap-1 text-xs text-[#002ec1] font-medium">
+                      {copied === student.id ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+                      {copied === student.id ? 'Copied!' : 'Copy link'}
+                    </button>
+                  )}
+                  {student.submission?.id && ['scored','complete','generating_report','report_sent','decided'].includes(student.pipeline_status) && (
+                    <a href={`/report?id=${student.submission.id}`} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-1 text-xs text-[#002ec1] font-medium">
+                      <FileText className="h-4 w-4" /> View report
+                    </a>
+                  )}
+                  <button onClick={() => handleDelete(student.id, `${student.first_name} ${student.last_name}`)}
+                    className="ml-auto p-1 text-gray-300 hover:text-red-500">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+          {/* Mobile pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-2 px-1">
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}
+                className="text-sm text-[#002ec1] font-medium disabled:opacity-30">← Prev</button>
+              <span className="text-xs text-gray-400">{currentPage} / {totalPages}</span>
+              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}
+                className="text-sm text-[#002ec1] font-medium disabled:opacity-30">Next →</button>
+            </div>
+          )}
+        </div>
+
+        {/* ── DESKTOP: table ── */}
+        <div className="hidden md:block">
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">

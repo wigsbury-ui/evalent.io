@@ -727,7 +727,7 @@ function DomainPerformanceCards({
       <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
         Academic Realms — Student Performance vs Thresholds
       </h3>
-      <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-3 gap-4 items-start">
+      <div className="grid grid-cols-1 sm:grid-cols-1 sm:grid-cols-1 md:grid-cols-3 gap-4 items-start">
         {domains.map((domain) => {
           const isExpanded = expandedDomain === domain.key;
 
@@ -943,7 +943,7 @@ export default function SchoolDashboard() {
       <div className="p-8">
         <div className="animate-pulse space-y-6">
           <div className="h-8 bg-gray-200 rounded w-64" />
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-1 sm:grid-cols-4 gap-4">
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className="h-24 bg-gray-100 rounded-xl" />
             ))}
@@ -1232,7 +1232,7 @@ export default function SchoolDashboard() {
       </div>
 
       {/* ── Row 1: KPI Cards ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <Card className="border-0 shadow-sm">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2 cursor-help relative group">
@@ -1370,7 +1370,7 @@ export default function SchoolDashboard() {
         </Card>
 
         {/* Right column: Donut + Threshold stacked */}
-        <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-1 sm:grid-cols-1 md:grid-cols-2 gap-6">
           {/* Evalent Insights */}
           <Card className="border border-evalent-200 shadow-sm">
             <CardHeader className="pb-2">
@@ -1464,7 +1464,7 @@ export default function SchoolDashboard() {
       />
 
       {/* ── Row 3: Recent Activity + Quick Actions ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-1 sm:grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Activity feed — 2 cols */}
         <Card className="border-0 shadow-sm lg:col-span-2">
           <CardHeader className="pb-2">
