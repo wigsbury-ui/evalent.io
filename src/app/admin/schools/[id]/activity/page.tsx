@@ -72,7 +72,7 @@ export default async function SchoolActivityPage({ params }: { params: { id: str
 
   // If no students found via school_id, fetch via submission student_ids
   if (students.length === 0 && submissions.length > 0) {
-    const studentIds = [...new Set(submissions.map(s => s.student_id).filter(Boolean))]
+    const studentIds = Array.from(new Set(submissions.map(s => s.student_id).filter(Boolean)))
     if (studentIds.length > 0) {
       const { data: studentsViaSubmission } = await supabase
         .from('students')
