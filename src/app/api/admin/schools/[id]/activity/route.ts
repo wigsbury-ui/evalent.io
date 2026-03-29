@@ -16,6 +16,7 @@ export async function GET(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
+
   const { id } = params
 
   const [
@@ -53,9 +54,9 @@ export async function GET(
     }
   }
 
-  const scoredSubmissions = (submissions || []).filter(s => s.overall_academic_pct != null)
-  const avgScore = scoredSubmissions.length > 0
-    ? scoredSubmissions.reduce((sum, s) => sum + (s.overall_academic_pct || 0), 0) / scoredSubmissions.length
+  const scored = (submissions || []).filter(s => s.overall_academic_pct != null)
+  const avgScore = scored.length > 0
+    ? scored.reduce((sum, s) => sum + (s.overall_academic_pct || 0), 0) / scored.length
     : null
 
   return NextResponse.json({
@@ -63,7 +64,7 @@ export async function GET(
     stats: {
       total_students: students?.length || 0,
       total_submissions: submissions?.length || 0,
-      scored: scoredSubmissions.length,
+      scored: scored.length,
       avg_score: avgScore ? Math.round(avgScore * 10) / 10 : null,
       status_counts: statusCounts,
       rec_counts: recCounts,
