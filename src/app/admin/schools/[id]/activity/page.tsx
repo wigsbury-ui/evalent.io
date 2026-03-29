@@ -1,8 +1,14 @@
-'use client'
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { redirect } from 'next/navigation'
+import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
-import { ArrowLeft, Users, FileText, TrendingUp, Clock, Activity, User } from 'lucide-react'
+import { ArrowLeft, Users, FileText, TrendingUp, Activity, User } from 'lucide-react'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
 
 const STATUS_COLORS: Record<string, string> = {
   registered: 'bg-gray-100 text-gray-600',
@@ -35,29 +41,54 @@ function timeAgo(date: string) {
   return 'just now'
 }
 
-export default function SchoolActivityPage({ params }: { params: { id: string } }) {
-  const [data, setData] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+export default async function SchoolActivityPage({ params }: { params: { id: string } }) {
+  const session = await getServerSession(authOptions)
+  if (!session || session.user.role !== 'super_admin') redirect('/login')
 
-  useEffect(() => {
-    fetch(`/api/admin/schools/${params.id}/activity`)
-      .then(r => r.json())
-      .then(d => { setData(d); setLoading(false) })
-      .catch(e => { setError(String(e)); setLoading(false) })
-  }, [params.id])
+  const { id } = params
 
-  if (loading) return (
-    <div className="flex items-center justify-center py-20">
-      <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-600 border-t-transparent" />
-    </div>
-  )
+  const [
+    { data: school },
+    { data: students },
+    { data: submissions },
+    { data: users },
+    { data: auditLog },
+  ] = await Promise.all([
+    supabase.from('schools').select('*').eq('id', id).single(),
+    supabase.from('students').select('id, first_name, last_name, grade_applied, pipeline_status, created_at, admission_term, admission_year').eq('school_id', id).order('created_at', { ascending: false }),
+    supabase.from('submissions').select('id, student_id, overall_academic_pct, recommendation_band, processing_status, created_at').eq('school_id', id).order('created_at', { ascending: false }),
+    supabase.from('users').select('id, name, email, role, created_at, last_sign_in_at').eq('school_id', id),
+    supabase.from('audit_log').select('id, action, actor_email, created_at, details').eq('entity_id', id).order('created_at', { ascending: false }).limit(50),
+  ])
 
-  if (error || data?.error) return (
-    <div className="p-6 text-red-600">Error: {error || data?.error}</div>
-  )
+  if (!school) redirect('/admin/schools')
 
-  const { school, stats, recent_students, users, audit_log } = data
+  // Stats
+  const statusCounts: Record<string, number> = {}
+  for (const s of students || []) {
+    statusCounts[s.pipeline_status] = (statusCounts[s.pipeline_status] || 0) + 1
+  }
+
+  const recCounts: Record<string, number> = {}
+  for (const s of submissions || []) {
+    if (s.recommendation_band) {
+      const key = s.recommendation_band.toLowerCase().includes('ready to admit') ? 'Ready to admit'
+        : s.recommendation_band.toLowerCase().includes('borderline') ? 'Borderline'
+        : s.recommendation_band.toLowerCase().includes('not yet') ? 'Not yet ready'
+        : s.recommendation_band
+      recCounts[key] = (recCounts[key] || 0) + 1
+    }
+  }
+
+  const scoredSubmissions = (submissions || []).filter(s => s.overall_academic_pct != null)
+  const avgScore = scoredSubmissions.length > 0
+    ? scoredSubmissions.reduce((sum, s) => sum + (s.overall_academic_pct || 0), 0) / scoredSubmissions.length
+    : null
+
+  const recentStudents = (students || []).slice(0, 10).map(s => ({
+    ...s,
+    submission: (submissions || []).find(sub => sub.student_id === s.id) || null,
+  }))
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
@@ -76,8 +107,8 @@ export default function SchoolActivityPage({ params }: { params: { id: string } 
             </span>
           </p>
         </div>
-        <div className="ml-auto flex gap-2">
-          <Link href={`/admin/schools/${params.id}`}
+        <div className="ml-auto">
+          <Link href={`/admin/schools/${id}`}
             className="text-sm text-blue-600 hover:text-blue-800 font-medium px-3 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-50">
             Edit school
           </Link>
@@ -87,10 +118,10 @@ export default function SchoolActivityPage({ params }: { params: { id: string } 
       {/* Stat cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Total students', value: stats.total_students, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
-          { label: 'Submissions', value: stats.total_submissions, icon: FileText, color: 'text-purple-600', bg: 'bg-purple-50' },
-          { label: 'Scored', value: stats.scored, icon: TrendingUp, color: 'text-green-600', bg: 'bg-green-50' },
-          { label: 'Avg score', value: stats.avg_score != null ? `${stats.avg_score}%` : '—', icon: Activity, color: 'text-amber-600', bg: 'bg-amber-50' },
+          { label: 'Total students', value: students?.length || 0, icon: Users, color: 'text-blue-600', bg: 'bg-blue-50' },
+          { label: 'Submissions', value: submissions?.length || 0, icon: FileText, color: 'text-purple-600', bg: 'bg-purple-50' },
+          { label: 'Scored', value: scoredSubmissions.length, icon: TrendingUp, color: 'text-green-600', bg: 'bg-green-50' },
+          { label: 'Avg score', value: avgScore != null ? `${Math.round(avgScore * 10) / 10}%` : '—', icon: Activity, color: 'text-amber-600', bg: 'bg-amber-50' },
         ].map(({ label, value, icon: Icon, color, bg }) => (
           <div key={label} className="bg-white border border-gray-200 rounded-xl p-4">
             <div className={`inline-flex items-center justify-center w-9 h-9 rounded-lg ${bg} mb-3`}>
@@ -103,47 +134,44 @@ export default function SchoolActivityPage({ params }: { params: { id: string } 
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
-
-        {/* Pipeline status breakdown */}
+        {/* Pipeline status */}
         <div className="bg-white border border-gray-200 rounded-xl p-5">
           <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4">Pipeline Status</h2>
-          {Object.keys(stats.status_counts).length === 0 ? (
+          {Object.keys(statusCounts).length === 0 ? (
             <p className="text-sm text-gray-400">No students yet</p>
           ) : (
             <div className="space-y-2">
-              {Object.entries(stats.status_counts)
-                .sort(([,a], [,b]) => (b as number) - (a as number))
+              {Object.entries(statusCounts)
+                .sort(([, a], [, b]) => b - a)
                 .map(([status, count]) => (
                   <div key={status} className="flex items-center justify-between">
                     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${STATUS_COLORS[status] || 'bg-gray-100 text-gray-600'}`}>
                       {status.replace(/_/g, ' ')}
                     </span>
-                    <span className="text-sm font-semibold text-gray-700">{count as number}</span>
+                    <span className="text-sm font-semibold text-gray-700">{count}</span>
                   </div>
-                ))
-              }
+                ))}
             </div>
           )}
         </div>
 
-        {/* Recommendation breakdown */}
+        {/* Recommendations */}
         <div className="bg-white border border-gray-200 rounded-xl p-5">
           <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-4">Recommendations</h2>
-          {Object.keys(stats.rec_counts).length === 0 ? (
+          {Object.keys(recCounts).length === 0 ? (
             <p className="text-sm text-gray-400">No scored assessments yet</p>
           ) : (
             <div className="space-y-2">
-              {Object.entries(stats.rec_counts)
-                .sort(([,a], [,b]) => (b as number) - (a as number))
+              {Object.entries(recCounts)
+                .sort(([, a], [, b]) => b - a)
                 .map(([band, count]) => (
                   <div key={band} className="flex items-center justify-between">
                     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${REC_COLORS[band] || 'bg-gray-100 text-gray-600'}`}>
                       {band}
                     </span>
-                    <span className="text-sm font-semibold text-gray-700">{count as number}</span>
+                    <span className="text-sm font-semibold text-gray-700">{count}</span>
                   </div>
-                ))
-              }
+                ))}
             </div>
           )}
         </div>
@@ -152,9 +180,11 @@ export default function SchoolActivityPage({ params }: { params: { id: string } 
       {/* Recent students */}
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Recent Students</h2>
+          <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider">
+            Recent Students ({students?.length || 0} total)
+          </h2>
         </div>
-        {recent_students.length === 0 ? (
+        {recentStudents.length === 0 ? (
           <p className="p-5 text-sm text-gray-400">No students registered yet</p>
         ) : (
           <table className="w-full text-sm">
@@ -164,15 +194,14 @@ export default function SchoolActivityPage({ params }: { params: { id: string } 
                 <th className="text-left px-5 py-3 font-medium text-gray-500">Grade</th>
                 <th className="text-left px-5 py-3 font-medium text-gray-500">Status</th>
                 <th className="text-left px-5 py-3 font-medium text-gray-500">Score</th>
+                <th className="text-left px-5 py-3 font-medium text-gray-500">Recommendation</th>
                 <th className="text-left px-5 py-3 font-medium text-gray-500">Registered</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {recent_students.map((s: any) => (
+              {recentStudents.map((s: any) => (
                 <tr key={s.id} className="hover:bg-gray-50/60">
-                  <td className="px-5 py-3 font-medium text-gray-900">
-                    {s.first_name} {s.last_name}
-                  </td>
+                  <td className="px-5 py-3 font-medium text-gray-900">{s.first_name} {s.last_name}</td>
                   <td className="px-5 py-3 text-gray-500">G{s.grade_applied}</td>
                   <td className="px-5 py-3">
                     <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium capitalize ${STATUS_COLORS[s.pipeline_status] || 'bg-gray-100 text-gray-600'}`}>
@@ -180,9 +209,20 @@ export default function SchoolActivityPage({ params }: { params: { id: string } 
                     </span>
                   </td>
                   <td className="px-5 py-3 text-gray-500">
-                    {s.submission?.overall_academic_pct != null
-                      ? `${s.submission.overall_academic_pct.toFixed(1)}%`
-                      : '—'}
+                    {s.submission?.overall_academic_pct != null ? `${s.submission.overall_academic_pct.toFixed(1)}%` : '—'}
+                  </td>
+                  <td className="px-5 py-3">
+                    {s.submission?.recommendation_band ? (
+                      <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        REC_COLORS[
+                          s.submission.recommendation_band.toLowerCase().includes('ready to admit') ? 'Ready to admit'
+                          : s.submission.recommendation_band.toLowerCase().includes('borderline') ? 'Borderline'
+                          : 'Not yet ready'
+                        ] || 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {s.submission.recommendation_band}
+                      </span>
+                    ) : '—'}
                   </td>
                   <td className="px-5 py-3 text-gray-400 text-xs">{timeAgo(s.created_at)}</td>
                 </tr>
@@ -193,13 +233,12 @@ export default function SchoolActivityPage({ params }: { params: { id: string } 
       </div>
 
       <div className="grid md:grid-cols-2 gap-6">
-
-        {/* Team members */}
+        {/* Team */}
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-100">
             <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Team</h2>
           </div>
-          {users.length === 0 ? (
+          {!users || users.length === 0 ? (
             <p className="p-5 text-sm text-gray-400">No users</p>
           ) : (
             <div className="divide-y divide-gray-50">
@@ -229,11 +268,11 @@ export default function SchoolActivityPage({ params }: { params: { id: string } 
           <div className="px-5 py-4 border-b border-gray-100">
             <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Recent Activity</h2>
           </div>
-          {audit_log.length === 0 ? (
+          {!auditLog || auditLog.length === 0 ? (
             <p className="p-5 text-sm text-gray-400">No activity logged</p>
           ) : (
             <div className="divide-y divide-gray-50 max-h-80 overflow-y-auto">
-              {audit_log.map((entry: any) => (
+              {auditLog.map((entry: any) => (
                 <div key={entry.id} className="flex items-start gap-3 px-5 py-3">
                   <div className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0 mt-1.5" />
                   <div className="flex-1 min-w-0">
@@ -242,9 +281,9 @@ export default function SchoolActivityPage({ params }: { params: { id: string } 
                       {' '}
                       <span className="text-gray-400">{entry.action?.replace(/_/g, ' ')}</span>
                     </p>
-                    {entry.details && Object.keys(entry.details).length > 0 && (
+                    {entry.details && typeof entry.details === 'object' && Object.keys(entry.details).length > 0 && (
                       <p className="text-xs text-gray-400 truncate mt-0.5">
-                        {Object.entries(entry.details).slice(0, 2).map(([k, v]) => `${k}: ${v}`).join(' · ')}
+                        {Object.entries(entry.details).slice(0, 2).map(([k, v]) => `${k}: ${String(v).substring(0, 30)}`).join(' · ')}
                       </p>
                     )}
                   </div>
@@ -254,8 +293,8 @@ export default function SchoolActivityPage({ params }: { params: { id: string } 
             </div>
           )}
         </div>
-
       </div>
+
     </div>
   )
 }
