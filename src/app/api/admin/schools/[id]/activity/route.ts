@@ -59,17 +59,44 @@ export async function GET(
     submission: (submissions || []).find(sub => sub.student_id === s.id) || null,
   }))
 
+  // Debug: get actual student_ids from submissions
+  const submissionStudentIds = (submissions || []).map(s => s.student_id).filter(Boolean)
+  
+  // Try fetching students by their IDs directly (no school_id filter)
+  let studentsById: any[] = []
+  if (submissionStudentIds.length > 0) {
+    const uniqueIds = Array.from(new Set(submissionStudentIds)).slice(0, 50)
+    const { data: byIdData } = await supabase
+      .from('students')
+      .select('id, first_name, last_name, grade_applied, pipeline_status, created_at')
+      .in('id', uniqueIds)
+    studentsById = byIdData || []
+  }
+
+  // Use studentsById if direct school_id query returned nothing
+  const finalStudents = (students?.length || 0) > 0 ? students! : studentsById
+  const finalRecent = finalStudents.slice(0, 10).map(s => ({
+    ...s,
+    submission: (submissions || []).find(sub => sub.student_id === s.id) || null,
+  }))
+
+  const finalStatusCounts: Record<string, number> = {}
+  for (const s of finalStudents) {
+    finalStatusCounts[s.pipeline_status] = (finalStatusCounts[s.pipeline_status] || 0) + 1
+  }
+
   return NextResponse.json({
     school,
+    debug: { submissionStudentIdsCount: submissionStudentIds.length, studentsByIdCount: studentsById.length, directCount: students?.length || 0 },
     stats: {
-      total_students: students?.length || 0,
+      total_students: finalStudents.length,
       total_submissions: submissions?.length || 0,
       scored: scoredSubmissions.length,
       avg_score: avgScore ? Math.round(avgScore * 10) / 10 : null,
-      status_counts: statusCounts,
+      status_counts: finalStatusCounts,
       rec_counts: recCounts,
     },
-    recent_students: recentStudents,
+    recent_students: finalRecent,
     users: users || [],
     audit_log: auditLog || [],
   })
