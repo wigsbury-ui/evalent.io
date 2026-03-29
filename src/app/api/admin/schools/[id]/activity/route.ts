@@ -15,7 +15,7 @@ export async function GET(
   const supabase = createServerClient()
   const { id } = params
 
-  // Fetch school, users, and audit log directly
+  // Fetch school, users and audit log (these work fine)
   const [
     { data: school },
     { data: users },
@@ -26,49 +26,29 @@ export async function GET(
     supabase.from('audit_log').select('id, action, actor_email, created_at, details').eq('entity_id', id).order('created_at', { ascending: false }).limit(50),
   ])
 
-  // Fetch submissions WITH student data joined — avoids separate students RLS issue
-  const { data: submissionsWithStudents } = await supabase
-    .from('submissions')
-    .select(`
-      id,
-      student_id,
-      overall_academic_pct,
-      recommendation_band,
-      processing_status,
-      created_at,
-      students (
-        id,
-        first_name,
-        last_name,
-        grade_applied,
-        pipeline_status,
-        created_at,
-        admission_term,
-        admission_year
-      )
-    `)
-    .eq('school_id', id)
-    .order('created_at', { ascending: false })
-
-  const submissions = submissionsWithStudents || []
-
-  // Extract unique students from the joined data
-  const studentsMap = new Map()
-  for (const sub of submissions) {
-    const st = (sub as any).students
-    if (st && !studentsMap.has(st.id)) {
-      studentsMap.set(st.id, st)
-    }
+  // Use the dashboard API with schoolId override — this bypasses RLS via the session
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.evalent.io'
+  const dashRes = await fetch(`${baseUrl}/api/school/dashboard?schoolId=${id}`, {
+    headers: { cookie: req.headers.get('cookie') || '' }
+  })
+  
+  let pipeline: any[] = []
+  let submissions: any[] = []
+  
+  if (dashRes.ok) {
+    const dash = await dashRes.json()
+    pipeline = dash.pipeline || []
+    // Extract submissions from pipeline students
+    submissions = pipeline
+      .filter((s: any) => s.submission)
+      .map((s: any) => s.submission)
   }
-  const students = Array.from(studentsMap.values())
 
-  // Build status counts from students
   const statusCounts: Record<string, number> = {}
-  for (const s of students) {
+  for (const s of pipeline) {
     statusCounts[s.pipeline_status] = (statusCounts[s.pipeline_status] || 0) + 1
   }
 
-  // Build recommendation counts
   const recCounts: Record<string, number> = {}
   for (const s of submissions) {
     if (s.recommendation_band) {
@@ -80,21 +60,27 @@ export async function GET(
     }
   }
 
-  const scoredSubmissions = submissions.filter(s => s.overall_academic_pct != null)
+  const scoredSubmissions = submissions.filter((s: any) => s.overall_academic_pct != null)
   const avgScore = scoredSubmissions.length > 0
-    ? scoredSubmissions.reduce((sum, s) => sum + (s.overall_academic_pct || 0), 0) / scoredSubmissions.length
+    ? scoredSubmissions.reduce((sum: number, s: any) => sum + (s.overall_academic_pct || 0), 0) / scoredSubmissions.length
     : null
 
-  // Build recent students with their submission
-  const recentStudents = students.slice(0, 10).map(s => ({
-    ...s,
-    submission: submissions.find(sub => sub.student_id === s.id) || null,
+  const recentStudents = pipeline.slice(0, 10).map((s: any) => ({
+    id: s.id,
+    first_name: s.first_name,
+    last_name: s.last_name,
+    grade_applied: s.grade_applied,
+    pipeline_status: s.pipeline_status,
+    created_at: s.created_at,
+    admission_term: s.admission_term,
+    admission_year: s.admission_year,
+    submission: s.submission || null,
   }))
 
   return NextResponse.json({
     school,
     stats: {
-      total_students: students.length,
+      total_students: pipeline.length,
       total_submissions: submissions.length,
       scored: scoredSubmissions.length,
       avg_score: avgScore ? Math.round(avgScore * 10) / 10 : null,
