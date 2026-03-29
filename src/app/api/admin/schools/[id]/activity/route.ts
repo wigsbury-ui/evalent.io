@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { createClient } from '@supabase/supabase-js'
+import { createServerClient } from '@/lib/supabase/server'
 
 export async function GET(
   req: NextRequest,
@@ -12,16 +12,12 @@ export async function GET(
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-
+  const supabase = createServerClient()
   const { id } = params
 
   const [
     { data: school },
-    { data: students },
+    { data: students, error: studentsError },
     { data: submissions },
     { data: users },
     { data: auditLog },
@@ -61,6 +57,7 @@ export async function GET(
 
   return NextResponse.json({
     school,
+    debug: { studentsError: studentsError?.message, studentsCount: students?.length },
     stats: {
       total_students: students?.length || 0,
       total_submissions: submissions?.length || 0,
