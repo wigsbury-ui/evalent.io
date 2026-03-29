@@ -118,6 +118,9 @@ export default function SchoolsClient({ initialSchools }: { initialSchools: Scho
                         <Link href={`/admin/billing?school=${school.id}`} className="text-xs text-gray-400 hover:text-gray-600 font-medium px-2 py-1 rounded hover:bg-gray-50 transition-colors">
                           Billing
                         </Link>
+                        <Link href={`/admin/schools/${school.id}/activity`} className="text-xs text-purple-600 hover:text-purple-800 font-medium px-2 py-1 rounded hover:bg-purple-50 transition-colors">
+                          Activity
+                        </Link>
                         <button
                           onClick={() => setConfirmDelete(school)}
                           className="text-xs text-red-400 hover:text-red-600 font-medium px-2 py-1 rounded hover:bg-red-50 transition-colors"
