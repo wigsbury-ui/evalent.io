@@ -206,7 +206,7 @@ function LoginForm() {
       if (callbackUrl) { router.push(callbackUrl); return; }
       try {
         const s = await fetch("/api/auth/session").then(r => r.json());
-        router.push(s?.user?.role === "school_admin" ? "/school/students" : "/admin");
+        router.push(s?.user?.role === "school_admin" ? "/school" : "/admin");
       } catch { router.push("/admin"); }
     }
   };
