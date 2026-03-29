@@ -5,11 +5,6 @@ import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 import { ArrowLeft, Users, FileText, TrendingUp, Activity, User } from 'lucide-react'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
 const STATUS_COLORS: Record<string, string> = {
   registered: 'bg-gray-100 text-gray-600',
   submitted: 'bg-blue-100 text-blue-700',
@@ -45,11 +40,16 @@ export default async function SchoolActivityPage({ params }: { params: { id: str
   const session = await getServerSession(authOptions)
   if (!session || session.user.role !== 'super_admin') redirect('/login')
 
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+
   const { id } = params
 
   const [
     { data: school },
-    { data: submissionsRaw },
+    { data: submissions },
     { data: users },
     { data: auditLog },
   ] = await Promise.all([
@@ -59,31 +59,33 @@ export default async function SchoolActivityPage({ params }: { params: { id: str
     supabase.from('audit_log').select('id, action, actor_email, created_at, details').eq('entity_id', id).order('created_at', { ascending: false }).limit(50),
   ])
 
-  const submissions = submissionsRaw || []
+  if (!school) redirect('/admin/schools')
 
-  // Fetch students — try school_id first, fall back to fetching by submission student_ids
-  let { data: studentsDirect } = await supabase
-    .from('students')
-    .select('id, first_name, last_name, grade_applied, pipeline_status, created_at, admission_term, admission_year, school_id')
-    .eq('school_id', id)
-    .order('created_at', { ascending: false })
+  // Get unique student IDs from submissions
+  const studentIds = Array.from(new Set(
+    (submissions || []).map(s => s.student_id).filter(Boolean)
+  ))
 
-  let students = studentsDirect || []
-
-  // If no students found via school_id, fetch via submission student_ids
-  if (students.length === 0 && submissions.length > 0) {
-    const studentIds = Array.from(new Set(submissions.map(s => s.student_id).filter(Boolean)))
-    if (studentIds.length > 0) {
-      const { data: studentsViaSubmission } = await supabase
-        .from('students')
-        .select('id, first_name, last_name, grade_applied, pipeline_status, created_at, admission_term, admission_year, school_id')
-        .in('id', studentIds.slice(0, 100))
-        .order('created_at', { ascending: false })
-      students = studentsViaSubmission || []
-    }
+  // Fetch students by their IDs (school_id may not be set for Jotform-registered students)
+  let students: any[] = []
+  if (studentIds.length > 0) {
+    const { data: studentsById } = await supabase
+      .from('students')
+      .select('id, first_name, last_name, grade_applied, pipeline_status, created_at, admission_term, admission_year, school_id')
+      .in('id', studentIds.slice(0, 100))
+      .order('created_at', { ascending: false })
+    students = studentsById || []
   }
 
-  if (!school) redirect('/admin/schools')
+  // Also try direct school_id query in case some students are linked that way
+  if (students.length === 0) {
+    const { data: directStudents } = await supabase
+      .from('students')
+      .select('id, first_name, last_name, grade_applied, pipeline_status, created_at, admission_term, admission_year, school_id')
+      .eq('school_id', id)
+      .order('created_at', { ascending: false })
+    students = directStudents || []
+  }
 
   // Stats
   const statusCounts: Record<string, number> = {}
