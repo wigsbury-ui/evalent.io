@@ -49,17 +49,39 @@ export default async function SchoolActivityPage({ params }: { params: { id: str
 
   const [
     { data: school },
-    { data: students },
-    { data: submissions },
+    { data: submissionsRaw },
     { data: users },
     { data: auditLog },
   ] = await Promise.all([
     supabase.from('schools').select('*').eq('id', id).single(),
-    supabase.from('students').select('id, first_name, last_name, grade_applied, pipeline_status, created_at, admission_term, admission_year').eq('school_id', id).order('created_at', { ascending: false }),
     supabase.from('submissions').select('id, student_id, overall_academic_pct, recommendation_band, processing_status, created_at').eq('school_id', id).order('created_at', { ascending: false }),
     supabase.from('users').select('id, name, email, role, created_at, last_sign_in_at').eq('school_id', id),
     supabase.from('audit_log').select('id, action, actor_email, created_at, details').eq('entity_id', id).order('created_at', { ascending: false }).limit(50),
   ])
+
+  const submissions = submissionsRaw || []
+
+  // Fetch students — try school_id first, fall back to fetching by submission student_ids
+  let { data: studentsDirect } = await supabase
+    .from('students')
+    .select('id, first_name, last_name, grade_applied, pipeline_status, created_at, admission_term, admission_year, school_id')
+    .eq('school_id', id)
+    .order('created_at', { ascending: false })
+
+  let students = studentsDirect || []
+
+  // If no students found via school_id, fetch via submission student_ids
+  if (students.length === 0 && submissions.length > 0) {
+    const studentIds = [...new Set(submissions.map(s => s.student_id).filter(Boolean))]
+    if (studentIds.length > 0) {
+      const { data: studentsViaSubmission } = await supabase
+        .from('students')
+        .select('id, first_name, last_name, grade_applied, pipeline_status, created_at, admission_term, admission_year, school_id')
+        .in('id', studentIds.slice(0, 100))
+        .order('created_at', { ascending: false })
+      students = studentsViaSubmission || []
+    }
+  }
 
   if (!school) redirect('/admin/schools')
 
