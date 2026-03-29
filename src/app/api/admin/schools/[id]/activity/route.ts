@@ -17,22 +17,19 @@ export async function GET(
 
   const [
     { data: school },
-    { data: students, error: studentsError },
+    { data: students },
     { data: submissions },
     { data: users },
     { data: auditLog },
   ] = await Promise.all([
     supabase.from('schools').select('*').eq('id', id).single(),
-    supabase.from('students').select('id, first_name, last_name, grade_applied, pipeline_status, created_at, admission_term, admission_year').eq('school_id', id).order('created_at', { ascending: false }),
+    supabase.from('students').select('id, first_name, last_name, grade_applied, created_at, admission_term, admission_year').eq('school_id', id).order('created_at', { ascending: false }),
     supabase.from('submissions').select('id, student_id, overall_academic_pct, recommendation_band, processing_status, created_at').eq('school_id', id).order('created_at', { ascending: false }),
     supabase.from('users').select('id, name, email, role, created_at, last_sign_in_at').eq('school_id', id),
     supabase.from('audit_log').select('id, action, actor_email, created_at, details').eq('entity_id', id).order('created_at', { ascending: false }).limit(50),
   ])
 
   const statusCounts: Record<string, number> = {}
-  for (const s of students || []) {
-    statusCounts[s.pipeline_status] = (statusCounts[s.pipeline_status] || 0) + 1
-  }
 
   const recentStudents = (students || []).slice(0, 10).map(s => ({
     ...s,
@@ -57,7 +54,6 @@ export async function GET(
 
   return NextResponse.json({
     school,
-    debug: { studentsError: studentsError?.message, studentsCount: students?.length },
     stats: {
       total_students: students?.length || 0,
       total_submissions: submissions?.length || 0,
