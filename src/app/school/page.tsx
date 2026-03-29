@@ -1208,7 +1208,7 @@ export default function SchoolDashboard() {
     <>
       <div className="space-y-6 max-w-[1400px] mx-auto px-6 py-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight" style={{ color: "#1a2b6b" }}>
             {school?.name || "School"} Dashboard
@@ -1217,10 +1217,10 @@ export default function SchoolDashboard() {
             Admissions overview and student progress
           </p>
         </div>
-        <div className="flex flex-col items-end gap-2">
+        <div className="flex flex-col items-start sm:items-end gap-2">
           <Link href="/school/students/new">
             <Button
-              className="text-white"
+              className="text-white w-full sm:w-auto"
               style={{ backgroundColor: "#1a2b6b" }}
             >
               <UserPlus className="w-4 h-4 mr-2" />
